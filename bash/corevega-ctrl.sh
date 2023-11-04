@@ -8,7 +8,7 @@ COREVEGA_RSYNC_PORT=12000
 ## server: run rsync daemon
 run_rsync_daemon()
 {
-    if [ "$EUID" -e 0 ]; then
+    if [ "$EUID" -eq 0 ]; then
         rsync --daemon --config ~/.config/rsync/default.conf -v
     else
         echo "this daemon requires running as super user"
