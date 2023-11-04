@@ -3,15 +3,23 @@
 COREVEGA_FUNCTION=$1
 COREVEGA_IP_ETHERNET="192.168.2.2"
 COREVEGA_RSYNC_PORT=12000
+COREVEGA_HOME=/home/zachvp
 
 ## server: run rsync daemon
 run_rsync_daemon()
 {
-    if [ "$EUID" -eq 0 ]; then
-        rsync --daemon --config ~/.config/rsync/default.conf -v
-    else
-        echo "this daemon requires running as super user"
-    fi
+    COREVEGA_DAEMON_CONFIG_FILE=$COREVEGA_HOME/.config/rsync/default.conf
+	echo "function requires sudo access, continue? [y/N]"
+	read CONTINUE
+	if [ $CONTINUE == "y" ]; then
+    	sudo rsync --daemon --config $COREVEGA_DAEMON_CONFIG_FILE -v
+
+		COREVEGA_RSYNC_PID=`cat $COREVEGA_HOME/developer/state/rsync/rsyncd.pid`
+		echo "daemon running, PID: $COREVEGA_RSYNC_PID"
+		ps aux | grep 'rsync -v --daemon'
+	else
+		echo "user declined to continue"
+	fi
 }
 
 ## client: run rsync
