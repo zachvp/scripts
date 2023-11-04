@@ -13,21 +13,22 @@ run_rsync_daemon()
 ## client: run rsync
 
 ### Preferred: direct ethernet+ssh+daemon transfer
-run_sync_transfer_daemon()
+run_rsync_transfer_daemon()
 {
 	rsync $COREVEGA_MUSIC_MEDIA_SOURCE rsync://zachvp@$COREVEGA_IP_ETHERNET:$COREVEGA_RSYNC_PORT/music --progress -rtvzi --exclude ".*"
 }
 
 ### Simple setup: direct ethernet+ssh transfer
-run_sync_transfer()
+run_rsync_transfer()
 {
 	rsync $COREVEGA_MUSIC_MEDIA_SOURCE zachvp@$COREVEGA_IP_ETHERNET:/media/zachvp/SOL/transfer-rsync/rsync_default --progress -rtvzi --exclude ".*"
 }
 
 ## run container on host port 8000
+run_docker_media_music_stream()
 docker run -dti \
     --publish 8000:4040 \
-    --name="subsonic_custom_network_dns_0" \
+    --name="subsonic_corevega" \
     --hostname corevega-music \
     --network corevega-net \
     --dns 192.168.1.1 \
