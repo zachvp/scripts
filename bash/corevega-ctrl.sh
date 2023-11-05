@@ -9,12 +9,11 @@ COREVEGA_PATH_RSYNC_PID="$COREVEGA_PATH_HOME/developer/state/rsync/rsyncd.pid"
 ## UTIL
 cv_echo()
 {
-	PREFIX="corevega"
-	echo "$PREFIX: $1"
+	echo "corevega: $1"
 }
 
 ## SERVER
-ps_rsync_daemon()
+ps_rsyncd()
 {
 	if [ -e "$COREVEGA_PATH_RSYNC_PID" ]; then
 		cv_echo "daemon PID: $(cat $COREVEGA_PATH_RSYNC_PID)"
@@ -25,20 +24,20 @@ ps_rsync_daemon()
 }
 
 ## run rsync daemon
-start_rsync_daemon()
+start_rsyncd()
 {
     COREVEGA_DAEMON_CONFIG_FILE=$COREVEGA_PATH_HOME/.config/rsync/default.conf
 	cv_echo "function requires sudo access, continue? [y/N]"
 	read CONTINUE
 	if [ $CONTINUE == "y" ]; then
     	sudo rsync --daemon --config $COREVEGA_DAEMON_CONFIG_FILE -v
-		ps_rsync_daemon
+		ps_rsyncd
 	else
 		cv_echo "user declined to continue"
 	fi
 }
 
-stop_rsync_daemon()
+stop_rsyncd()
 {
 	if [ -e "$COREVEGA_PATH_RSYNC_PID" ]; then
 		sudo kill "$(cat $COREVEGA_PATH_RSYNC_PID)"
@@ -88,7 +87,8 @@ run_rsync_transfer()
 }
 
 # MAIN
-# run the function argument
 cv_echo "$COREVEGA_FUNCTION"
+
+# run the provided function argument
 $COREVEGA_FUNCTION
 
