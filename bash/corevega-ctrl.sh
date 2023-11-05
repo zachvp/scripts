@@ -60,6 +60,8 @@ run_docker_media_music_stream()
         -v /media/zachvp/SOL/transfer-rsync/daemon/transfer:/var/music \
         -v /home/zachvp/developer/state/subsonic:/var/subsonic \
         hydria/subsonic:latest
+
+    docker ps
 }
 
 # ===
@@ -69,13 +71,32 @@ run_docker_media_music_stream()
 #### Preferred: direct ethernet+ssh+daemon transfer
 run_rsync_transfer_daemon()
 {
-    COREVEGA_MUSIC_MEDIA_SOURCE=$2
-    COREVEGA_TRANSFER_DEST="rsync://zachvp@$COREVEGA_IP_ETHERNET:$COREVEGA_RSYNC_PORT/music"
+    cv_echo "args: $0 $1 $2 $3"
+    while [[ $# -gt 0 ]]; do case "$3" in
+            -m | --music)
+                cv_echo "selected transfer music"
+                COREVEGA_MUSIC_MEDIA_SOURCE=$2
+                COREVEGA_TRANSFER_DEST="rsync://zachvp@$COREVEGA_IP_ETHERNET:$COREVEGA_RSYNC_PORT/music"
 
-    echo "transfer source: $COREVEGA_MUSIC_MEDIA_SOURCE"
-    echo "transfer destination: $COREVEGA_TRANSFER_DEST"
-	time rsync $COREVEGA_MUSIC_MEDIA_SOURCE $COREVEGA_TRANSFER_DEST \
-        --progress -rtvzi --exclude ".*"
+                cv_echo "transfer source: $COREVEGA_MUSIC_MEDIA_SOURCE"
+                cv_echo "transfer destination: $COREVEGA_TRANSFER_DEST"
+                time rsync $COREVEGA_MUSIC_MEDIA_SOURCE $COREVEGA_TRANSFER_DEST \
+                    --progress -rtvzi --exclude ".*"
+                ;;
+            -p | --prefs)
+                cv_echo "todo: handle prefs flag"
+                ;;
+            *)
+                cv_echo "unknown option: $1"
+                exit 1
+                ;;
+        esac
+        shift
+    done
+            
+
+    
+
 }
 
 #### Simple setup: direct ethernet+ssh transfer
@@ -90,5 +111,5 @@ run_rsync_transfer()
 cv_echo "$COREVEGA_FUNCTION"
 
 # run the provided function argument
-$COREVEGA_FUNCTION
+$COREVEGA_FUNCTION $@
 
