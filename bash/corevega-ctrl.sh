@@ -1,10 +1,10 @@
 #/bin/bash
 
-COREVEGA_FUNCTION=$1
 COREVEGA_IP_ETHERNET="192.168.2.2"
 COREVEGA_RSYNC_PORT=12000
-COREVEGA_PATH_HOME=/home/zachvp
+COREVEGA_PATH_HOME="/home/zachvp"
 COREVEGA_PATH_RSYNC_PID="$COREVEGA_PATH_HOME/developer/state/rsync/rsyncd.pid"
+COREVEGA_USER="zachvp"
 
 ## UTIL
 cv_echo()
@@ -28,8 +28,8 @@ start_rsyncd()
 {
     COREVEGA_DAEMON_CONFIG_FILE=$COREVEGA_PATH_HOME/.config/rsync/default.conf
 	cv_echo "function requires sudo access, continue? [y/N]"
-	read CONTINUE
-	if [ $CONTINUE == "y" ]; then
+	read COREVEGA_CONTINUE
+	if [ $COREVEGA_CONTINUE == "y" ]; then
     	sudo rsync --daemon --config $COREVEGA_DAEMON_CONFIG_FILE -v
 		ps_rsyncd
 	else
@@ -72,22 +72,39 @@ run_docker_media_music_stream()
 run_rsync_transfer_daemon()
 {
     cv_echo "args: $0 $1 $2 $3"
+    COREVEGA_TRANSFER_DEST="rsync://$COREVEGA_USER@$COREVEGA_IP_ETHERNET:$COREVEGA_RSYNC_PORT"
+    COREVEGA_MUSIC_SOURCE=$2
+
     while [[ $# -gt 0 ]]; do case "$3" in
             -m | --music)
                 cv_echo "selected transfer music"
-                COREVEGA_MUSIC_MEDIA_SOURCE=$2
-                COREVEGA_TRANSFER_DEST="rsync://zachvp@$COREVEGA_IP_ETHERNET:$COREVEGA_RSYNC_PORT/music"
-
-                cv_echo "transfer source: $COREVEGA_MUSIC_MEDIA_SOURCE"
-                cv_echo "transfer destination: $COREVEGA_TRANSFER_DEST"
-                time rsync $COREVEGA_MUSIC_MEDIA_SOURCE $COREVEGA_TRANSFER_DEST \
-                    --progress -rtvzi --exclude ".*"
+                cv_echo "transfer source: $COREVEGA_MUSIC_SOURCE"
+                cv_echo "transfer destination: $COREVEGA_TRANSFER_DEST/music"
+                cv_echo "executing: rsync $COREVEGA_MUSIC_SOURCE "$COREVEGA_TRANSFER_DEST/music" "$COREVEGA_TRANSFER_OPT""
+                
+                time rsync $COREVEGA_MUSIC_SOURCE "$COREVEGA_TRANSFER_DEST/music" \
+                    --progress -rtvzi --exclude '.*'
+                exit 0
                 ;;
             -p | --prefs)
-                cv_echo "todo: handle prefs flag"
+                cv_echo "selected transfer prefs"
+                cv_echo "transfer source: $COREVEGA_MUSIC_SOURCE"
+                cv_echo "transfer destination: $COREVEGA_TRANSFER_DEST/music-prefs"
+                
+                cv_echo "continue [Y/n]?"
+                read COREVEGA_CONTINUE
+
+                if [$COREVEGA_CONTINUE == "Y"]; then
+                    time rsync $COREVEGA_MUSIC_SOURCE "$COREVEGA_TRANSFER_DEST/music-prefs" \
+                        --progress -rtvzi --exclude '.*'
+                    exit 0
+                else
+                    cv_echo "exiting"
+                    exit 2
+                fi
                 ;;
             *)
-                cv_echo "unknown option: $1"
+                cv_echo "Unknown flag '$3'. Usage: $0 run_rsync_transfer_daemon -m | -p"
                 exit 1
                 ;;
         esac
@@ -108,8 +125,8 @@ run_rsync_transfer()
 }
 
 # MAIN
-cv_echo "$COREVEGA_FUNCTION"
+cv_echo "$1"
 
 # run the provided function argument
-$COREVEGA_FUNCTION $@
+$1 $@
 
