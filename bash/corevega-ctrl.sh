@@ -12,6 +12,16 @@ cv_echo()
 	echo "corevega: $1"
 }
 
+cv_check_continue()
+{
+    cv_echo "continue [y/N]?"
+    read COREVEGA_CONTINUE
+    if [ "$COREVEGA_CONTINUE" != "y" ]; then
+        cv_echo "exiting"
+        exit 2
+    fi
+}
+
 ## SERVER
 ps_rsyncd()
 {
@@ -68,52 +78,54 @@ run_docker_media_music_stream()
 
 ## CLIENT 
 ### run rsync
+
 #### Preferred: direct ethernet+ssh+daemon transfer
 run_rsync_transfer_daemon()
 {
-    cv_echo "args: $0 $1 $2 $3"
     COREVEGA_TRANSFER_DEST="rsync://$COREVEGA_USER@$COREVEGA_IP_ETHERNET:$COREVEGA_RSYNC_PORT"
-    COREVEGA_MUSIC_SOURCE=$2
+    COREVEGA_ACTION=$2
+    COREVEGA_MUSIC_SOURCE=$3
+    COREVEGA_OPTIONS="--progress -rtvzi"
 
-    while [[ $# -gt 0 ]]; do case "$3" in
-            -m | --music)
+    while [[ $# -gt 0 ]]; do case "$COREVEGA_ACTION" in
+            music)
                 cv_echo "selected transfer music"
                 cv_echo "transfer source: $COREVEGA_MUSIC_SOURCE"
                 cv_echo "transfer destination: $COREVEGA_TRANSFER_DEST/music"
-                cv_echo "executing: rsync $COREVEGA_MUSIC_SOURCE "$COREVEGA_TRANSFER_DEST/music" "$COREVEGA_TRANSFER_OPT""
                 
-                time rsync $COREVEGA_MUSIC_SOURCE "$COREVEGA_TRANSFER_DEST/music" \
-                    --progress -rtvzi --exclude '.*'
+                cv_check_continue
+
+                set -x
+                time rsync "$COREVEGA_MUSIC_SOURCE/" "$COREVEGA_TRANSFER_DEST/music" \
+                    $COREVEGA_OPTIONS \
+                    --exclude '.*'
                 exit 0
+
                 ;;
-            -p | --prefs)
+            prefs)
                 cv_echo "selected transfer prefs"
                 cv_echo "transfer source: $COREVEGA_MUSIC_SOURCE"
-                cv_echo "transfer destination: $COREVEGA_TRANSFER_DEST/music-prefs"
+                cv_echo "transfer destination: $COREVEGA_TRANSFER_DEST/music-prefs/subsonic"
                 
-                cv_echo "continue [Y/n]?"
-                read COREVEGA_CONTINUE
+                cv_check_continue
 
-                if [$COREVEGA_CONTINUE == "Y"]; then
-                    time rsync $COREVEGA_MUSIC_SOURCE "$COREVEGA_TRANSFER_DEST/music-prefs" \
-                        --progress -rtvzi --exclude '.*'
+                set -x
+                # include subsonic.backup      subsonic.data        subsonic.lck         subsonic.log         subsonic.properties  subsonic.script
+                time rsync "$COREVEGA_MUSIC_SOURCE/" "$COREVEGA_TRANSFER_DEST/music-prefs/subsonic" \
+                        $COREVEGA_OPTIONS \
+                        --include 'db/' --include '*.properties' --exclude '*/' --exclude '*.log' --exclude '*.lck'
                     exit 0
-                else
-                    cv_echo "exiting"
-                    exit 2
-                fi
                 ;;
             *)
-                cv_echo "Unknown flag '$3'. Usage: $0 run_rsync_transfer_daemon -m | -p"
+                cv_echo "Unknown argument '$COREVEGA_ACTION'. Usage: $0 run_rsync_transfer_daemon music | prefs <path>"
+                set +x
                 exit 1
                 ;;
         esac
         shift
     done
-            
 
-    
-
+    set +x
 }
 
 #### Simple setup: direct ethernet+ssh transfer
@@ -125,7 +137,7 @@ run_rsync_transfer()
 }
 
 # MAIN
-cv_echo "$1"
+cv_echo "$*"
 
 # run the provided function argument
 $1 $@
