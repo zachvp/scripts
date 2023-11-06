@@ -1,4 +1,7 @@
+# files
 *.zip
 *.DS_Store
+*.swp
+
+# directories
 .vscode/
-.swp
