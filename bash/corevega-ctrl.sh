@@ -60,15 +60,15 @@ stop_rsyncd()
 ## run container on host port 8000
 run_docker_media_music_stream()
 {
-    cv_echo "running subsonic_corevega"
     docker run -dti \
         --publish 8000:4040 \
-        --name="subsonic_corevega" \
+        --name="subsonic_corevega_restore" \
         --hostname corevega-music \
         --network corevega-net \
         --dns 192.168.1.1 \
-        -v /media/zachvp/SOL/transfer-rsync/daemon/transfer:/var/music \
-        -v /home/zachvp/developer/state/subsonic:/var/subsonic \
+        -v /media/zachvp/SOL/transfer-rsync/daemon/music:/Users/zachvp/Library/CloudStorage/OneDrive-Personal/Backups/rekordbox/rekordbox_bak \
+		-v /media/zachvp/SOL/transfer-rsync/daemon/music-prefs/subsonic/subsonic.properties:/var/subsonic/subsonic.properties \
+    	-v /media/zachvp/SOL/transfer-rsync/daemon/music-prefs/subsonic/db:/var/subsonic/db \
         hydria/subsonic:latest
 
     docker ps
