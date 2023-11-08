@@ -1,5 +1,7 @@
 #! /bin/bash
 
+echo "starting script"
+
 RED=15
 GREEN=60
 ORANGE=63
@@ -29,3 +31,5 @@ sendmidi dev "Launch Control XL" ch 1 on 92 $GREEN
 
 # scene playlist actions
 sendmidi dev "Launch Control XL" ch 1 on 108 $ORANGE
+
+echo "done mapping"
