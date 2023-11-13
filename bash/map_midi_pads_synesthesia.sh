@@ -1,5 +1,6 @@
 #! /bin/bash
 
+# TODO: add health check support
 echo "starting script"
 
 RED=15

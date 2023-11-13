@@ -60,6 +60,8 @@ stop_rsyncd()
 ## run container on host port 8000
 run_docker_media_music_stream()
 {
+    # todo: check if container already exists, offer option to run or create new container
+
     docker run -dti \
         --publish 8000:4040 \
         --name="subsonic_corevega_restore" \
