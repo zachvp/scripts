@@ -3,5 +3,8 @@
 *.DS_Store
 *.swp
 
-# directories
+# auto-generated directories
 .vscode/
+
+# custom directories
+data/write/
