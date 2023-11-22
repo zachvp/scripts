@@ -18,7 +18,7 @@ import sys
 import os
 import shutil
 import xml.etree.ElementTree as ET
-from urllib.parse import quote
+from urllib.parse import unquote
 
 def date_path(date: str, mapping: dict) -> str:
     year, month, _ = date.split('-')
@@ -51,26 +51,24 @@ def find_track(path_collection: str, filename: str) -> ET.Element:
     for node in collection:
         node_filename = node.attrib[ATTR_PATH].split('/')[-1]
         # print(f"node_filename: {node_filename}")
-        print(f"{quote(filename)} == {quote(node_filename)}?")
-        if quote(filename) == quote(node_filename):
-            print(f"search for file '{filename}' matches node {node_filename}")
+        # print(f"{unquote(filename)} == {unquote(node_filename)}?")
+        if unquote(filename) == unquote(node_filename):
+            # print(f"search for file '{filename}' matches node {node_filename}")
             return node
+    return None
 
 
 def script(path_root: str, path_collection: str) -> None:
-    
-
     for filename in collect_track_paths(path_root)[:2]:
         # find track in collection
         # extract DateAdded attribute
         # construct new full path using helpers
         # move file to the new full path
-        print(f"finding track {filename}")
         node = find_track(path_collection, filename)
 
         if node is None:
-            print(f"error: unable to find '{filename}' in collection")
-            exit()
+            print(f"fatal error: unable to find '{filename}' in collection, exiting")
+            sys.exit()
 
 # CONSTANTS
 ATTR_DATE_ADDED = 'DateAdded'
@@ -91,22 +89,22 @@ MAPPING_MONTH =\
     7  : 'july',
     8  : 'august',
     9  : 'september',
-    10 : 'october', 
+    10 : 'october',
     11 : 'november',
     12 : 'december',
 }
 
 # MAIN
-test_str =\
+TEST_STR =\
 '''
     <TRACK TrackID="109970693" Name="花と鳥と山" Artist="haircuts for men" Composer="" Album="京都コネクション" Grouping="" Genre="Lounge/Ambient" Kind="AIFF File" Size="84226278" TotalTime="476" DiscNumber="0" TrackNumber="5" Year="2023" AverageBpm="134.00" DateAdded="2023-04-27" BitRate="1411" SampleRate="44100" Comments="8A - 1" PlayCount="1" Rating="0" Location="file://localhost/Volumes/ZVP-MUSIC/DJing/haircuts%20for%20men%20-%20%e8%8a%b1%e3%81%a8%e9%b3%a5%e3%81%a8%e5%b1%b1.aiff" Remixer="" Tonality="8A" Label="" Mix="">
       <TEMPO Inizio="0.126" Bpm="134.00" Metro="4/4" Battito="1" />
     </TRACK>'''
-t = ET.fromstring(test_str)
-print(t.tag)
+t = ET.fromstring(TEST_STR)
+# print(t.tag)
 
 t = full_path(t, '/ZVP-MUSIC/DJing/', MAPPING_MONTH)
 
 # print(collect_track_paths(sys.argv[1])[0])
-print(quote("Planetary%20Assault%20Systems%20-%20Desert%20Races%20(Or.aiff"))
-# print(script(sys.argv[1], sys.argv[2]))
+# print(unquote("Planetary%20Assault%20Systems%20-%20Desert%20Races%20(Or.aiff"))
+script(sys.argv[1], sys.argv[2])
