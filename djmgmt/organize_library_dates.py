@@ -140,11 +140,10 @@ def dev_debug():
     # print(*generate_new_paths(sys.argv[1], spoof_root=sys.argv[2]))
 
 # DEV - TESTING
-SPOOF_ROOT = sys.argv[2]
+SPOOF_ROOT = '/dev/null'
 
 # GLOBALS
 ## Mutable
-VERBOSE = False
 INTERACTIVE = False
 
 ## Read-only
@@ -173,22 +172,30 @@ MAPPING_MONTH =\
 
 # MAIN
 if __name__ == '__main__':
-    if len(sys.argv) > 3:
-        if sys.argv[3] == '-v':
-            VERBOSE = True
-            print('verbose: verbose enabled')
-        elif sys.argv[3] == '-i':
-            print('verbose: interactive enabled')
-            INTERACTIVE = True
-            print(INTERACTIVE)
-            organize(sys.argv[1])
-        elif sys.argv[3] == '--force':
-            organize(sys.argv[1])
-        else:
-            print('error: unrecognized argument: {sys.argv[3]}')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('xml_collection_path', type=str, help='the rekordbox library path containing the DateAdded history')
+    parser.add_argument('spoof_root', type=str, help='the path root to use in place of the path defined in the rekordbox xml')
+    parser.add_argument('-i', '--interactive', action='store_true', help='run script in interactive mode')
+    parser.add_argument('--force', action='store_true', help='force skip any interaction')
+
+    args = parser.parse_args()
+
+    # set globals
+    SPOOF_ROOT = args.spoof_root
+
+    # check switches
+    if args.interactive:
+        print('verbose: interactive enabled')
+        INTERACTIVE = True
+        print(INTERACTIVE)
+        organize(args.xml_collection_path)
+    if args.force:
+        print('verbose: force enabled')
+        organize(args.xml_collection_path)
     else:
         main_choice = input("this is a destructive action, and interactive mode is disabled, continue? [y/N]")
         if main_choice == 'y':
-            organize(sys.argv[1])
+            print('verbose: running organize(_)...')
+            organize(args.xml_collection_path)
         else:
             print("exit: user quit")
