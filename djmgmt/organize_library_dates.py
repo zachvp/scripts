@@ -78,7 +78,7 @@ def generate_new_paths(path_collection: str) -> list:
                     ''')
                 sys.exit()
 
-            lines.append(f"{track_path_old}->{track_path_new}")
+            lines.append(f"{track_path_old}{DELIMITER}{track_path_new}")
         else:
             print(f"warn: track {unquote(node.attrib[ATTR_PATH])} is not in root, will skip")
     return lines
@@ -87,8 +87,7 @@ def organize(path_collection: str) -> None:
     new_paths = generate_new_paths(path_collection)
 
     for path in new_paths:
-        source, dest = path.split('->')
-        # print(f"debug: {path.split('->')}")
+        source, dest = path.split(DELIMITER)
 
         # interactive session
         if INTERACTIVE:
@@ -107,7 +106,7 @@ def organize(path_collection: str) -> None:
 
         # create dir if it doesn't exist
         if not os.path.exists(target_dir_path):
-            # /Users/zachvp/backups/DJing/2021/march/02 Can't Resist (Bimbo Jones Full Mix).aiff
+            # example: /Users/zachvp/backups/DJing/2021/march/02 Can't Resist (Bimbo Jones Full Mix).aiff
             os.makedirs(target_dir_path)
 
         shutil.move(source, dest)
@@ -124,12 +123,10 @@ def dev_debug():
     u = full_path(t, '/ZVP-MUSIC/DJing/', MAPPING_MONTH)
     print(u)
 
-# DEV - TESTING
-SPOOF_ROOT = '/dev/null'
-
 # GLOBALS
 ## Mutable
 INTERACTIVE = False
+SPOOF_ROOT = '/dev/null'
 
 ## Read-only
 ATTR_DATE_ADDED = 'DateAdded'
@@ -172,10 +169,9 @@ if __name__ == '__main__':
     if args.interactive:
         print('verbose: interactive enabled')
         INTERACTIVE = True
-        print(INTERACTIVE)
         organize(args.xml_collection_path)
     if args.force:
-        print('verbose: force enabled')
+        print('verbose: force enabled, running with no guardrails')
         organize(args.xml_collection_path)
     else:
         main_choice = input("this is a destructive action, and interactive mode is disabled, continue? [y/N]")
