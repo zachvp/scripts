@@ -42,18 +42,6 @@ def full_path(node: ET.Element, pivot: str, mapping: dict) -> str:
 
     return f"{path_components[0]}{pivot}{subpath_date}/{path_components[1]}"
 
-def find_track(path_collection: str, filename: str) -> ET.Element | None:
-    collection = WrapETElement(ET.parse(path_collection).getroot().find(XPATH_COLLECTION))
-
-    for node in collection:
-        node_filename = node.attrib[ATTR_PATH].split('/')[-1]
-        # print(f"node_filename: {node_filename}")
-        # print(f"{unquote(filename)} == {unquote(node_filename)}?")
-        if unquote(filename) == unquote(node_filename):
-            # print(f"search for file '{filename}' matches node {node_filename}")
-            return node
-    return None
-
 def collection_path_to_syspath(path: str) -> str:
     path_parts = path.split('/')
 
@@ -135,9 +123,6 @@ def dev_debug():
 
     u = full_path(t, '/ZVP-MUSIC/DJing/', MAPPING_MONTH)
     print(u)
-
-    # print(unquote("Planetary%20Assault%20Systems%20-%20Desert%20Races%20(Or.aiff"))
-    # print(*generate_new_paths(sys.argv[1], spoof_root=sys.argv[2]))
 
 # DEV - TESTING
 SPOOF_ROOT = '/dev/null'
