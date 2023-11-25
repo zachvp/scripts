@@ -176,7 +176,7 @@ if __name__ == '__main__':
     else:
         main_choice = input("this is a destructive action, and interactive mode is disabled, continue? [y/N]")
         if main_choice == 'y':
-            print('verbose: running organize(_)...')
+            print(f"verbose: running organize({args.xml_collection_path})...")
             organize(args.xml_collection_path)
         else:
             print("exit: user quit")
