@@ -1,11 +1,6 @@
 '''
 re-encode tracks
 
-# core command
-ffmpeg -i "/path/to/track.foo"\
-    -ar 44100 -c:a pcm_s16be -write_id3v2 1\
-    path/to/output/file.bar"
-
 '''
 
 import subprocess
@@ -13,8 +8,6 @@ import argparse
 import os
 import sys
 import shlex
-
-
 
 def dev_debug(args: argparse.Namespace) -> None:
     lexed = shlex.split(args.root)
@@ -36,12 +29,27 @@ def process_args() -> argparse.Namespace:
     parser.add_argument('extension', type=str, help='the output extension for each file')
 
     parser.add_argument('--interactive', '-i', action='store_true', help='run the script in interactive mode')
+    parser.add_argument('--verbose', '-v', action='store_true', help='run the script with verbose output')
 
     return parser.parse_args()
 
-def re_encode(args: argparse.Namespace) -> None:
-    # CONSTANTS
+def build_command(args: argparse.Namespace, filename: str, input_path: str) -> list:
+    # core command:
+    # ffmpeg -i /path/to/input.foo -ar 44100 -c:a pcm_s16be -write_id3v2 1 path/to/output.bar
     # ffmpeg options: 44100 Hz sample rate, 16-bit PCM big-endian, write ID3V2 tags
+
+    options_str = '-ar 44100 -c:a pcm_s16be -write_id3v2 1'
+
+    # swap existing extension with the configured one
+    # output_filename = ''.join(filename.split('.')[:-1]) + args.extension
+    output_filename = filename.split('.')
+    output_filename[-1] = args.extension
+
+    output_path = os.path.join(args.output, ''.join(output_filename))
+
+    return ['ffmpeg', '-i', input_path] + shlex.split(options_str) + [output_path]
+
+def re_encode(args: argparse.Namespace) -> None:
     if not args.extension.startswith('.'):
         print(f"error: invalid extension {args.extension}, exiting")
         sys.exit()
@@ -65,13 +73,10 @@ def re_encode(args: argparse.Namespace) -> None:
                 print(f"warn: encountered .wav file: {full_input_path}")
                 continue
 
-            # build the ffmpeg command
-            options_str = '-ar 44100 -c:a pcm_s16be -write_id3v2 1'
-            output_filename = ''.join(name.split('.')[:-1]) + args.extension
-            full_output_path = os.path.join(args.output, output_filename)
-            command = ['ffmpeg', '-i', full_input_path] + shlex.split(options_str) + [full_output_path]
-
-            print(f"will run cmd:\n\t{command}")
+            # build ffmpeg command
+            command = build_command(args, name, full_input_path)
+            if args.verbose:
+                print(f"will run cmd:\n\t{command}")
 
             # interactive mode
             if args.interactive:
@@ -80,11 +85,10 @@ def re_encode(args: argparse.Namespace) -> None:
                     print('exit, user quit')
                     sys.exit()
 
+            # run the ffmpeg command
             try:
-                # command = f"ffmpeg -i '{full_input_path}' -ar 44100 -c:a pcm_s16be -write_id3v2 1 '{full_output_path}'"
-                # command = shlex.split(command_str)
                 subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-                print('success\n')
+                print(f"success: {name}\n")
             except subprocess.CalledProcessError as error:
                 print(f"error subprocess:\n{error.stderr}")
 
