@@ -38,7 +38,7 @@ def build_command(args: argparse.Namespace, filename: str, input_path: str) -> l
     # ffmpeg -i /path/to/input.foo -ar 44100 -c:a pcm_s16be -write_id3v2 1 path/to/output.bar
     # ffmpeg options: 44100 Hz sample rate, 16-bit PCM big-endian, write ID3V2 tags
 
-    options_str = '-ar 44100 -c:a pcm_s16be -write_id3v2 1'
+    options_str = '-ar 44100 -c:a pcm_s16be -write_id3v2 1 -y'
 
     # swap existing extension with the configured one
     # output_filename = ''.join(filename.split('.')[:-1]) + args.extension
@@ -49,6 +49,24 @@ def build_command(args: argparse.Namespace, filename: str, input_path: str) -> l
 
     return ['ffmpeg', '-i', input_path] + shlex.split(options_str) + [output_path]
 
+def check_skip_sample_rate(args: argparse.Namespace, input_path: str):
+    command = shlex.split("ffprobe -v error -show_entries stream=sample_rate -of default=noprint_wrappers=1:nokey=1")
+    command.append(input_path)
+
+    try:
+        if args.verbose:
+            print(f"checking sample rate: {command}")
+        sample_rate = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
+        if args.verbose:
+            print(f"result: {sample_rate.stdout.strip()}")
+        if int(sample_rate.stdout) <= 44100:
+            return True
+    except subprocess.CalledProcessError as error:
+        print(f"fatal error: subprocess:\n{error.stderr}")
+        sys.exit()
+
+    return False
+
 def re_encode(args: argparse.Namespace) -> None:
     if not args.extension.startswith('.'):
         print(f"error: invalid extension {args.extension}, exiting")
@@ -56,21 +74,23 @@ def re_encode(args: argparse.Namespace) -> None:
 
     # main processing loop
     for working_dir, _, filenames in os.walk(args.root):
-        if os.path.dirname(working_dir).startswith('.'):  # working_dir.lstrip('.').lstrip('/').startswith('.'):
-            print(f"skipping hidden dir {os.path.dirname(working_dir)}")
+        if working_dir.lstrip('.').lstrip('/').startswith('.'): # os.path.dirname(working_dir).startswith('.'):  #
+            print(f"skipping hidden dir '{os.path.dirname(working_dir)}'")
             continue
 
         for name in filenames:
-            # print(f"current root: {working_dir}")
             if name.startswith('.'):
                 continue
 
             full_input_path = os.path.join(working_dir, name)
             if not name.endswith('.aiff'):
-                print(f"skip unsupported file: {full_input_path}")
+                print(f"skip unsupported file: '{full_input_path}'")
                 continue
             if name.endswith('.wav'):
-                print(f"warn: encountered .wav file: {full_input_path}")
+                print(f"warn: encountered .wav file: '{full_input_path}'")
+                continue
+            if check_skip_sample_rate(args, full_input_path):
+                print(f"warn: sample rate is optimal, skipping '{full_input_path}'")
                 continue
 
             # build ffmpeg command
@@ -80,7 +100,7 @@ def re_encode(args: argparse.Namespace) -> None:
 
             # interactive mode
             if args.interactive:
-                choice = input("continue? [y/N]")
+                choice = input(f"re-encode '{full_input_path}'? [y/N]")
                 if choice != 'y':
                     print('exit, user quit')
                     sys.exit()
@@ -88,9 +108,10 @@ def re_encode(args: argparse.Namespace) -> None:
             # run the ffmpeg command
             try:
                 subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-                print(f"success: {name}\n")
+                print(f"success: {name}")
             except subprocess.CalledProcessError as error:
                 print(f"error subprocess:\n{error.stderr}")
+            print()
 
     print('finished processing all files')
 
