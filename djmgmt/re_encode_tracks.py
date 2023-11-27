@@ -62,7 +62,7 @@ def check_skip_sample_rate(args: argparse.Namespace, input_path: str):
         if int(sample_rate.stdout) <= 44100:
             return True
     except subprocess.CalledProcessError as error:
-        print(f"fatal error: subprocess:\n{error.stderr}")
+        print(f"fatal error, could not read sample rate: subprocess:\n{error.stderr}")
         sys.exit()
 
     return False
@@ -73,16 +73,21 @@ def re_encode(args: argparse.Namespace) -> None:
         sys.exit()
 
     # main processing loop
-    for working_dir, _, filenames in os.walk(args.root):
-        if working_dir.lstrip('.').lstrip('/').startswith('.'): # os.path.dirname(working_dir).startswith('.'):  #
-            print(f"skipping hidden dir '{os.path.dirname(working_dir)}'")
-            continue
+    for working_dir, dirnames, filenames in os.walk(args.root):
+        # todo: track accumulated file size delta
+
+        # prune hidden directories
+        for i, d in enumerate(dirnames):
+            if d.startswith('.'):
+                del dirnames[i]
 
         for name in filenames:
+            full_input_path = os.path.join(working_dir, name)
+
             if name.startswith('.'):
+                print(f"skip hidden file '{full_input_path}'")
                 continue
 
-            full_input_path = os.path.join(working_dir, name)
             if not name.endswith('.aiff'):
                 print(f"skip unsupported file: '{full_input_path}'")
                 continue
@@ -92,6 +97,8 @@ def re_encode(args: argparse.Namespace) -> None:
             if check_skip_sample_rate(args, full_input_path):
                 print(f"warn: sample rate is optimal, skipping '{full_input_path}'")
                 continue
+
+            continue
 
             # build ffmpeg command
             command = build_command(args, name, full_input_path)
@@ -107,8 +114,8 @@ def re_encode(args: argparse.Namespace) -> None:
 
             # run the ffmpeg command
             try:
-                subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-                print(f"success: {name}")
+                # subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
+                print(f"fake success: {name}")
             except subprocess.CalledProcessError as error:
                 print(f"error subprocess:\n{error.stderr}")
             print()
