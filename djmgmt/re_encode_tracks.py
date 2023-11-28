@@ -9,21 +9,6 @@ import os
 import sys
 import shlex
 
-def dev_debug(args: argparse.Namespace) -> None:
-    lexed = shlex.split(args.root)
-    lexed = ['ffmpeg', '-i', "/Users/zachvp/developer/music/data/tracks/0C9E6352_24-Carat Black - Poverty's Paradis.aiff",\
-    '-ar', '44100', '-c:a', 'pcm_s16be', '-write_id3v2', '1',\
-    '/Users/zachvp/developer/music/data/tracks/re-encoded/manual-testing/lexed.aif']
-    print(f"running: {lexed}")
-
-    try:
-        result = subprocess.run(lexed, check=True, capture_output=True, encoding='utf-8')
-        print(result.stdout.strip())
-    except subprocess.CalledProcessError as error:
-        print(error.stderr.strip())
-
-    sys.exit()
-
 def process_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('root', type=str, help='the root directory to recursively process')
