@@ -33,19 +33,12 @@ def process_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
-def build_command(args: argparse.Namespace, filename: str, input_path: str) -> list:
+def build_command(input_path: str, output_path: str) -> list:
     # core command:
     # ffmpeg -i /path/to/input.foo -ar 44100 -c:a pcm_s16be -write_id3v2 1 path/to/output.bar
     # ffmpeg options: 44100 Hz sample rate, 16-bit PCM big-endian, write ID3V2 tags
 
     options_str = '-ar 44100 -c:a pcm_s16be -write_id3v2 1 -y'
-
-    # swap existing extension with the configured one
-    # output_filename = ''.join(filename.split('.')[:-1]) + args.extension
-    output_filename = filename.split('.')
-    output_filename[-1] = args.extension
-
-    output_path = os.path.join(args.output, ''.join(output_filename))
 
     return ['ffmpeg', '-i', input_path] + shlex.split(options_str) + [output_path]
 
@@ -55,7 +48,7 @@ def check_skip_sample_rate(args: argparse.Namespace, input_path: str):
 
     try:
         if args.verbose:
-            print(f"checking sample rate: {command}")
+            print(f"check sample rate: {command}")
         sample_rate = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
         if args.verbose:
             print(f"result: {sample_rate.stdout.strip()}")
@@ -74,53 +67,59 @@ def re_encode(args: argparse.Namespace) -> None:
 
     # main processing loop
     for working_dir, dirnames, filenames in os.walk(args.root):
-        # todo: track accumulated file size delta
-
         # prune hidden directories
-        for i, d in enumerate(dirnames):
-            if d.startswith('.'):
-                del dirnames[i]
+        for index, directory in enumerate(dirnames):
+            if directory.startswith('.'):
+                del dirnames[index]
 
         for name in filenames:
-            full_input_path = os.path.join(working_dir, name)
+            input_path = os.path.join(working_dir, name)
+            name_split = name.split('.')
 
             if name.startswith('.'):
-                print(f"skip hidden file '{full_input_path}'")
+                print(f"skip hidden file '{input_path}'")
+                continue
+            if not name_split[-1] in { 'aif', 'aiff', 'wav' }:
+                print(f"skip unsupported file: '{input_path}'")
+                continue
+            if not name.endswith('.wav') and check_skip_sample_rate(args, input_path):
+                print(f"warn: optimal sample rate, skip '{input_path}'")
                 continue
 
-            if not name.endswith('.aiff'):
-                print(f"skip unsupported file: '{full_input_path}'")
-                continue
-            if name.endswith('.wav'):
-                print(f"warn: encountered .wav file: '{full_input_path}'")
-                continue
-            if check_skip_sample_rate(args, full_input_path):
-                print(f"warn: sample rate is optimal, skipping '{full_input_path}'")
-                continue
+            # build the output path
+            # swap existing extension with the configured one
+            # output_filename = ''.join(filename.split('.')[:-1]) + args.extension
+            output_filename = name_split.copy()
+            output_filename[-1] = args.extension
 
-            continue
+            output_path = os.path.join(args.output, ''.join(output_filename))
 
             # build ffmpeg command
-            command = build_command(args, name, full_input_path)
+            command = build_command(input_path, output_path)
             if args.verbose:
-                print(f"will run cmd:\n\t{command}")
+                print(f"run cmd:\n\t{command}")
 
             # interactive mode
             if args.interactive:
-                choice = input(f"re-encode '{full_input_path}'? [y/N]")
+                choice = input(f"re-encode '{input_path}'? [y/N]")
                 if choice != 'y':
                     print('exit, user quit')
                     sys.exit()
 
             # run the ffmpeg command
             try:
-                # subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-                print(f"fake success: {name}")
+                subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
+                print(f"success: {output_path}")
             except subprocess.CalledProcessError as error:
                 print(f"error subprocess:\n{error.stderr}")
+
+            # compute input - output size difference after encoding
+            size_diff = os.path.getsize(input_path) / 10**6 - os.path.getsize(output_path) / 10**6
+            size_diff = round(size_diff, 2)
+            print(f"info: file size diff: {size_diff} MB")
             print()
 
-    print('finished processing all files')
+    print('processed all files')
 
 # MAIN
 if __name__ == '__main__':
