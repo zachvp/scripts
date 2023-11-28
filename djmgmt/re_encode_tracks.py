@@ -9,6 +9,8 @@ import os
 import sys
 import shlex
 
+# todo: add docstrings
+
 def process_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('root', type=str, help='the root directory to recursively process')
@@ -29,7 +31,13 @@ def build_command(input_path: str, output_path: str) -> list:
 
     return ['ffmpeg', '-i', input_path] + shlex.split(options_str) + [output_path]
 
+# todo: add common method for sample rate and bit depth
+
 def check_skip_sample_rate(args: argparse.Namespace, input_path: str):
+    # core command:
+    # ffprobe -v error -select_streams a:0 -show_entries stream=sample_rate\
+    #   -of default=noprint_wrappers=1:nokey=1 "path/to/input.foo"
+    # ffprobe options: only log errors, show value in a minimally printed format
     command = shlex.split('ffprobe -v error -show_entries stream=sample_rate -of default=noprint_wrappers=1:nokey=1')
     command.append(input_path)
 
@@ -47,6 +55,10 @@ def check_skip_sample_rate(args: argparse.Namespace, input_path: str):
     return False
 
 def check_skip_bit_depth(args: argparse.Namespace, input_path: str):
+    # core command:
+    # ffprobe -v error -select_streams a:0 -show_entries stream=sample_fmt\
+    #   -of default=noprint_wrappers=1:nokey=1 "path/to/input.foo"
+    # ffprobe options: only log errors, show value in a minimally printed format
     command_format = shlex.split('-of default=noprint_wrappers=1:nokey=1')
     command = shlex.split('ffprobe -v error -select_streams a:0 -show_entries stream=sample_fmt')
     command += command_format
@@ -84,7 +96,7 @@ def re_encode(args: argparse.Namespace) -> None:
             if name.startswith('.'):
                 print(f"info: skip: hidden file '{input_path}'")
                 continue
-            if not name_split[-1] in { 'aif', 'aiff', 'wav' }:
+            if not name_split[-1] in { 'aif', 'aiff', 'wav', }:
                 print(f"info: skip: unsupported file: '{input_path}'")
                 continue
             if not name.endswith('.wav'):
@@ -120,7 +132,7 @@ def re_encode(args: argparse.Namespace) -> None:
                 print(f"error subprocess:\n{error.stderr.strip()}")
 
             # compute input - output size difference after encoding
-            # todo: write each size diff to file
+            # todo: write each size diff to file: '{input_path, output_path : size_diff}'
             size_diff = os.path.getsize(input_path) / 10**6 - os.path.getsize(output_path) / 10**6
             size_diff = round(size_diff, 2)
             print(f"info: file size diff: {size_diff} MB")
