@@ -11,7 +11,9 @@ import shlex
 
 def dev_debug(args: argparse.Namespace) -> None:
     lexed = shlex.split(args.root)
-    lexed = ['ffmpeg', '-i', "/Users/zachvp/developer/music/data/tracks/0C9E6352_24-Carat Black - Poverty's Paradis.aiff", '-ar', '44100', '-c:a', 'pcm_s16be', '-write_id3v2', '1', '/Users/zachvp/developer/music/data/tracks/re-encoded/manual-testing/lexed.aif']
+    lexed = ['ffmpeg', '-i', "/Users/zachvp/developer/music/data/tracks/0C9E6352_24-Carat Black - Poverty's Paradis.aiff",\
+    '-ar', '44100', '-c:a', 'pcm_s16be', '-write_id3v2', '1',\
+    '/Users/zachvp/developer/music/data/tracks/re-encoded/manual-testing/lexed.aif']
     print(f"running: {lexed}")
 
     try:
@@ -43,22 +45,40 @@ def build_command(input_path: str, output_path: str) -> list:
     return ['ffmpeg', '-i', input_path] + shlex.split(options_str) + [output_path]
 
 def check_skip_sample_rate(args: argparse.Namespace, input_path: str):
-    command = shlex.split("ffprobe -v error -show_entries stream=sample_rate -of default=noprint_wrappers=1:nokey=1")
+    command = shlex.split('ffprobe -v error -show_entries stream=sample_rate -of default=noprint_wrappers=1:nokey=1')
     command.append(input_path)
 
     try:
         if args.verbose:
-            print(f"check sample rate: {command}")
-        sample_rate = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
+            print(f"info: check sample rate: {command}")
+        sample_rate = int(subprocess.run(command, check=True, capture_output=True, encoding='utf-8').stdout.strip())
         if args.verbose:
-            print(f"result: {sample_rate.stdout.strip()}")
-        if int(sample_rate.stdout) <= 44100:
-            return True
+            print(f"info: sample rate: {sample_rate}")
+        return sample_rate <= 44100
     except subprocess.CalledProcessError as error:
-        print(f"fatal error, could not read sample rate: subprocess:\n{error.stderr}")
+        print(f"error: fatal: could not read sample rate: subprocess:\n{error.stderr.strip()}")
         sys.exit()
 
     return False
+
+def check_skip_bit_depth(args: argparse.Namespace, input_path: str):
+    command_format = shlex.split('-of default=noprint_wrappers=1:nokey=1')
+    command = shlex.split('ffprobe -v error -select_streams a:0 -show_entries stream=sample_fmt')
+    command += command_format
+    command.append(input_path)
+
+    try:
+        if args.verbose:
+            print(f"info: check bit depth: {command}")
+        bit_depth = int(subprocess.run(command, check=True, capture_output=True, encoding='utf-8')\
+            .stdout.strip().lstrip('s'))
+        if args.verbose:
+            print(f"info: bit depth: {bit_depth}")
+        return bit_depth == 16
+    except subprocess.CalledProcessError as error:
+        print(f"error: fatal: could not read sample rate: subprocess:\n{error.stderr.strip()}")
+        print(f"command: {shlex.join(command)}")
+        sys.exit()
 
 def re_encode(args: argparse.Namespace) -> None:
     if not args.extension.startswith('.'):
@@ -77,18 +97,19 @@ def re_encode(args: argparse.Namespace) -> None:
             name_split = name.split('.')
 
             if name.startswith('.'):
-                print(f"skip hidden file '{input_path}'")
+                print(f"info: skip: hidden file '{input_path}'")
                 continue
             if not name_split[-1] in { 'aif', 'aiff', 'wav' }:
-                print(f"skip unsupported file: '{input_path}'")
+                print(f"info: skip: unsupported file: '{input_path}'")
                 continue
-            if not name.endswith('.wav') and check_skip_sample_rate(args, input_path):
-                print(f"warn: optimal sample rate, skip '{input_path}'")
-                continue
+            if not name.endswith('.wav'):
+                if check_skip_sample_rate(args, input_path) and check_skip_bit_depth(args, input_path):
+                    print(f"info: skip: optimal sample rate and bit depth: '{input_path}'")
+                    continue
 
             # build the output path
+
             # swap existing extension with the configured one
-            # output_filename = ''.join(filename.split('.')[:-1]) + args.extension
             output_filename = name_split.copy()
             output_filename[-1] = args.extension
 
@@ -111,9 +132,10 @@ def re_encode(args: argparse.Namespace) -> None:
                 subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
                 print(f"success: {output_path}")
             except subprocess.CalledProcessError as error:
-                print(f"error subprocess:\n{error.stderr}")
+                print(f"error subprocess:\n{error.stderr.strip()}")
 
             # compute input - output size difference after encoding
+            # todo: write each size diff to file
             size_diff = os.path.getsize(input_path) / 10**6 - os.path.getsize(output_path) / 10**6
             size_diff = round(size_diff, 2)
             print(f"info: file size diff: {size_diff} MB")
