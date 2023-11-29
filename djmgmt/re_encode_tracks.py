@@ -17,11 +17,17 @@ def process_args() -> argparse.Namespace:
     parser.add_argument('output', type=str, help='the output directory to contain all the files in a flat structure')
     parser.add_argument('extension', type=str, help='the output extension for each file')
 
-    parser.add_argument('--storepath', type=str, help='the script storage path to write to')
+    parser.add_argument('--store-path', type=str, help='the script storage path to write to')
+    parser.add_argument('--store-skipped', action='store_true', help='store the skipped files in store path')
     parser.add_argument('--interactive', '-i', action='store_true', help='run the script in interactive mode')
     parser.add_argument('--verbose', '-v', action='store_true', help='run the script with verbose output')
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if args.store_skipped and not args.store_path:
+        parser.error("if option '--store-skipped' is set, option '--store-path' is required")
+
+    return args
 
 def build_command(input_path: str, output_path: str) -> list:
     # core command:
@@ -57,18 +63,18 @@ def check_skip_bit_depth(args: argparse.Namespace, input_path: str) -> bool:
     result = read_ffprobe_value(args, input_path, 'sample_fmt').lstrip('s')
     return False if len(result) < 1 else int(result) <= 16
 
-def setup_storage(args: argparse.Namespace) -> str:
+def setup_storage(args: argparse.Namespace, filename: str) -> str:
     # storage directory setup
-    storage_dir = f"{args.storepath}/write/tsv/"
-    if not os.path.exists(args.storepath):
-        os.makedirs(storage_dir)
     script_path_list = os.path.normpath(__file__).split(os.sep)
-    store_path = os.path.normpath(f"{storage_dir}/{script_path_list[-1].rstrip('.py')}.tsv")
+    storage_dir = f"{args.store_path}/{script_path_list[-1].rstrip('.py')}/"
+    if not os.path.exists(storage_dir):
+        os.makedirs(storage_dir)
+    store_path = os.path.join(storage_dir, filename)
 
     # truncate the file to clear storage
     with open(store_path, 'w', encoding='utf-8'):
         pass
-    print(f"store path: {store_path}")
+    print(f"set up store path: {store_path}")
 
     return store_path
 
@@ -77,9 +83,12 @@ def re_encode(args: argparse.Namespace) -> None:
         print(f"error: fatal: invalid extension {args.extension}, exiting")
         sys.exit()
     size_diff_sum = 0.0
+    skipped_files : list[str] = []
 
-    if args.storepath:
-        store_path = setup_storage(args)
+    if args.store_path:
+        store_path_size = setup_storage(args, 'size-diff.tsv')
+    if args.store_skipped:
+        store_path_skipped = setup_storage(args, 'skipped.tsv')
 
     # main processing loop
     for working_dir, dirnames, filenames in os.walk(args.root):
@@ -97,11 +106,13 @@ def re_encode(args: argparse.Namespace) -> None:
                 continue
             if not name_split[-1] in { 'aif', 'aiff', 'wav', }:
                 print(f"info: skip: unsupported file: '{input_path}'")
+                skipped_files.append(f"{input_path}\n")
                 continue
             if not name.endswith('.wav') and\
             check_skip_sample_rate(args, input_path) and\
             check_skip_bit_depth(args, input_path):
                 print(f"info: skip: optimal sample rate and bit depth: '{input_path}'")
+                skipped_files.append(f"{input_path}\n")
                 continue
 
             # -- build the output path
@@ -134,16 +145,20 @@ def re_encode(args: argparse.Namespace) -> None:
             size_diff = round(size_diff, 2)
             print(f"info: file size diff: {size_diff} MB")
 
-            if args.storepath:
-                with open(store_path, 'a', encoding='utf-8') as store_file:
+            if args.store_path:
+                with open(store_path_size, 'a', encoding='utf-8') as store_file:
                     store_file.write(f"{input_path}\t{output_path}\t{size_diff}\n")
             # newline to separate entries
             print()
-    print("processed all files")
-    if args.storepath:
-        with open(store_path, 'a', encoding='utf-8') as store_file:
+
+    if args.store_path:
+        with open(store_path_size, 'a', encoding='utf-8') as store_file:
             store_file.write(f"\n=>size diff sum: {round(size_diff_sum, 2)}")
+    if args.store_skipped:
+        with open(store_path_skipped, 'a', encoding='utf-8') as store_file:
+            store_file.writelines(skipped_files)
 
 # MAIN
 if __name__ == '__main__':
-    re_encode(process_args())
+    script_args = process_args()
+    re_encode(script_args)

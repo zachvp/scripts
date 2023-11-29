@@ -106,7 +106,6 @@ def organize(path_collection: str) -> None:
 
         # create dir if it doesn't exist
         if not os.path.exists(target_dir_path):
-            # example: /Users/zachvp/backups/DJing/2021/march/02 Can't Resist (Bimbo Jones Full Mix).aiff
             os.makedirs(target_dir_path)
 
         shutil.move(source, dest)
