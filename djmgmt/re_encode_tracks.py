@@ -132,6 +132,7 @@ def re_encode(args: argparse.Namespace) -> None:
         # prune hidden directories
         for index, directory in enumerate(dirnames):
             if directory.startswith('.'):
+                print(f"info: skip: hidden directory '{os.path.join(working_dir, directory)}'")
                 del dirnames[index]
 
         for name in filenames:
