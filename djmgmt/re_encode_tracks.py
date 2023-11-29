@@ -1,6 +1,5 @@
 '''
 re-encode tracks
-
 '''
 
 import subprocess
@@ -9,11 +8,11 @@ import os
 import sys
 import shlex
 
-# todo: add docstrings
-
 def process_args() -> argparse.Namespace:
+    '''Process the script's command line aruments.
+    '''
     parser = argparse.ArgumentParser()
-    parser.add_argument('root', type=str, help='the root directory to recursively process')
+    parser.add_argument('source', type=str, help='the source directory to recursively process')
     parser.add_argument('output', type=str, help='the output directory to contain all the files in a flat structure')
     parser.add_argument('extension', type=str, help='the output extension for each file')
 
@@ -29,15 +28,27 @@ def process_args() -> argparse.Namespace:
 
     return args
 
-def build_command(input_path: str, output_path: str) -> list:
-    # core command:
-    # ffmpeg -i /path/to/input.foo -ar 44100 -c:a pcm_s16be -write_id3v2 1 path/to/output.bar
-    # ffmpeg options: 44100 Hz sample rate, 16-bit PCM big-endian, write ID3V2 tags
+def build_ffmpeg_command(input_path: str, output_path: str) -> list:
+    '''Returns a list of ffmpeg command line arguments that will encode the ``input_path`` to the ``output_path``.
+    Core command:
+        ffmpeg -i /path/to/input.foo -ar 44100 -c:a pcm_s16be -write_id3v2 1 path/to/output.bar
+        ffmpeg options: 44100 Hz sample rate, 16-bit PCM big-endian, write ID3V2 tags
+    '''
     options_str = '-ar 44100 -c:a pcm_s16be -write_id3v2 1 -y'
 
     return ['ffmpeg', '-i', input_path] + shlex.split(options_str) + [output_path]
 
 def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream: str) -> str:
+    '''Uses ffprobe command line tool. Reads the ffprobe value for a particular stream entry.
+
+    Args:
+    `args`        : The script's arguments.
+    `input_path`  : Path to the file to probe.
+    `stream`      : The stream label according to 'ffprobe' documentation.
+
+    Returns:
+    Stripped stdout of the ffprobe command or empty string.
+    '''
     command = shlex.split(f"ffprobe -v error -show_entries stream={stream} -of default=noprint_wrappers=1:nokey=1")
     command.append(input_path)
 
@@ -56,22 +67,30 @@ def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream: str) -
     return ''
 
 def check_skip_sample_rate(args: argparse.Namespace, input_path: str) -> bool:
+    '''Returns `True` if sample rate for `input_path` is at or below the standardized value.
+    '''
     result = read_ffprobe_value(args, input_path, 'sample_rate')
     return False if len(result) < 1 else int(result) <= 44100
 
 def check_skip_bit_depth(args: argparse.Namespace, input_path: str) -> bool:
+    '''Returns `True` if bit depth (aka 'sample format') is at or below the standardized value.
+    '''
     result = read_ffprobe_value(args, input_path, 'sample_fmt').lstrip('s')
     return False if len(result) < 1 else int(result) <= 16
 
 def setup_storage(args: argparse.Namespace, filename: str) -> str:
-    # storage directory setup
+    '''Create or clear a storage file called `filename` at the path specified in `args`.
+
+    Returns:
+    The absolute path to the storage file.
+    '''
     script_path_list = os.path.normpath(__file__).split(os.sep)
-    storage_dir = f"{args.store_path}/{script_path_list[-1].rstrip('.py')}/"
+    storage_dir = os.path.normpath(f"{args.store_path}/{script_path_list[-1].rstrip('.py')}/")
     if not os.path.exists(storage_dir):
         os.makedirs(storage_dir)
-    store_path = os.path.join(storage_dir, filename)
 
-    # truncate the file to clear storage
+    # create the file or clear any existing storage
+    store_path = os.path.join(storage_dir, filename)
     with open(store_path, 'w', encoding='utf-8'):
         pass
     print(f"set up store path: {store_path}")
@@ -79,6 +98,16 @@ def setup_storage(args: argparse.Namespace, filename: str) -> str:
     return store_path
 
 def re_encode(args: argparse.Namespace) -> None:
+    '''Primary script function. Recursively walks the source path specified in `args` to re-encode each eligible file.
+    A file is eligible if:
+        1) It is an uncompressed `aiff` or `wav` type.
+        2) It has a sample rate exceeding 44100 Hz or bit depth exceeding 16 bits.
+
+    All other files are skipped. If `args` is configured properly, the user can store each skipped path in a file.
+
+    If `args` is configured properly, the script can also store each difference in file size before and after re-encoding.
+    '''
+
     if not args.extension.startswith('.'):
         print(f"error: fatal: invalid extension {args.extension}, exiting")
         sys.exit()
@@ -86,12 +115,12 @@ def re_encode(args: argparse.Namespace) -> None:
     skipped_files : list[str] = []
 
     if args.store_path:
-        store_path_size = setup_storage(args, 'size-diff.tsv')
+        store_path_size_diff = setup_storage(args, 'size-diff.tsv')
     if args.store_skipped:
         store_path_skipped = setup_storage(args, 'skipped.tsv')
 
     # main processing loop
-    for working_dir, dirnames, filenames in os.walk(args.root):
+    for working_dir, dirnames, filenames in os.walk(args.source):
         # prune hidden directories
         for index, directory in enumerate(dirnames):
             if directory.startswith('.'):
@@ -130,7 +159,7 @@ def re_encode(args: argparse.Namespace) -> None:
                     break
 
             # -- build and run the ffmpeg encode command
-            command = build_command(input_path, output_path)
+            command = build_ffmpeg_command(input_path, output_path)
             if args.verbose:
                 print(f"run cmd:\n\t{command}")
             try:
@@ -146,19 +175,18 @@ def re_encode(args: argparse.Namespace) -> None:
             print(f"info: file size diff: {size_diff} MB")
 
             if args.store_path:
-                with open(store_path_size, 'a', encoding='utf-8') as store_file:
+                with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
                     store_file.write(f"{input_path}\t{output_path}\t{size_diff}\n")
             # newline to separate entries
             print()
 
     if args.store_path:
-        with open(store_path_size, 'a', encoding='utf-8') as store_file:
-            store_file.write(f"\n=>size diff sum: {round(size_diff_sum, 2)}")
+        with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
+            store_file.write(f"\n=> size diff sum: {round(size_diff_sum, 2)}")
     if args.store_skipped:
         with open(store_path_skipped, 'a', encoding='utf-8') as store_file:
             store_file.writelines(skipped_files)
 
 # MAIN
 if __name__ == '__main__':
-    script_args = process_args()
-    re_encode(script_args)
+    re_encode(process_args())
