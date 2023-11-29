@@ -31,15 +31,14 @@ def build_command(input_path: str, output_path: str) -> list:
 
     return ['ffmpeg', '-i', input_path] + shlex.split(options_str) + [output_path]
 
-# todo: add common method for sample rate and bit depth
-def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream: str) -> int:
+def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream: str) -> str:
     command = shlex.split(f"ffprobe -v error -show_entries stream={stream} -of default=noprint_wrappers=1:nokey=1")
     command.append(input_path)
 
     try:
         if args.verbose:
             print(f"info: read_ffprobe_value: {command}")
-        value = int(subprocess.run(command, check=True, capture_output=True, encoding='utf-8').stdout.strip())
+        value = subprocess.run(command, check=True, capture_output=True, encoding='utf-8').stdout.strip()
         if args.verbose:
             print(f"info: read_ffprobe_value: {value}")
         return value
@@ -48,50 +47,15 @@ def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream: str) -
         print(f"command: {shlex.join(command)}")
         sys.exit()
 
-    return False
+    return ''
 
 def check_skip_sample_rate(args: argparse.Namespace, input_path: str) -> bool:
-    # core command:
-    # ffprobe -v error -select_streams a:0 -show_entries stream=sample_rate\
-    #   -of default=noprint_wrappers=1:nokey=1 "path/to/input.foo"
-    # ffprobe options: only log errors, show value in a minimally printed format
-    command = shlex.split('ffprobe -v error -show_entries stream=sample_rate -of default=noprint_wrappers=1:nokey=1')
-    command.append(input_path)
-
-    try:
-        if args.verbose:
-            print(f"info: check sample rate: {command}")
-        sample_rate = int(subprocess.run(command, check=True, capture_output=True, encoding='utf-8').stdout.strip())
-        if args.verbose:
-            print(f"info: sample rate: {sample_rate}")
-        return sample_rate <= 44100
-    except subprocess.CalledProcessError as error:
-        print(f"error: fatal: could not read sample rate: CalledProcessError:\n{error.stderr.strip()}")
-        print(f"command: {shlex.join(command)}")
-        sys.exit()
-
-    return False
+    result = read_ffprobe_value(args, input_path, 'sample_rate')
+    return False if len(result) < 1 else int(result) <= 44100
 
 def check_skip_bit_depth(args: argparse.Namespace, input_path: str) -> bool:
-    # core command:
-    # ffprobe -v error -select_streams a:0 -show_entries stream=sample_fmt\
-    #   -of default=noprint_wrappers=1:nokey=1 "path/to/input.foo"
-    # ffprobe options: only log errors, show value in a minimally printed format
-    command = shlex.split('ffprobe -v error -show_entries stream=sample_fmt -of default=noprint_wrappers=1:nokey=1')
-    command.append(input_path)
-
-    try:
-        if args.verbose:
-            print(f"info: check bit depth: {command}")
-        bit_depth = int(subprocess.run(command, check=True, capture_output=True, encoding='utf-8')\
-            .stdout.strip().lstrip('s'))
-        if args.verbose:
-            print(f"info: bit depth: {bit_depth}")
-        return bit_depth == 16
-    except subprocess.CalledProcessError as error:
-        print(f"error: fatal: could not read bit depth: CalledProcessError:\n{error.stderr.strip()}")
-        print(f"command: {shlex.join(command)}")
-        sys.exit()
+    result = read_ffprobe_value(args, input_path, 'sample_fmt').lstrip('s')
+    return False if len(result) < 1 else int(result) > 16
 
 def setup_storage(args: argparse.Namespace) -> str:
     # storage file setup
@@ -101,7 +65,7 @@ def setup_storage(args: argparse.Namespace) -> str:
     script_path_list = os.path.normpath(__file__).split(os.sep)
     store_path = os.path.normpath(f"{storage_dir}/{script_path_list[-1].rstrip('.py')}.tsv")
 
-    # truncate the file
+    # truncate the file to clear storage
     with open(store_path, 'w', encoding='utf-8'):
         pass
     print(f"store path: {store_path}")
@@ -139,18 +103,12 @@ def re_encode(args: argparse.Namespace) -> None:
                 print(f"info: skip: optimal sample rate and bit depth: '{input_path}'")
                 continue
 
-            # build the output path
-
+            # -- build the output path
             # swap existing extension with the configured one
             output_filename = name_split.copy()
             output_filename[-1] = args.extension
 
             output_path = os.path.join(args.output, ''.join(output_filename))
-
-            # build ffmpeg command
-            command = build_command(input_path, output_path)
-            if args.verbose:
-                print(f"run cmd:\n\t{command}")
 
             # interactive mode
             if args.interactive:
@@ -159,14 +117,17 @@ def re_encode(args: argparse.Namespace) -> None:
                     print('exit, user quit')
                     break
 
-            # run the ffmpeg command
+            # -- build and run the ffmpeg encode command
+            command = build_command(input_path, output_path)
+            if args.verbose:
+                print(f"run cmd:\n\t{command}")
             try:
                 subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
                 print(f"success: {output_path}")
             except subprocess.CalledProcessError as error:
                 print(f"error subprocess:\n{error.stderr.strip()}")
 
-            # compute input - output size difference after encoding
+            # compute (input - output) size difference after encoding
             size_diff = os.path.getsize(input_path)/10**6 - os.path.getsize(output_path)/10**6
             size_diff_sum += size_diff
             size_diff = round(size_diff, 2)
