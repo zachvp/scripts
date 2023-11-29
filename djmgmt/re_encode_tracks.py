@@ -112,12 +112,20 @@ def re_encode(args: argparse.Namespace) -> None:
         print(f"error: fatal: invalid extension {args.extension}, exiting")
         sys.exit()
     size_diff_sum = 0.0
-    skipped_files : list[str] = []
 
+    # set up storage
     if args.store_path:
         store_path_size_diff = setup_storage(args, 'size-diff.tsv')
     if args.store_skipped:
         store_path_skipped = setup_storage(args, 'skipped.tsv')
+        skipped_files : list[str] = []
+
+    # confirm storage with user
+    if args.interactive and args.store_path:
+        choice = input("storage set up, does everything look okay? [y/N]")
+        if choice != 'y':
+            print("user quit")
+            return
 
     # main processing loop
     for working_dir, dirnames, filenames in os.walk(args.source):
