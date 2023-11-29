@@ -55,12 +55,12 @@ def check_skip_sample_rate(args: argparse.Namespace, input_path: str) -> bool:
 
 def check_skip_bit_depth(args: argparse.Namespace, input_path: str) -> bool:
     result = read_ffprobe_value(args, input_path, 'sample_fmt').lstrip('s')
-    return False if len(result) < 1 else int(result) > 16
+    return False if len(result) < 1 else int(result) <= 16
 
 def setup_storage(args: argparse.Namespace) -> str:
-    # storage file setup
+    # storage directory setup
     storage_dir = f"{args.storepath}/write/tsv/"
-    if len(args.storepath) > 0 and not os.path.exists(args.storepath):
+    if not os.path.exists(args.storepath):
         os.makedirs(storage_dir)
     script_path_list = os.path.normpath(__file__).split(os.sep)
     store_path = os.path.normpath(f"{storage_dir}/{script_path_list[-1].rstrip('.py')}.tsv")
@@ -78,7 +78,8 @@ def re_encode(args: argparse.Namespace) -> None:
         sys.exit()
     size_diff_sum = 0.0
 
-    store_path = setup_storage(args)
+    if args.storepath:
+        store_path = setup_storage(args)
 
     # main processing loop
     for working_dir, dirnames, filenames in os.walk(args.root):
@@ -133,13 +134,15 @@ def re_encode(args: argparse.Namespace) -> None:
             size_diff = round(size_diff, 2)
             print(f"info: file size diff: {size_diff} MB")
 
-            with open(store_path, 'a', encoding='utf-8') as store_file:
-                store_file.write(f"{input_path}\t{output_path}\t{size_diff}\n")
+            if args.storepath:
+                with open(store_path, 'a', encoding='utf-8') as store_file:
+                    store_file.write(f"{input_path}\t{output_path}\t{size_diff}\n")
             # newline to separate entries
             print()
     print("processed all files")
-    with open(store_path, 'a', encoding='utf-8') as store_file:
-        store_file.write(f"\n=>size diff sum: {round(size_diff_sum, 2)}")
+    if args.storepath:
+        with open(store_path, 'a', encoding='utf-8') as store_file:
+            store_file.write(f"\n=>size diff sum: {round(size_diff_sum, 2)}")
 
 # MAIN
 if __name__ == '__main__':
