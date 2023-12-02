@@ -29,7 +29,7 @@ def process_args() -> argparse.Namespace:
     return args
 
 def build_ffmpeg_command(input_path: str, output_path: str) -> list:
-    '''Returns a list of ffmpeg command line arguments that will encode the ``input_path`` to the ``output_path``.
+    '''Returns a list of ffmpeg command line arguments that will encode the `input_path` to the `output_path`.
     Core command:
         ffmpeg -i /path/to/input.foo -ar 44100 -c:a pcm_s16be -write_id3v2 1 path/to/output.bar
         ffmpeg options: 44100 Hz sample rate, 16-bit PCM big-endian, write ID3V2 tags
@@ -141,6 +141,7 @@ def re_encode(args: argparse.Namespace) -> None:
 
             if name.startswith('.'):
                 print(f"info: skip: hidden file '{input_path}'")
+                print(f"info: skip: hidden files are not written to skip storage '{input_path}'")
                 continue
             if not name_split[-1] in { 'aif', 'aiff', 'wav', }:
                 print(f"info: skip: unsupported file: '{input_path}'")
@@ -192,9 +193,11 @@ def re_encode(args: argparse.Namespace) -> None:
     if args.store_path:
         with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
             store_file.write(f"\n=> size diff sum: {round(size_diff_sum, 2)}")
+            print(f"info: wrote cumulative size difference to '{store_path_size_diff}'")
     if args.store_skipped:
         with open(store_path_skipped, 'a', encoding='utf-8') as store_file:
             store_file.writelines(skipped_files)
+            print(f"info: wrote skipped files to '{store_path_skipped}'")
 
 # MAIN
 if __name__ == '__main__':
