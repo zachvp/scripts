@@ -25,6 +25,7 @@ if __name__ == '__main__':
         Expects TSV format.')
     parser.add_argument('output_path', type=str, help='The output path that all files will be written to.')
     parser.add_argument('--column', '-c', type=int, help='The column to process in the input file.')
+    parser.add_argument('--interactive', '-i', action='store_true', help='Run the script in interactive mode.')
 
     args = parser.parse_args()
 
@@ -46,22 +47,25 @@ if __name__ == '__main__':
     with open(args.input_path, 'r', encoding='utf-8') as input_file:
         lines : list[str] = input_file.readlines()
         for line in lines:
-            # os.path.normpath(input_path.strip())
-            input_path = os.path.normpath(line.split()[args.column])
+            if '\t'not in line:
+                print(f"info: skip: no tab on line '{line}' for TSV file {args.input_path}")
+                continue
+            input_path = os.path.normpath(line.split('\t')[args.column])
             if args.function == 'mv':
                 if not os.path.exists(os.path.normpath(args.output_path)):
                     os.makedirs(os.path.normpath(args.output_path))
 
                 new_path = os.path.normpath(f"{args.output_path}/{os.path.basename(input_path)}")
                 if os.path.exists(new_path):
-                    print(f"info: skip: path '{os.path.normpath(args.output_path)}' exists")
+                    print(f"info: skip: path '{new_path}' exists")
                     continue
 
-                choice = input(format_message(f"""input: move
-                    '{os.path.normpath(input_path)}' to '{os.path.normpath(args.output_path)}'
-                    continue? [y/N]"""))
-                if choice != 'y':
-                    print("info: exit: user quit")
-                    break
+                if args.interactive:
+                    choice = input(format_message(f"""input: move
+                        '{os.path.normpath(input_path)}' to '{os.path.normpath(args.output_path)}'
+                        continue? [y/N]"""))
+                    if choice != 'y':
+                        print("info: exit: user quit")
+                        break
 
                 shutil.move(os.path.normpath(input_path), os.path.normpath(args.output_path))
