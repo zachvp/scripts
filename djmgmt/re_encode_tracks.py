@@ -31,7 +31,7 @@ def process_args() -> argparse.Namespace:
 def build_ffmpeg_command(input_path: str, output_path: str) -> list:
     '''Returns a list of ffmpeg command line arguments that will encode the `input_path` to the `output_path`.
     Core command:
-        ffmpeg -i /path/to/input.foo -ar 44100 -c:a pcm_s16be -write_id3v2 1 path/to/output.bar
+        ffmpeg -i /path/to/input.foo -ar 44100 -c:a pcm_s16be -write_id3v2 1 -y path/to/output.bar
         ffmpeg options: 44100 Hz sample rate, 16-bit PCM big-endian, write ID3V2 tags
     '''
     options_str = '-ar 44100 -c:a pcm_s16be -write_id3v2 1 -y'
@@ -137,13 +137,13 @@ def re_encode(args: argparse.Namespace) -> None:
 
         for name in filenames:
             input_path = os.path.join(working_dir, name)
-            name_split = name.split('.')
+            name_split = os.path.splitext(name)
 
             if name.startswith('.'):
                 print(f"info: skip: hidden file '{input_path}'")
                 print(f"info: skip: hidden files are not written to skip storage '{input_path}'")
                 continue
-            if not name_split[-1] in { 'aif', 'aiff', 'wav', }:
+            if name_split[1] not in { '.aif', '.aiff', '.wav', }:
                 print(f"info: skip: unsupported file: '{input_path}'")
                 skipped_files.append(f"{input_path}\n")
                 continue
@@ -156,10 +156,13 @@ def re_encode(args: argparse.Namespace) -> None:
 
             # -- build the output path
             # swap existing extension with the configured one
-            output_filename = name_split.copy()
-            output_filename[-1] = args.extension
-
+            output_filename = name_split[0] + args.extension
             output_path = os.path.join(args.output, ''.join(output_filename))
+
+            if os.path.basename(input_path) != os.path.basename(output_path):
+                choice = input(f"warn: {os.path.basename(input_path)} != {os.path.basename(output_path)}. Continue? [y/N]")
+                print('exit, user quit')
+                break
 
             # interactive mode
             if args.interactive:
