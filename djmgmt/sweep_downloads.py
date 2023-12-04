@@ -124,10 +124,10 @@ if __name__ == '__main__':
 
     script_args = parse_args(FUNCTIONS)
 
-    if script_args.function == 'sweep':
+    if script_args.function == FUNCTION_SWEEP:
         print(f"user chose function {script_args.function}")
         sweep(script_args)
-    elif script_args.function == 'flatten':
+    elif script_args.function == FUNCTION_FLATTEN:
         print(f"user chose function {script_args.function}")
         flatten_hierarchy(script_args)
         # flatten_zip(script_args.input, script_args.output)
