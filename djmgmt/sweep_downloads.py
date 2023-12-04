@@ -13,12 +13,6 @@ import os
 import shutil
 import zipfile
 
-# CONSTANTS
-FUNCTION_SWEEP = 'sweep'
-FUNCTION_FLATTEN = 'flatten'
-FUNCTIONS = {FUNCTION_FLATTEN, FUNCTION_SWEEP}
-
-# todo: move this to main procedure and flesh out more fully
 def flatten_zip(zip_path: str, extract_path: str) -> None:
     print(f"output dir: {os.path.join(extract_path, os.path.splitext(os.path.basename(zip_path))[0])}")
     with zipfile.ZipFile(zip_path, 'r') as file:
@@ -28,25 +22,51 @@ def flatten_zip(zip_path: str, extract_path: str) -> None:
         for name in filenames:
             print(f"move from {os.path.join(working_dir, name)} to {extract_path}")
             shutil.move(os.path.join(working_dir, name), extract_path)
-    shutil.rmtree(unzipped_path)
+    if os.path.exists(unzipped_path) and len(os.listdir(unzipped_path)) < 1:
+        print(f"info: remove empty unzipped path {unzipped_path}")
+        shutil.rmtree(unzipped_path)
 
-def flatten_hierarchy(top_path: str, output_path: str) -> None:
-    for working_dir, directories, filenames in os.walk(top_path):
+def flatten_hierarchy(args: argparse.Namespace) -> None:
+    for working_dir, directories, filenames in os.walk(args.input):
         prune(working_dir, directories, filenames)
 
         for name in filenames:
             input_path = os.path.join(working_dir, name)
+            output_path = os.path.join(args.output, name)
             if os.path.splitext(name)[1] == '.zip':
-                # flatten_zip(os.path.join(working_dir, name), output_path)
-                print(f"flatten zip: {input_path, output_path}")
-            elif not os.path.exists(os.path.join(output_path, name)):
-                print(f"move file {input_path} to {os.path.join(output_path, name)}")
+                print(f"flatten zip: {input_path, args.output}")
+                if args.interactive:
+                    choice = input('Continue? [y/N/q]')
+                    if choice == 'q':
+                        print('info: user quit')
+                        return
+                    if choice != 'y' or choice in 'nN':
+                        print(f"info: skip: {input_path}")
+                        continue
+                flatten_zip(os.path.join(working_dir, name), args.output)
+            elif not os.path.exists(output_path):
+                print(f"move '{input_path}' to '{output_path}'")
+                if args.interactive:
+                    choice = input('Continue? [y/N/q]')
+                    if choice == 'q':
+                        print('info: user quit')
+                        return
+                    if choice != 'y' or choice in 'nN':
+                        print(f"info: skip: {input_path}")
+                        continue
+                shutil.move(input_path, output_path)
             else:
                 print(f"info: skip: {input_path}")
 
+def is_prefix_match(value: str, prefixes: set[str]) -> bool:
+    for prefix in prefixes:
+        if value.startswith(prefix):
+            return True
+    return False
+
 def prune(working_dir: str, directories: list[str], filenames: list[str]) -> None:
     for index, directory in enumerate(directories):
-        if directory.startswith('.') or '.app' in directory:
+        if is_prefix_match(directory, {'.', '_'}) or '.app' in directory:
             print(f"info: skip: hidden directory or '.app' archive '{os.path.join(working_dir, directory)}'")
             del directories[index]
     for index, name in enumerate(filenames):
@@ -63,19 +83,24 @@ def sweep(args: argparse.Namespace) -> None:
             output_path = os.path.join(args.output, name)
             name_split = os.path.splitext(name)
 
-            if name_split[1] in {'.mp3', '.wav', '.aif', '.aiff', 'flac'} or\
-            (name_split[1] == '.zip' and (name_split[0].startswith('beatport_tracks') or name.startswith('juno_download'))):
-                print(f"info: filter matched file '{os.path.join(working_dir, name)}'")
-                choice = input(f"info: will move from '{input_path}' to '{output_path}'. Continue? [y/N]")
-                if choice != 'y':
-                    print('info: skip: user skipped file')
-                    continue
+            is_valid_archive = name_split[1] == '.zip' and is_prefix_match(name, {'beatport_tracks', 'juno_download'})
+            if name_split[1] in {'.mp3', '.wav', '.aif', '.aiff', 'flac'} or is_valid_archive:
+                print(f"info: filter matched file '{input_path}'")
+                if args.interactive:
+                    print(f"info: move from '{input_path}' to '{output_path}'")
+                    choice = input('Continue? [y/N/q]')
+                    if choice == 'q':
+                        print('info: user quit')
+                        return
+                    if choice != 'y' or choice in 'nN':
+                        print('info: skip: user skipped file')
+                        continue
                 shutil.move(input_path, output_path)
     print("swept all files")
 
-def parse_args() -> argparse.Namespace:
+def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('function', type=str, help=f"The script function to run. One of '{FUNCTIONS}'")
+    parser.add_argument('function', type=str, help=f"The script function to run. One of '{valid_functions}'")
     parser.add_argument('input', type=str, help='The input directory to sweep.')
     parser.add_argument('output', type=str, help='The output directory to place the swept tracks.')
     parser.add_argument('--zip-filter', type=str )
@@ -83,7 +108,7 @@ def parse_args() -> argparse.Namespace:
 
     args = parser.parse_args()
 
-    if args.function not in FUNCTIONS:
+    if args.function not in valid_functions:
         parser.error(f"invalid function '{args.function}'")
 
     args.input = os.path.normpath(args.input)
@@ -92,12 +117,17 @@ def parse_args() -> argparse.Namespace:
     return args
 
 if __name__ == '__main__':
-    script_args = parse_args()
+    # CONSTANTS
+    FUNCTION_SWEEP = 'sweep'
+    FUNCTION_FLATTEN = 'flatten'
+    FUNCTIONS = {FUNCTION_FLATTEN, FUNCTION_SWEEP}
+
+    script_args = parse_args(FUNCTIONS)
 
     if script_args.function == 'sweep':
-        print('fake sweep')
-        # sweep(script_args)
+        print(f"user chose function {script_args.function}")
+        sweep(script_args)
     elif script_args.function == 'flatten':
-        print('fake flatten')
-        flatten_hierarchy(script_args.input, script_args.output)
+        print(f"user chose function {script_args.function}")
+        flatten_hierarchy(script_args)
         # flatten_zip(script_args.input, script_args.output)
