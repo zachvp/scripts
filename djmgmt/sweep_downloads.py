@@ -100,11 +100,10 @@ def sweep(args: argparse.Namespace) -> None:
 
 def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('function', type=str, help=f"The script function to run. One of '{valid_functions}'")
+    parser.add_argument('function', type=str, help=f"Which script function to run. One of '{valid_functions}'.")
     parser.add_argument('input', type=str, help='The input directory to sweep.')
     parser.add_argument('output', type=str, help='The output directory to place the swept tracks.')
-    parser.add_argument('--zip-filter', type=str )
-    parser.add_argument('--interactive', '-i', action='store_true')
+    parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode')
 
     args = parser.parse_args()
 
@@ -130,4 +129,3 @@ if __name__ == '__main__':
     elif script_args.function == FUNCTION_FLATTEN:
         print(f"user chose function {script_args.function}")
         flatten_hierarchy(script_args)
-        # flatten_zip(script_args.input, script_args.output)
