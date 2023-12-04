@@ -24,8 +24,8 @@ if __name__ == '__main__':
     parser.add_argument('input_path', type=str, help='The input path to the file containing the list of paths.\
         Expects TSV format.')
     parser.add_argument('output_path', type=str, help='The output path that all files will be written to.')
-    parser.add_argument('--column', '-c', type=int, help='The column to process in the input file.')
-    parser.add_argument('--interactive', '-i', action='store_true', help='Run the script in interactive mode.')
+    parser.add_argument('--column', '-c', type=int, help="The column to process in the input file. Defaults to '0'")
+    parser.add_argument('--interactive', '-i', action='store_true', help="Run the script in interactive mode. Defaults to 'False'")
 
     args = parser.parse_args()
 
@@ -54,6 +54,9 @@ if __name__ == '__main__':
             if args.function == 'mv':
                 if not os.path.exists(os.path.normpath(args.output_path)):
                     os.makedirs(os.path.normpath(args.output_path))
+                if not os.path.exists(input_path):
+                    print(f"info: skip: input path '{input_path} does not exist.'")
+                    continue
 
                 new_path = os.path.normpath(f"{args.output_path}/{os.path.basename(input_path)}")
                 if os.path.exists(new_path):
