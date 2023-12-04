@@ -159,10 +159,11 @@ def re_encode(args: argparse.Namespace) -> None:
             output_filename = name_split[0] + args.extension
             output_path = os.path.join(args.output, ''.join(output_filename))
 
-            if os.path.basename(input_path) != os.path.basename(output_path):
-                choice = input(f"warn: {os.path.basename(input_path)} != {os.path.basename(output_path)}. Continue? [y/N]")
-                print('exit, user quit')
-                break
+            if os.path.splitext(os.path.basename(input_path))[0] != os.path.splitext(os.path.basename(output_path))[0]:
+                choice = input(f"warn: mismatched file names for '{input_path}' and '{output_path}'. Continue? [y/N]")
+                if choice != 'y' or choice in 'nN':
+                    print('exit, user quit')
+                    break
 
             # interactive mode
             if args.interactive:
@@ -195,7 +196,7 @@ def re_encode(args: argparse.Namespace) -> None:
 
     if args.store_path:
         with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
-            store_file.write(f"\n=> size diff sum: {round(size_diff_sum, 2)}")
+            store_file.write(f"\n=> size diff sum: {round(size_diff_sum, 2)} MB")
             print(f"info: wrote cumulative size difference to '{store_path_size_diff}'")
     if args.store_skipped:
         with open(store_path_skipped, 'a', encoding='utf-8') as store_file:
