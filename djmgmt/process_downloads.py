@@ -17,6 +17,7 @@ def flatten_zip(zip_path: str, extract_path: str) -> None:
     print(f"output dir: {os.path.join(extract_path, os.path.splitext(os.path.basename(zip_path))[0])}")
     with zipfile.ZipFile(zip_path, 'r') as file:
         file.extractall(os.path.normpath(extract_path))
+
     unzipped_path = os.path.join(extract_path, os.path.splitext(os.path.basename(zip_path))[0])
     for working_dir, _, filenames in os.walk(unzipped_path):
         for name in filenames:
@@ -26,15 +27,22 @@ def flatten_zip(zip_path: str, extract_path: str) -> None:
         print(f"info: remove empty unzipped path {unzipped_path}")
         shutil.rmtree(unzipped_path)
 
-def flatten_hierarchy(args: argparse.Namespace) -> None:
+def extract(args: argparse.Namespace) -> None:
     for working_dir, directories, filenames in os.walk(args.input):
         prune(working_dir, directories, filenames)
 
         for name in filenames:
             input_path = os.path.join(working_dir, name)
-            output_path = os.path.join(args.output, name)
-            if os.path.splitext(name)[1] == '.zip':
-                print(f"flatten zip: {input_path, args.output}")
+            name_split = os.path.splitext(name)
+            if name_split[1] == '.zip':
+                zip_input_path = os.path.join(working_dir, name)
+                zip_output_path = os.path.join(args.output, name_split[0])
+
+                if os.path.exists(zip_output_path) and os.path.isdir(zip_output_path):
+                    print(f"info: skip: existing ouput path '{zip_output_path}'")
+                    continue
+
+                print(f"info: extract {zip_input_path} to {args.output}")
                 if args.interactive:
                     choice = input('Continue? [y/N/q]')
                     if choice == 'q':
@@ -43,8 +51,21 @@ def flatten_hierarchy(args: argparse.Namespace) -> None:
                     if choice != 'y' or choice in 'nN':
                         print(f"info: skip: {input_path}")
                         continue
-                flatten_zip(os.path.join(working_dir, name), args.output)
-            elif not os.path.exists(output_path):
+                # flatten_zip(os.path.join(working_dir, name), args.output)
+                with zipfile.ZipFile(zip_input_path, 'r') as file:
+                    file.extractall(os.path.normpath(args.output))
+            else:
+                print(f"info: skip: non-zip file '{input_path}'")
+
+def flatten_hierarchy(args: argparse.Namespace) -> None:
+    for working_dir, directories, filenames in os.walk(args.input):
+        prune(working_dir, directories, filenames)
+
+        for name in filenames:
+            input_path = os.path.join(working_dir, name)
+            output_path = os.path.join(args.output, name)
+
+            if not os.path.exists(output_path):
                 print(f"move '{input_path}' to '{output_path}'")
                 if args.interactive:
                     choice = input('Continue? [y/N/q]')
@@ -74,7 +95,7 @@ def prune(working_dir: str, directories: list[str], filenames: list[str]) -> Non
             print(f"info: skip: hidden file '{name}'")
             del filenames[index]
 
-def sweep(args: argparse.Namespace) -> None:
+def sweep(args: argparse.Namespace, valid_extensions: set[str], prefix_hints: set[str]) -> None:
     for working_dir, directories, filenames in os.walk(args.input):
         prune(working_dir, directories, filenames)
 
@@ -83,8 +104,24 @@ def sweep(args: argparse.Namespace) -> None:
             output_path = os.path.join(args.output, name)
             name_split = os.path.splitext(name)
 
-            is_valid_archive = name_split[1] == '.zip' and is_prefix_match(name, {'beatport_tracks', 'juno_download'})
-            if name_split[1] in {'.mp3', '.wav', '.aif', '.aiff', 'flac'} or is_valid_archive:
+            if os.path.exists(output_path):
+                print(f"info: skip: path '{output_path}' exists in destination")
+                continue
+
+            is_valid_archive = False
+            if name_split[1] == '.zip':
+                if is_prefix_match(name, prefix_hints):
+                    is_valid_archive = True
+                else:
+                    with zipfile.ZipFile(input_path) as archive:
+                        for archive_file in archive.namelist():
+                            is_valid_archive |= os.path.splitext(archive_file)[1] in valid_extensions
+                            if is_valid_archive:
+                                break
+
+
+
+            if name_split[1] in valid_extensions or is_valid_archive:
                 print(f"info: filter matched file '{input_path}'")
                 if args.interactive:
                     print(f"info: move from '{input_path}' to '{output_path}'")
@@ -119,13 +156,17 @@ if __name__ == '__main__':
     # CONSTANTS
     FUNCTION_SWEEP = 'sweep'
     FUNCTION_FLATTEN = 'flatten'
-    FUNCTIONS = {FUNCTION_FLATTEN, FUNCTION_SWEEP}
+    FUNCTION_EXTRACT = 'extract'
+    FUNCTIONS = {FUNCTION_FLATTEN, FUNCTION_SWEEP, FUNCTION_EXTRACT}
+    EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', 'flac'}
+    PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
 
     script_args = parse_args(FUNCTIONS)
+    print(f"user chose function {script_args.function}")
 
     if script_args.function == FUNCTION_SWEEP:
-        print(f"user chose function {script_args.function}")
-        sweep(script_args)
+        sweep(script_args, EXTENSIONS, PREFIX_HINTS)
     elif script_args.function == FUNCTION_FLATTEN:
-        print(f"user chose function {script_args.function}")
         flatten_hierarchy(script_args)
+    elif script_args.function == FUNCTION_EXTRACT:
+        extract(script_args)
