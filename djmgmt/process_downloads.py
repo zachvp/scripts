@@ -13,6 +13,18 @@ import os
 import shutil
 import zipfile
 
+def compress_dir(input_path: str, output_path: str):
+    with zipfile.ZipFile(output_path + '.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+        for working_dir, _, names in os.walk(input_path):
+            for name in names:
+                archive.write(os.path.join(working_dir, name), arcname=name)
+
+def compress_all(args: argparse.Namespace) -> None:
+    for working_dir, directories, _ in os.walk(args.input):
+        for directory in directories:
+            # print(f"dbg: {os.path.join(working_dir, directory), os.path.join(args.output, directory)}")
+            compress_dir(os.path.join(working_dir, directory), os.path.join(args.output, directory))
+
 def flatten_zip(zip_path: str, extract_path: str) -> None:
     print(f"output dir: {os.path.join(extract_path, os.path.splitext(os.path.basename(zip_path))[0])}")
     with zipfile.ZipFile(zip_path, 'r') as file:
@@ -119,8 +131,6 @@ def sweep(args: argparse.Namespace, valid_extensions: set[str], prefix_hints: se
                             if is_valid_archive:
                                 break
 
-
-
             if name_split[1] in valid_extensions or is_valid_archive:
                 print(f"info: filter matched file '{input_path}'")
                 if args.interactive:
@@ -135,17 +145,20 @@ def sweep(args: argparse.Namespace, valid_extensions: set[str], prefix_hints: se
                 shutil.move(input_path, output_path)
     print("swept all files")
 
-def parse_args(valid_functions: set[str]) -> argparse.Namespace:
+# todo: remove: single arg functions
+def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('function', type=str, help=f"Which script function to run. One of '{valid_functions}'.")
     parser.add_argument('input', type=str, help='The input directory to sweep.')
-    parser.add_argument('output', type=str, help='The output directory to place the swept tracks.')
+    parser.add_argument('output', nargs='?', type=str, help='The output directory to place the swept tracks.')
     parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode')
 
     args = parser.parse_args()
 
     if args.function not in valid_functions:
         parser.error(f"invalid function '{args.function}'")
+    if not args.output and args.function not in single_arg_functions:
+        parser.error(f"the 'output' parameter is required for function '{args.function}'")
 
     args.input = os.path.normpath(args.input)
     args.output = os.path.normpath(args.output)
@@ -157,12 +170,14 @@ if __name__ == '__main__':
     FUNCTION_SWEEP = 'sweep'
     FUNCTION_FLATTEN = 'flatten'
     FUNCTION_EXTRACT = 'extract'
-    FUNCTIONS = {FUNCTION_FLATTEN, FUNCTION_SWEEP, FUNCTION_EXTRACT}
+    FUNCTION_COMPRESS = 'compress'
+    FUNCTIONS_SINGLE_ARG = {FUNCTION_COMPRESS}
+    FUNCTIONS = {FUNCTION_FLATTEN, FUNCTION_SWEEP, FUNCTION_EXTRACT}.union((FUNCTIONS_SINGLE_ARG))
     EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', 'flac'}
     PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
 
-    script_args = parse_args(FUNCTIONS)
-    print(f"user chose function {script_args.function}")
+    script_args = parse_args(FUNCTIONS, FUNCTIONS_SINGLE_ARG)
+    print(f"user chose function '{script_args.function}'")
 
     if script_args.function == FUNCTION_SWEEP:
         sweep(script_args, EXTENSIONS, PREFIX_HINTS)
@@ -170,3 +185,6 @@ if __name__ == '__main__':
         flatten_hierarchy(script_args)
     elif script_args.function == FUNCTION_EXTRACT:
         extract(script_args)
+    elif script_args.function == FUNCTION_COMPRESS:
+        # compress_dir(script_args.input, script_args.output)
+        compress_all(script_args)
