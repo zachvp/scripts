@@ -13,6 +13,8 @@ import os
 import shutil
 import zipfile
 
+# todo: record each function's processing list (e.g. list of files extracted or swept)
+
 def compress_dir(input_path: str, output_path: str):
     with zipfile.ZipFile(output_path + '.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
         for working_dir, _, names in os.walk(input_path):
