@@ -163,7 +163,11 @@ def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> arg
         parser.error(f"the 'output' parameter is required for function '{args.function}'")
 
     args.input = os.path.normpath(args.input)
-    args.output = os.path.normpath(args.output)
+
+    if args.output:
+        args.output = os.path.normpath(args.output)
+    else:
+        args.output = args.input
 
     return args
 
@@ -173,7 +177,7 @@ if __name__ == '__main__':
     FUNCTION_FLATTEN = 'flatten'
     FUNCTION_EXTRACT = 'extract'
     FUNCTION_COMPRESS = 'compress'
-    FUNCTIONS_SINGLE_ARG = {FUNCTION_COMPRESS}
+    FUNCTIONS_SINGLE_ARG = {FUNCTION_COMPRESS, FUNCTION_FLATTEN}
     FUNCTIONS = {FUNCTION_FLATTEN, FUNCTION_SWEEP, FUNCTION_EXTRACT}.union((FUNCTIONS_SINGLE_ARG))
     EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', 'flac'}
     PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
