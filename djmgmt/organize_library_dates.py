@@ -61,13 +61,13 @@ def generate_matching_paths(args: argparse.Namespace) -> list[str]:
     source_lines : dict[str, str] = {}
     dest_lines : dict[str, str] = {}
 
-    for working_dir, _, filenames in os.walk(args.spoof_root):
+    for working_dir, _, filenames in os.walk(args.output):
         for filename in filenames:
             source_lines[filename] = os.path.join(working_dir, filename)
 
     for node in collection:
         dest_line = collection_path_to_syspath(node.attrib[ATTR_PATH])
-        dest_line = swap_root(dest_line, args.spoof_root)
+        dest_line = swap_root(dest_line, args.output)
         filename = os.path.split(dest_line)[1]
         dest_lines[filename] = dest_line
 
@@ -84,16 +84,16 @@ def generate_new_paths(args: argparse.Namespace) -> list[str]:
     for node in collection:
         # check if track is in collection root folder
         node_path_parts = node.attrib[ATTR_PATH].split('/')
-        if node_path_parts[-2] == 'DJing' or args.spoof_root:
+        if node_path_parts[-2] == 'DJing' or args.output:
             # build each entry for the old and new path
             track_path_old = collection_path_to_syspath(node.attrib[ATTR_PATH])
-            if args.spoof_root:
-                track_path_old = swap_root(track_path_old, args.spoof_root)
+            if args.output:
+                track_path_old = swap_root(track_path_old, args.output)
 
             track_path_new = full_path(node, PATH_LIBRARY_PIVOT, MAPPING_MONTH)
             track_path_new = collection_path_to_syspath(track_path_new)
-            if args.spoof_root:
-                track_path_new = swap_root(track_path_new, args.spoof_root)
+            if args.output:
+                track_path_new = swap_root(track_path_new, args.output)
 
             if DELIMITER in track_path_old or DELIMITER in track_path_new:
                 print(f'''
@@ -175,8 +175,7 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}")
     parser.add_argument('xml_collection_path', type=str, help='The rekordbox library path containing the DateAdded history')
-    # todo: refactor.rename spoof root
-    parser.add_argument('--spoof-root', '-s', type=str,\
+    parser.add_argument('--output', '-o', type=str,\
         help='the root path to use in place of the path defined in the rekordbox xml')
     parser.add_argument('-i', '--interactive', action='store_true', help='run script in interactive mode')
 
@@ -194,16 +193,14 @@ if __name__ == '__main__':
     script_functions = {FUNCTION_GENERATE, FUNCTION_MATCH}
     script_args = parse_args(script_functions)
 
-    if script_args.spoof_root:
-        print(f"info: spoofing root to be: '{script_args.spoof_root}'")
-
+    if script_args.output:
+        print(f"info: args output root dir: '{script_args.output}'")
 
     # check switches
     if not script_args.interactive:
         main_choice = input("this is a destructive action, and interactive mode is disabled, continue? [y/N]")
         if main_choice == 'y':
             print(f"verbose: running organize({script_args.xml_collection_path})...")
-            # organize(script_args, generate_matching_paths(script_args))
         else:
             print("exit: user quit")
             sys.exit()
