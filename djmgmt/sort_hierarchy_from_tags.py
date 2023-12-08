@@ -12,12 +12,16 @@ import os
 import shutil
 import find_duplicate_tags
 
-def parse_args() -> argparse.Namespace:
+def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('input', type=str, help='The top/root path to scan and organize')
+    parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}")
+    parser.add_argument('input', type=str, help='The top/root path to scan and organize.')
 
     args = parser.parse_args()
     args.input = os.path.normpath(args.input)
+
+    if args.function not in valid_functions:
+        parser.error(f"invalid function: '{args.function}'")
 
     return args
 
@@ -69,8 +73,7 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
             else:
                 print(f"info: skip: unsupported file: '{filepath}'")
 
-def validate_hierarchy(args: argparse.Namespace) -> None:
-    # todo: confirm no empty dirs
+def validate_hierarchy(args: argparse.Namespace, expected_depth: int) -> None:
     for working_dir, _, filenames in os.walk(args.input):
         for filename in filenames:
             filepath = os.path.join(working_dir, filename)
@@ -78,11 +81,17 @@ def validate_hierarchy(args: argparse.Namespace) -> None:
             relpath = os.path.relpath(filepath, start=args.input)
             print(filepath)
             print()
-            if len(relpath.split('/')) != 5:
+            if len(relpath.split('/')) != expected_depth:
                 print(f"info: invalid filepath: {filepath}; depth is: {len(relpath.split('/'))}")
+            # if len(os.scandir(working_dir))
 
 if __name__ == '__main__':
-    script_args = parse_args()
+    FUNCTION_VALIDATE = 'validate'
+    FUNCTION_SORT = 'sort'
+    script_functions = {FUNCTION_VALIDATE, FUNCTION_SORT}
+    script_args = parse_args(script_functions)
 
-    # sort_hierarchy(script_args)
-    validate_hierarchy(script_args)
+    if script_args.function == FUNCTION_VALIDATE:
+        validate_hierarchy(script_args, 5)
+    elif script_args.function == FUNCTION_SORT:
+        sort_hierarchy(script_args)
