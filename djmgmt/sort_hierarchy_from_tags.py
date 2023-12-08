@@ -66,10 +66,10 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
                         print(f"info: skip: output path exists: '{output_path}'")
                         continue
                     if not os.path.exists(parent_path):
-                        # print(f"info: os.makedirs({parent_path})")
-                        os.makedirs(parent_path)
-                    # print(f"shutil.move{(filepath, output_path)}")
-                    shutil.move(filepath, output_path)
+                        print(f"info: os.makedirs({parent_path})")
+                        # os.makedirs(parent_path)
+                    print(f"shutil.move{(filepath, output_path)}")
+                    # shutil.move(filepath, output_path)
             else:
                 print(f"info: skip: unsupported file: '{filepath}'")
 
