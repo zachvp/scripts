@@ -2,8 +2,8 @@
 Uses a combination of audio file metadata to determine duplicates
 '''
 
-import sys
 import os
+import argparse
 import mutagen
 
 # debug
@@ -110,20 +110,17 @@ def script(root: str, artist_keys: list, title_keys: list) -> None:
                 print(path)
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print("""\
-            ERROR: incorrect args, expected
-            1: SOURCE_PATH: /path/to/search/directory""")
-        sys.exit()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input', type=str, help='The path to the search directory root.')
 
-    ROOT = sys.argv[1]
+    script_args = parser.parse_args()
+    script_args.input = os.path.normpath(script_args.input)
+
     ARTIST_KEYS = ['TPE1', 'TPE2', 'TPE4', '©ART', 'Author', 'artist', 'TOPE']
     TITLE_KEYS = ['TIT2', '©nam', 'Title', 'title']
 
-    script(ROOT, ARTIST_KEYS, TITLE_KEYS)
-    # print(relevant_keys)
+    script(script_args.input, ARTIST_KEYS, TITLE_KEYS)
 
-    # sys.exit()
     sorted_dict = dict(sorted(printed.items(), key=lambda item: item[0]))
     for p in sorted_dict:
         print(f"{p} -> {', '.join(sorted(printed[p]))}")

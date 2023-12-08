@@ -55,21 +55,25 @@ def swap_root(path: str, root: str) -> str:
 
     return root
 
-def generate_new_paths(path_collection: str) -> list:
-    collection = WrapETElement(ET.parse(path_collection).getroot().find(XPATH_COLLECTION))
-    lines = []
+def generate_new_paths(args: argparse.Namespace) -> list:
+    collection = WrapETElement(ET.parse(args.xml_collection_path).getroot().find(XPATH_COLLECTION))
+    lines: list[str] = []
 
     for node in collection:
         # check if track is in collection root folder
         node_path_parts = node.attrib[ATTR_PATH].split('/')
+        print(node_path_parts)
         if node_path_parts[-2] == 'DJing':
             # build each entry for the old and new path
             track_path_old = collection_path_to_syspath(node.attrib[ATTR_PATH])
-            track_path_old = swap_root(track_path_old, SPOOF_ROOT)
+            if args.spoof_root:
+                track_path_old = swap_root(track_path_old, args.spoof_root)
 
             track_path_new = full_path(node, PATH_LIBRARY_PIVOT, MAPPING_MONTH)
             track_path_new = collection_path_to_syspath(track_path_new)
-            track_path_new = swap_root(track_path_new, SPOOF_ROOT)
+
+            if args.spoof_root:
+                track_path_new = swap_root(track_path_new, args.spoof_root)
 
             if DELIMITER in track_path_old or DELIMITER in track_path_new:
                 print(f'''
@@ -83,14 +87,12 @@ def generate_new_paths(path_collection: str) -> list:
             print(f"warn: track {unquote(node.attrib[ATTR_PATH])} is not in root, will skip")
     return lines
 
-def organize(path_collection: str) -> None:
-    new_paths = generate_new_paths(path_collection)
-
-    for path in new_paths:
+def organize(args: argparse.Namespace) -> None:
+    for path in generate_new_paths(args):
         source, dest = path.split(DELIMITER)
 
         # interactive session
-        if INTERACTIVE:
+        if args.interactive:
             choice = input(f"info: will move file from '{source}' to '{dest}', continue? [Y/n]")
             if len(choice) > 0 and choice not in 'Yy':
                 print("exit: user quit")
@@ -102,6 +104,9 @@ def organize(path_collection: str) -> None:
         # validate
         if not os.path.exists(source):
             print(f"warn: source path '{source}' does not exist, skipping")
+            continue
+        if os.path.exists(dest):
+            print(f"warn: destination path '{dest}' exists, skipping")
             continue
 
         # create dir if it doesn't exist
@@ -123,10 +128,6 @@ def dev_debug():
     print(u)
 
 # GLOBALS
-## Mutable
-INTERACTIVE = False
-SPOOF_ROOT = '/dev/null'
-
 ## Read-only
 ATTR_DATE_ADDED = 'DateAdded'
 ATTR_PATH = 'Location'
@@ -150,32 +151,28 @@ MAPPING_MONTH =\
     12 : 'december',
 }
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('xml_collection_path', type=str, help='the rekordbox library path containing the DateAdded history')
+    parser.add_argument('--spoof-root', '-s', type=str,\
+        help='the root path to use in place of the path defined in the rekordbox xml')
+    parser.add_argument('-i', '--interactive', action='store_true', help='run script in interactive mode')
+
+    return parser.parse_args()
 
 # MAIN
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('xml_collection_path', type=str, help='the rekordbox library path containing the DateAdded history')
-    parser.add_argument('spoof_root', type=str, help='the path root to use in place of the path defined in the rekordbox xml')
-    parser.add_argument('-i', '--interactive', action='store_true', help='run script in interactive mode')
-    parser.add_argument('--force', action='store_true', help='force skip any interaction')
-
-    args = parser.parse_args()
-
-    # set globals
-    SPOOF_ROOT = args.spoof_root
+    script_args = parse_args()
 
     # check switches
-    if args.interactive:
+    if script_args.interactive:
         print('verbose: interactive enabled')
-        INTERACTIVE = True
-        organize(args.xml_collection_path)
-    if args.force:
-        print('verbose: force enabled, running with no guardrails')
-        organize(args.xml_collection_path)
+        print(f"verbose: running organize({script_args.xml_collection_path})")
+        organize(script_args)
     else:
         main_choice = input("this is a destructive action, and interactive mode is disabled, continue? [y/N]")
         if main_choice == 'y':
-            print(f"verbose: running organize({args.xml_collection_path})...")
-            organize(args.xml_collection_path)
+            print(f"verbose: running organize({script_args.xml_collection_path})...")
+            organize(script_args)
         else:
             print("exit: user quit")
