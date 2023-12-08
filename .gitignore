@@ -5,6 +5,7 @@
 
 # auto-generated directories
 .vscode/
+__pycache__/
 
 # custom directories
 data/write/
