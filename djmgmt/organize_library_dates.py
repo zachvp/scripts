@@ -55,15 +55,36 @@ def swap_root(path: str, root: str) -> str:
 
     return root
 
-def generate_new_paths(args: argparse.Namespace) -> list:
+def generate_matching_paths(args: argparse.Namespace) -> list[str]:
+    collection = WrapETElement(ET.parse(args.xml_collection_path).getroot().find(XPATH_COLLECTION))
+    lines: list[str] = []
+    source_lines : dict[str, str] = {}
+    dest_lines : dict[str, str] = {}
+
+    for working_dir, _, filenames in os.walk(args.spoof_root):
+        for filename in filenames:
+            source_lines[filename] = os.path.join(working_dir, filename)
+
+    for node in collection:
+        dest_line = collection_path_to_syspath(node.attrib[ATTR_PATH])
+        dest_line = swap_root(dest_line, args.spoof_root)
+        filename = os.path.split(dest_line)[1]
+        dest_lines[filename] = dest_line
+
+    for key, source_line in source_lines.items():
+        if key in dest_lines:
+            lines.append(f"{source_line}{DELIMITER}{dest_lines[key]}")
+
+    return lines
+
+def generate_new_paths(args: argparse.Namespace) -> list[str]:
     collection = WrapETElement(ET.parse(args.xml_collection_path).getroot().find(XPATH_COLLECTION))
     lines: list[str] = []
 
     for node in collection:
         # check if track is in collection root folder
         node_path_parts = node.attrib[ATTR_PATH].split('/')
-        print(node_path_parts)
-        if node_path_parts[-2] == 'DJing':
+        if node_path_parts[-2] == 'DJing' or args.spoof_root:
             # build each entry for the old and new path
             track_path_old = collection_path_to_syspath(node.attrib[ATTR_PATH])
             if args.spoof_root:
@@ -71,7 +92,6 @@ def generate_new_paths(args: argparse.Namespace) -> list:
 
             track_path_new = full_path(node, PATH_LIBRARY_PIVOT, MAPPING_MONTH)
             track_path_new = collection_path_to_syspath(track_path_new)
-
             if args.spoof_root:
                 track_path_new = swap_root(track_path_new, args.spoof_root)
 
@@ -84,11 +104,11 @@ def generate_new_paths(args: argparse.Namespace) -> list:
 
             lines.append(f"{track_path_old}{DELIMITER}{track_path_new}")
         else:
-            print(f"warn: track {unquote(node.attrib[ATTR_PATH])} is not in root, will skip")
+            print(f"warn: unexpected root {node_path_parts[-2]}, will skip")
     return lines
 
-def organize(args: argparse.Namespace) -> None:
-    for path in generate_new_paths(args):
+def organize(args: argparse.Namespace, paths: list[str]) -> None:
+    for path in paths:
         source, dest = path.split(DELIMITER)
 
         # interactive session
@@ -151,28 +171,46 @@ MAPPING_MONTH =\
     12 : 'december',
 }
 
-def parse_args() -> argparse.Namespace:
+def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('xml_collection_path', type=str, help='the rekordbox library path containing the DateAdded history')
+    parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}")
+    parser.add_argument('xml_collection_path', type=str, help='The rekordbox library path containing the DateAdded history')
+    # todo: refactor.rename spoof root
     parser.add_argument('--spoof-root', '-s', type=str,\
         help='the root path to use in place of the path defined in the rekordbox xml')
     parser.add_argument('-i', '--interactive', action='store_true', help='run script in interactive mode')
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if args.function not in valid_functions:
+        parser.error(f"invalid parameter '{args.function}'")
+
+    return args
 
 # MAIN
 if __name__ == '__main__':
-    script_args = parse_args()
+    FUNCTION_GENERATE = 'generate'
+    FUNCTION_MATCH = 'match'
+    script_functions = {FUNCTION_GENERATE, FUNCTION_MATCH}
+    script_args = parse_args(script_functions)
+
+    if script_args.spoof_root:
+        print(f"info: spoofing root to be: '{script_args.spoof_root}'")
+
 
     # check switches
-    if script_args.interactive:
-        print('verbose: interactive enabled')
-        print(f"verbose: running organize({script_args.xml_collection_path})")
-        organize(script_args)
-    else:
+    if not script_args.interactive:
         main_choice = input("this is a destructive action, and interactive mode is disabled, continue? [y/N]")
         if main_choice == 'y':
             print(f"verbose: running organize({script_args.xml_collection_path})...")
-            organize(script_args)
+            # organize(script_args, generate_matching_paths(script_args))
         else:
             print("exit: user quit")
+            sys.exit()
+
+    print('verbose: interactive enabled')
+    print(f"verbose: running organize({script_args.xml_collection_path})")
+    if script_args.function == FUNCTION_GENERATE:
+        organize(script_args, generate_new_paths(script_args))
+    elif script_args.function == FUNCTION_MATCH:
+        organize(script_args, generate_matching_paths(script_args))
