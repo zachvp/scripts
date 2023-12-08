@@ -47,7 +47,7 @@ def dev_print_relevant_values(track: mutagen.FileType, relevant_keys: set[str]) 
                     printed[k].add(line)
     return printed
 
-def get_track_key(track: mutagen.FileType, options: list[str]) -> Optional[str]:
+def get_track_key(track: mutagen.FileType, options: set[str]) -> Optional[str]:
     try:
         for o in options:
             if o in track:
@@ -58,7 +58,11 @@ def get_track_key(track: mutagen.FileType, options: list[str]) -> Optional[str]:
 
     return None
 
-def read_tags(path: str, artist_keys: list[str], album_keys: list[str], title_keys: list[str]) -> Optional[Tags]:
+def read_tags(path: str) -> Optional[Tags]:
+    artist_keys = {'TPE1', 'TPE2', 'TPE4', '©ART', 'Author', 'artist', 'TOPE'}
+    album_keys = {'TALB', 'TOAL', 'album'}
+    title_keys = {'TIT2', '©nam', 'Title', 'title'}
+
     # load track tags, check for errors
     print(f"info: read_tags: {path}")
     try:
@@ -102,7 +106,7 @@ def read_tags(path: str, artist_keys: list[str], album_keys: list[str], title_ke
     return Tags(artist, album, title)
 
 # script input
-def script(root: str, artist_keys: list[str], album_keys: list[str], title_keys: list[str]) -> None:
+def script(root: str) -> None:
     # script state
     file_set: set[str] = set()
 
@@ -117,7 +121,7 @@ def script(root: str, artist_keys: list[str], album_keys: list[str], title_keys:
             path = os.path.join(dirpath, name)
 
             # load track tags, check for errors
-            tags = read_tags(path, artist_keys, album_keys, title_keys)
+            tags = read_tags(path)
             if not tags:
                 continue
 
@@ -133,18 +137,13 @@ def script(root: str, artist_keys: list[str], album_keys: list[str], title_keys:
                 print(path)
 
 if __name__ == '__main__':
-    # todo: convert to sets
-    ARTIST_KEYS = ['TPE1', 'TPE2', 'TPE4', '©ART', 'Author', 'artist', 'TOPE']
-    TITLE_KEYS = ['TIT2', '©nam', 'Title', 'title']
-    ALBUM_KEYS = ['TALB', 'TOAL', 'album']
-
     parser = argparse.ArgumentParser()
     parser.add_argument('input', type=str, help='The path to the search directory root.')
 
     script_args = parser.parse_args()
     script_args.input = os.path.normpath(script_args.input)
 
-    script(script_args.input, ARTIST_KEYS, ALBUM_KEYS, TITLE_KEYS)
+    script(script_args.input)
 
     # DEV investigation:
     # printed = dev_print_relevant_values(track, relevant_keys)
