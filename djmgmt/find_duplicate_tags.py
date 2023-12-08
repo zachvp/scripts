@@ -64,7 +64,6 @@ def read_tags(path: str) -> Optional[Tags]:
     title_keys = {'TIT2', '©nam', 'Title', 'title'}
 
     # load track tags, check for errors
-    print(f"info: read_tags: {path}")
     try:
         track = mutagen.File(path)
         # track = ID3(path)
@@ -103,7 +102,7 @@ def read_tags(path: str) -> Optional[Tags]:
     if isinstance(album, list):
         album = album[0]
 
-    return Tags(artist, album, title)
+    return Tags(str(artist), str(album), str(title))
 
 # script input
 def script(root: str) -> None:
