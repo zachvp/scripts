@@ -17,6 +17,7 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}")
     parser.add_argument('input', type=str, help='The top/root path to scan and organize.')
+    parser.add_argument('--interactive', '-i', action='store_true', help='Run the script in interactive mode')
 
     args = parser.parse_args()
     args.input = os.path.normpath(args.input)
@@ -93,14 +94,21 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
             else:
                 print(f"info: skip: unsupported file: '{filepath}'")
 
-def validate_hierarchy(args: argparse.Namespace, expected_depth: int) -> None:
+def validate_hierarchy(args: argparse.Namespace, expected_depth: int, prune: bool=False) -> None:
+    remove_dirs: list[str] = []
+    remove_files: list[str] = []
+
     for working_dir, _, filenames in os.walk(args.input):
         if len(filenames) < 1:
+            if prune:
+                remove_dirs.append(working_dir)
             print(f"info: invalid: empty directory: {working_dir}")
 
         for filename in filenames:
             if filename.startswith('.'):
                 print(f"info: invalid: illegal prefix: '{filename}'")
+                if prune:
+                    remove_files.append(filename)
                 continue
 
             # check file path depth
@@ -110,13 +118,34 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int) -> None:
                 print(f"info: invalid: filepath depth: {filepath}; depth is: {len(relpath.split('/'))}")
                 continue
 
+    if args.interactive:
+        print(f"remove_dirs: {remove_dirs}")
+        print(f"remove_files: {remove_files}")
+        choice = input("about to prune, continue? [y/N]")
+
+        if choice != 'y':
+            print("info: user quit")
+            return
+
+    # prune if necessary
+    for directory in remove_dirs:
+        os.removedirs(directory)
+    for file in remove_files:
+        os.remove(file)
+
 if __name__ == '__main__':
     FUNCTION_VALIDATE = 'validate'
     FUNCTION_SORT = 'sort'
-    script_functions = {FUNCTION_VALIDATE, FUNCTION_SORT}
+    FUNCTION_PRUNE = 'prune'
+    EXPECTED_DEPTH = 5
+    script_functions = {FUNCTION_VALIDATE, FUNCTION_SORT, FUNCTION_PRUNE}
     script_args = parse_args(script_functions)
 
+    print(f"info: running function '{script_args.function}'")
+
     if script_args.function == FUNCTION_VALIDATE:
-        validate_hierarchy(script_args, 5)
+        validate_hierarchy(script_args, EXPECTED_DEPTH)
     elif script_args.function == FUNCTION_SORT:
         sort_hierarchy(script_args)
+    elif script_args.function == FUNCTION_PRUNE:
+        validate_hierarchy(script_args, EXPECTED_DEPTH, True)
