@@ -29,7 +29,7 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
 def clean_dirname(dirname: str) -> str:
     output = dirname
 
-    return output.replace('/', '&').replace(':', '')
+    return output.replace('/', '&').replace(':', '').strip()
 
 def sort_hierarchy(args: argparse.Namespace) -> None:
     # CONSTANTS
@@ -49,9 +49,9 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
                     artist_raw = artist
                     artist = clean_dirname(artist)
                     if artist != artist_raw:
-                        print(f"info: artist '{artist}' contains at least one illegal character, replacing")
+                        print(f"info: artist '{artist_raw}' contains at least one illegal character, replacing")
                         artist = clean_dirname(artist)
-                        print(f"new artist name: {artist}")
+                        print(f"new artist name: '{artist}'")
 
                     album = tags.album if tags.album else unknown_album
                     album_raw = album
@@ -59,7 +59,7 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
 
                     if album != album_raw:
                         print(f"info: album '{album}' contains at least one illegal character, replacing")
-                        print(f"new album name: {album}")
+                        print(f"new album name: '{album}'")
 
                     parent_path = os.path.join(working_dir, artist, album)
                     output_path = os.path.join(parent_path, filename)
