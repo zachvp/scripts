@@ -108,7 +108,7 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int, prune: boo
             if filename.startswith('.'):
                 print(f"info: invalid: illegal prefix: '{filename}'")
                 if prune:
-                    remove_files.append(filename)
+                    remove_files.append(os.path.join(working_dir, filename))
                 continue
 
             # check file path depth
