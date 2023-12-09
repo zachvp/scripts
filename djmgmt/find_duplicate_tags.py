@@ -68,7 +68,7 @@ def read_tags(path: str) -> Optional[Tags]:
         track = mutagen.File(path)
         # track = ID3(path)
     except mutagen.MutagenError as e:
-        print(f"error: {e}")
+        print(f"mutagen.MutagenError: {e}\npath: '{path}'")
         return None
 
     if track is None or track.tags is None:
