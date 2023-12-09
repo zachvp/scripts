@@ -28,8 +28,23 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
 
 def clean_dirname(dirname: str) -> str:
     output = dirname
+    replacements: dict[str,str] = {\
+    '\\' : '',
+     '/' : '&',
+     ':' : '',
+     '*' : ' ',
+     '?' : '',
+     '"' : '',
+     '<' : '(',
+     '>' : ')',
+     '|' : ' '
+    }
 
-    return output.replace('/', '&').replace(':', '').strip()
+    for key, value in replacements.items():
+        if key in output:
+            output = output.replace(key, value)
+
+    return output.strip()
 
 def sort_hierarchy(args: argparse.Namespace) -> None:
     # CONSTANTS
