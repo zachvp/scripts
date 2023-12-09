@@ -209,4 +209,6 @@ if __name__ == '__main__':
     if script_args.function == FUNCTION_GENERATE:
         organize(script_args, generate_new_paths(script_args))
     elif script_args.function == FUNCTION_MATCH:
-        organize(script_args, generate_matching_paths(script_args))
+        # todo: this function does not seem to work - files end up redundantly nested
+        # organize(script_args, generate_matching_paths(script_args))
+        print("Error: this function is borked. Ensure that the output directory is flattened and only contains audio files.")
