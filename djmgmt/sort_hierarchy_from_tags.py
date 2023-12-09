@@ -11,6 +11,7 @@ import argparse
 import os
 import shutil
 import find_duplicate_tags
+import process_downloads
 
 def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -36,6 +37,8 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
     unknown_album = 'UNKNOWN_ALBUM'
 
     for working_dir, _, filenames in os.walk(args.input):
+        process_downloads.prune(working_dir, [], filenames)
+
         for filename in filenames:
             filepath = os.path.join(working_dir, filename)
 
