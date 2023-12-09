@@ -97,15 +97,14 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int) -> None:
     for working_dir, _, filenames in os.walk(args.input):
         for filename in filenames:
             filepath = os.path.join(working_dir, filename)
-            print(filepath)
             relpath = os.path.relpath(filepath, start=args.input)
-            print(filepath)
-            print()
             if len(relpath.split('/')) != expected_depth:
                 print(f"info: invalid: filepath depth: {filepath}; depth is: {len(relpath.split('/'))}")
+
             file_count = len(list(os.scandir(working_dir)))
             if file_count < 1:
                 print(f"info: invalid: empty directory: {working_dir}")
+
             if filename.startswith('.'):
                 print(f"info: invalid: illegal prefix: '{filename}'")
 
