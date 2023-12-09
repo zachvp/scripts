@@ -27,6 +27,9 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     return args
 
 def clean_dirname(dirname: str) -> str:
+    '''cleans according to Fat32 specs
+    source: https://stackoverflow.com/questions/4814040/allowed-characters-in-filename
+    '''
     output = dirname
     replacements: dict[str,str] = {\
     '\\' : '',
@@ -99,8 +102,12 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int) -> None:
             print(filepath)
             print()
             if len(relpath.split('/')) != expected_depth:
-                print(f"info: invalid filepath: {filepath}; depth is: {len(relpath.split('/'))}")
-            # if len(os.scandir(working_dir)) todo: finish this check
+                print(f"info: invalid: filepath depth: {filepath}; depth is: {len(relpath.split('/'))}")
+            file_count = len(list(os.scandir(working_dir)))
+            if file_count < 1:
+                print(f"info: invalid: empty directory: {working_dir}")
+            if filename.startswith('.'):
+                print(f"info: invalid: illegal prefix: '{filename}'")
 
 if __name__ == '__main__':
     FUNCTION_VALIDATE = 'validate'
