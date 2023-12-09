@@ -119,7 +119,6 @@ def organize(args: argparse.Namespace, paths: list[str]) -> None:
                 sys.exit()
 
         target_dir_path =  '/'.join(dest.split('/')[:-1])
-        print(target_dir_path)
 
         # validate
         if not os.path.exists(source):
