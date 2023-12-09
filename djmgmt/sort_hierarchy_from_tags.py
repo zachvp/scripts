@@ -135,6 +135,9 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int, prune: boo
             if e.errno == 39:
                 print(f"info: skip: will not remove non-empty dir {directory}")
     for file in remove_files:
+        if not file.startswith('.') and os.path.splitext(file)[1] in {'.aif', '.aiff', '.wav', '.mp3'}:
+            print(f"will not prune visible music file '{file}'")
+            continue
         os.remove(file)
 
 if __name__ == '__main__':
