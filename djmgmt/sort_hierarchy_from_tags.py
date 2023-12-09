@@ -33,15 +33,15 @@ def clean_dirname(dirname: str) -> str:
     '''
     output = dirname
     replacements: dict[str,str] = {\
-    '\\' : '',
+    '\\' : '()',
      '/' : '&',
-     ':' : '',
-     '*' : ' ',
-     '?' : '',
-     '"' : '',
+     ':' : '()',
+     '*' : '()',
+     '?' : '()',
+     '"' : '()',
      '<' : '(',
      '>' : ')',
-     '|' : ' '
+     '|' : '()'
     }
 
     for key, value in replacements.items():
@@ -77,7 +77,7 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
                     album = clean_dirname(album)
 
                     if album != album_raw:
-                        print(f"info: album '{album}' contains at least one illegal character, replacing")
+                        print(f"info: album '{album_raw}' contains at least one illegal character, replacing")
                         print(f"new album name: '{album}'")
 
                     parent_path = os.path.join(working_dir, artist, album)
