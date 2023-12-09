@@ -45,7 +45,6 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
             if os.path.splitext(filename)[1] in {'.aiff', '.aif', '.mp3', '.wav'}:
                 tags = find_duplicate_tags.read_tags(filepath)
                 if tags:
-                    print(f"tags: {tags.artist}\t{tags.album}\t{tags.title}")
                     artist = tags.artist if tags.artist else unknown_artist
                     artist_raw = artist
                     artist = clean_dirname(artist)
@@ -70,9 +69,9 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
                         continue
                     if not os.path.exists(parent_path):
                         print(f"info: os.makedirs({parent_path})")
-                        # os.makedirs(parent_path)
+                        os.makedirs(parent_path)
                     print(f"shutil.move{(filepath, output_path)}")
-                    # shutil.move(filepath, output_path)
+                    shutil.move(filepath, output_path)
             else:
                 print(f"info: skip: unsupported file: '{filepath}'")
 
@@ -86,7 +85,7 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int) -> None:
             print()
             if len(relpath.split('/')) != expected_depth:
                 print(f"info: invalid filepath: {filepath}; depth is: {len(relpath.split('/'))}")
-            # if len(os.scandir(working_dir))
+            # if len(os.scandir(working_dir)) todo: finish this check
 
 if __name__ == '__main__':
     FUNCTION_VALIDATE = 'validate'
