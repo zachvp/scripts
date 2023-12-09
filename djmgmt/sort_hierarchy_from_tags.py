@@ -129,7 +129,11 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int, prune: boo
 
     # prune if necessary
     for directory in remove_dirs:
-        os.removedirs(directory)
+        try:
+            os.removedirs(directory)
+        except OSError as e:
+            if e.errno == 39:
+                print(f"info: skip: will not remove non-empty dir {directory}")
     for file in remove_files:
         os.remove(file)
 
