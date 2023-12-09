@@ -98,8 +98,8 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int, prune: boo
     remove_dirs: list[str] = []
     remove_files: list[str] = []
 
-    for working_dir, _, filenames in os.walk(args.input):
-        if len(filenames) < 1:
+    for working_dir, dirs, filenames in os.walk(args.input):
+        if len(filenames) < 1 and len(dirs) < 1:
             if prune:
                 remove_dirs.append(working_dir)
             print(f"info: invalid: empty directory: {working_dir}")
@@ -118,7 +118,7 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int, prune: boo
                 print(f"info: invalid: filepath depth: {filepath}; depth is: {len(relpath.split('/'))}")
                 continue
 
-    if args.interactive:
+    if args.interactive and prune:
         print(f"remove_dirs: {remove_dirs}")
         print(f"remove_files: {remove_files}")
         choice = input("about to prune, continue? [y/N]")
