@@ -194,7 +194,8 @@ def prune_empty(args: argparse.Namespace) -> None:
 
 def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('function', type=str, help=f"Which script function to run. One of '{valid_functions}'.")
+    parser.add_argument('function', type=str, help=f"Which script function to run. One of '{valid_functions}'.\
+        The following functions only require a single argument: '{single_arg_functions}'.")
     parser.add_argument('input', type=str, help='The input directory to sweep.')
     parser.add_argument('output', nargs='?', type=str, help='The output directory to place the swept tracks.')
     parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode')
