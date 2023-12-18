@@ -5,7 +5,7 @@ COREVEGA_PATH_HOME="/home/zachvp"
 COREVEGA_USER="zachvp"
 
 COREVEGA_RSYNC_PORT=12000
-COREVEGA_RSYNC_OPTIONS="--progress -avzi"
+COREVEGA_RSYNC_OPTIONS="--progress -auvzi"
 COREVEGA_PATH_RSYNC_PID="$COREVEGA_PATH_HOME/developer/state/rsync/rsyncd.pid"
 
 ## UTIL
@@ -145,4 +145,3 @@ cv_echo "$*"
 
 # run the provided function argument
 $1 $@
-
