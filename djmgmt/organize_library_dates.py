@@ -33,7 +33,7 @@ class WrapETElement:
 def date_path(date: str, mapping: dict) -> str:
     year, month, _ = date.split('-')
 
-    return f"{year}/{mapping[int(month)]}"
+    return f"{year}/{month} {mapping[int(month)]}"
 
 def full_path(node: ET.Element, pivot: str, mapping: dict) -> str:
     date = node.attrib[ATTR_DATE_ADDED]
@@ -54,28 +54,6 @@ def swap_root(path: str, root: str) -> str:
     root = path.replace('/Volumes/ZVP-MUSIC/DJing/', root)
 
     return root
-
-def generate_matching_paths(args: argparse.Namespace) -> list[str]:
-    collection = WrapETElement(ET.parse(args.xml_collection_path).getroot().find(XPATH_COLLECTION))
-    lines: list[str] = []
-    source_lines : dict[str, str] = {}
-    dest_lines : dict[str, str] = {}
-
-    for working_dir, _, filenames in os.walk(args.output):
-        for filename in filenames:
-            source_lines[filename] = os.path.join(working_dir, filename)
-
-    for node in collection:
-        dest_line = collection_path_to_syspath(node.attrib[ATTR_PATH])
-        dest_line = swap_root(dest_line, args.output)
-        filename = os.path.split(dest_line)[1]
-        dest_lines[filename] = dest_line
-
-    for key, source_line in source_lines.items():
-        if key in dest_lines:
-            lines.append(f"{source_line}{DELIMITER}{dest_lines[key]}")
-
-    return lines
 
 def generate_new_paths(args: argparse.Namespace) -> list[str]:
     collection = WrapETElement(ET.parse(args.xml_collection_path).getroot().find(XPATH_COLLECTION))
@@ -188,8 +166,7 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
 # MAIN
 if __name__ == '__main__':
     FUNCTION_GENERATE = 'generate'
-    FUNCTION_MATCH = 'match'
-    script_functions = {FUNCTION_GENERATE, FUNCTION_MATCH}
+    script_functions = {FUNCTION_GENERATE}
     script_args = parse_args(script_functions)
 
     if script_args.output:
@@ -208,7 +185,3 @@ if __name__ == '__main__':
     print(f"verbose: running organize({script_args.xml_collection_path})")
     if script_args.function == FUNCTION_GENERATE:
         organize(script_args, generate_new_paths(script_args))
-    elif script_args.function == FUNCTION_MATCH:
-        # todo: this function does not seem to work - files end up redundantly nested
-        # organize(script_args, generate_matching_paths(script_args))
-        print("Error: this function is borked. Ensure that the output directory is flattened and only contains audio files.")
