@@ -1,10 +1,12 @@
 #/bin/bash
 
 COREVEGA_IP_ETHERNET="192.168.2.2"
-COREVEGA_RSYNC_PORT=12000
 COREVEGA_PATH_HOME="/home/zachvp"
-COREVEGA_PATH_RSYNC_PID="$COREVEGA_PATH_HOME/developer/state/rsync/rsyncd.pid"
 COREVEGA_USER="zachvp"
+
+COREVEGA_RSYNC_PORT=12000
+COREVEGA_RSYNC_OPTIONS="--progress -avzi"
+COREVEGA_PATH_RSYNC_PID="$COREVEGA_PATH_HOME/developer/state/rsync/rsyncd.pid"
 
 ## UTIL
 cv_echo()
@@ -58,6 +60,7 @@ stop_rsyncd()
 
 
 ## run container on host port 8000
+# NOTE: this is kept as a reference only, airsonic dockerfile is preferred
 run_docker_media_music_stream()
 {
     docker run -dti \
@@ -87,7 +90,6 @@ run_rsync_transfer_daemon()
     COREVEGA_TRANSFER_DEST="rsync://$COREVEGA_USER@$COREVEGA_IP_ETHERNET:$COREVEGA_RSYNC_PORT"
     COREVEGA_ACTION=$2
     COREVEGA_MUSIC_SOURCE=$3
-    COREVEGA_OPTIONS="--progress -rtvzi"
 
     while [[ $# -gt 0 ]]; do case "$COREVEGA_ACTION" in
             music)
@@ -99,7 +101,7 @@ run_rsync_transfer_daemon()
 
                 set -x
                 time rsync "$COREVEGA_MUSIC_SOURCE/" "$COREVEGA_TRANSFER_DEST/music" \
-                    $COREVEGA_OPTIONS \
+                    $COREVEGA_RSYNC_OPTIONS \
                     --exclude '.*'
                 exit 0
 
@@ -114,7 +116,7 @@ run_rsync_transfer_daemon()
                 set -x
                 # include subsonic.backup      subsonic.data        subsonic.lck         subsonic.log         subsonic.properties  subsonic.script
                 time rsync "$COREVEGA_MUSIC_SOURCE/" "$COREVEGA_TRANSFER_DEST/music-prefs/subsonic" \
-                        $COREVEGA_OPTIONS \
+                        $COREVEGA_RSYNC_OPTIONS \
                         --include 'db/' --include '*.properties' --exclude '*/' --exclude '*.log' --exclude '*.lck'
                     exit 0
                 ;;
@@ -135,7 +137,7 @@ run_rsync_transfer()
 {
     COREVEGA_MUSIC_MEDIA_SOURCE=$2
 	time rsync $COREVEGA_MUSIC_MEDIA_SOURCE zachvp@$COREVEGA_IP_ETHERNET:/media/zachvp/SOL/transfer-rsync/rsync_default \
-        --progress -rtvzi --exclude ".*"
+        $COREVEGA_RSYNC_OPTIONS --exclude ".*"
 }
 
 # MAIN

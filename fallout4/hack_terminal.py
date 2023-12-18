@@ -14,7 +14,7 @@ def compare_similarity(lhs : str, rhs : str) -> int :
 # state
 
 ## input
-file_path = 'input.txt'
+file_path = sys.argv[1]
 
 ## storage
 guesses = []

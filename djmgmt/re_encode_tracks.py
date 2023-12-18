@@ -12,7 +12,7 @@ def process_args() -> argparse.Namespace:
     '''Process the script's command line aruments.
     '''
     parser = argparse.ArgumentParser()
-    parser.add_argument('source', type=str, help='the source directory to recursively process')
+    parser.add_argument('input', type=str, help='the input directory to recursively process')
     parser.add_argument('output', type=str, help='the output directory to contain all the files in a flat structure')
     parser.add_argument('extension', type=str, help='the output extension for each file')
 
@@ -98,7 +98,7 @@ def setup_storage(args: argparse.Namespace, filename: str) -> str:
     return store_path
 
 def re_encode(args: argparse.Namespace) -> None:
-    '''Primary script function. Recursively walks the source path specified in `args` to re-encode each eligible file.
+    '''Primary script function. Recursively walks the input path specified in `args` to re-encode each eligible file.
     A file is eligible if:
         1) It is an uncompressed `aiff` or `wav` type.
         2) It has a sample rate exceeding 44100 Hz or bit depth exceeding 16 bits.
@@ -128,7 +128,7 @@ def re_encode(args: argparse.Namespace) -> None:
             return
 
     # main processing loop
-    for working_dir, dirnames, filenames in os.walk(args.source):
+    for working_dir, dirnames, filenames in os.walk(args.input):
         # prune hidden directories
         for index, directory in enumerate(dirnames):
             if directory.startswith('.'):
@@ -161,7 +161,7 @@ def re_encode(args: argparse.Namespace) -> None:
 
             if os.path.splitext(os.path.basename(input_path))[0] != os.path.splitext(os.path.basename(output_path))[0]:
                 choice = input(f"warn: mismatched file names for '{input_path}' and '{output_path}'. Continue? [y/N]")
-                if choice != 'y' or choice in 'nN':
+                if choice != 'y' or choice.lower() == 'n':
                     print('exit, user quit')
                     break
 

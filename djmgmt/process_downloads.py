@@ -89,7 +89,13 @@ def flatten_hierarchy(args: argparse.Namespace) -> None:
                     if choice != 'y' or choice in 'nN':
                         print(f"info: skip: {input_path}")
                         continue
-                shutil.move(input_path, output_path)
+                try:
+                    shutil.move(input_path, output_path)
+                except FileNotFoundError as error:
+                    if error.filename == input_path:
+                        print(f"info: skip: encountered ghost file: '{input_path}'")
+                        continue
+
             else:
                 print(f"info: skip: {input_path}")
 
@@ -147,10 +153,49 @@ def sweep(args: argparse.Namespace, valid_extensions: set[str], prefix_hints: se
                 shutil.move(input_path, output_path)
     print("swept all files")
 
-# todo: remove: single arg functions
+def is_empty_dir(top: str) -> bool:
+    paths = os.listdir(top)
+    empty_files = 0
+    for path in paths:
+        if path.startswith('.'):
+            empty_files += 1
+
+    return empty_files == len(paths)
+
+def find_root_year(path: str) -> str:
+    parts : list[str] = path.split('/')
+    for i, part in enumerate(parts):
+        if part.isdecimal():
+            return '/'.join(parts[:i+1])
+    return ''
+
+def prune_empty(args: argparse.Namespace) -> None:
+    pruned = []
+
+    for working_dir, dirnames, _ in os.walk(args.input):
+        for dirname in dirnames:
+            path = os.path.join(working_dir, dirname)
+            if is_empty_dir(path):
+                pruned.append(path)
+
+    for path in pruned:
+        path_root = find_root_year(path)
+        print(f"info: will remove: '{path_root}'")
+        if args.interactive:
+            choice = input("continue? [y/N]")
+            if choice != 'y':
+                print('info: skip: user skipped')
+                continue
+        try:
+            shutil.rmtree(path_root)
+        except OSError as e:
+            if e.errno == 39:
+                print(f"info: skip: will not remove non-empty dir {path}")
+
 def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('function', type=str, help=f"Which script function to run. One of '{valid_functions}'.")
+    parser.add_argument('function', type=str, help=f"Which script function to run. One of '{valid_functions}'.\
+        The following functions only require a single argument: '{single_arg_functions}'.")
     parser.add_argument('input', type=str, help='The input directory to sweep.')
     parser.add_argument('output', nargs='?', type=str, help='The output directory to place the swept tracks.')
     parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode')
@@ -177,7 +222,8 @@ if __name__ == '__main__':
     FUNCTION_FLATTEN = 'flatten'
     FUNCTION_EXTRACT = 'extract'
     FUNCTION_COMPRESS = 'compress'
-    FUNCTIONS_SINGLE_ARG = {FUNCTION_COMPRESS, FUNCTION_FLATTEN}
+    FUNCTION_PRUNE = 'prune'
+    FUNCTIONS_SINGLE_ARG = {FUNCTION_COMPRESS, FUNCTION_FLATTEN, FUNCTION_PRUNE}
     FUNCTIONS = {FUNCTION_FLATTEN, FUNCTION_SWEEP, FUNCTION_EXTRACT}.union((FUNCTIONS_SINGLE_ARG))
     EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', 'flac'}
     PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
@@ -194,3 +240,5 @@ if __name__ == '__main__':
     elif script_args.function == FUNCTION_COMPRESS:
         # compress_dir(script_args.input, script_args.output)
         compress_all(script_args)
+    elif script_args.function == FUNCTION_PRUNE:
+        prune_empty(script_args)
