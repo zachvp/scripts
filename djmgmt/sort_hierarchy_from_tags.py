@@ -18,6 +18,8 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}")
     parser.add_argument('input', type=str, help='The top/root path to scan and organize.')
     parser.add_argument('--interactive', '-i', action='store_true', help='Run the script in interactive mode')
+    parser.add_argument('--compatibility', '-c', action='store_true', help='Run the script in compatibility mode -\
+        Directory names will be cleaned according to permitted FAT32 path characters.')
 
     args = parser.parse_args()
     args.input = os.path.normpath(args.input)
@@ -66,7 +68,8 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
                 if tags:
                     artist = tags.artist if tags.artist else unknown_artist
                     artist_raw = artist
-                    artist = clean_dirname(artist)
+                    if args.compatibility:
+                        artist = clean_dirname(artist)
                     if artist != artist_raw:
                         print(f"info: artist '{artist_raw}' contains at least one illegal character, replacing")
                         artist = clean_dirname(artist)
@@ -74,7 +77,8 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
 
                     album = tags.album if tags.album else unknown_album
                     album_raw = album
-                    album = clean_dirname(album)
+                    if args.compatibility:
+                        album = clean_dirname(album)
 
                     if album != album_raw:
                         print(f"info: album '{album_raw}' contains at least one illegal character, replacing")
@@ -86,6 +90,15 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
                     if os.path.exists(output_path):
                         print(f"info: skip: output path exists: '{output_path}'")
                         continue
+                    if args.interactive:
+                        choice = input(f"move {filepath} -> {output_path}? [y/N/q]")
+                        if choice == 'q':
+                            print("info: user quit")
+                            return
+                        if choice != 'y':
+                            print("info: skip: user skipped")
+                            continue
+
                     if not os.path.exists(parent_path):
                         print(f"info: os.makedirs({parent_path})")
                         os.makedirs(parent_path)
