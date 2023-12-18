@@ -60,19 +60,19 @@ stop_rsyncd()
 ## run container on host port 8000
 run_docker_media_music_stream()
 {
-    # todo: check if container already exists, offer option to run or create new container
-
     docker run -dti \
         --publish 8000:4040 \
-        --name="subsonic_corevega_restore" \
+        --name="$2" \
         --hostname corevega-music \
         --network corevega-net \
         --dns 192.168.1.1 \
-        -v /media/zachvp/SOL/transfer-rsync/daemon/music:/Users/zachvp/Library/CloudStorage/OneDrive-Personal/Backups/rekordbox/rekordbox_bak \
-		-v /media/zachvp/SOL/transfer-rsync/daemon/music-prefs/subsonic/subsonic.properties:/var/subsonic/subsonic.properties \
-    	-v /media/zachvp/SOL/transfer-rsync/daemon/music-prefs/subsonic/db:/var/subsonic/db \
+        -v /media/zachvp/SOL/music/media-server:/var/music \
+		-v /home/zachvp/subsonic:/var/subsonic \
         hydria/subsonic:latest
 
+	# link the container's transcoding lib to the path subsonic expects
+	# this is required because /var/subsonic is mounted to the host
+	docker exec -d "$2" sh -c "ln -s /usr/bin/ffmpeg /var/subsonic/transcode/ffmpeg"
     docker ps
 }
 
