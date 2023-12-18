@@ -162,23 +162,35 @@ def is_empty_dir(top: str) -> bool:
 
     return empty_files == len(paths)
 
+def find_root_year(path: str) -> str:
+    parts : list[str] = path.split('/')
+    for i, part in enumerate(parts):
+        if part.isdecimal():
+            return '/'.join(parts[:i+1])
+    return ''
+
 def prune_empty(args: argparse.Namespace) -> None:
+    pruned = []
+
     for working_dir, dirnames, _ in os.walk(args.input):
         for dirname in dirnames:
             path = os.path.join(working_dir, dirname)
             if is_empty_dir(path):
-                print(f"info: will remove: '{path}'")
-                if args.interactive:
-                    choice = input("continue? [y/N]")
-                    if choice != 'y':
-                        print('info: skip: user skipped')
-                        continue
-                try:
-                    # os.removedirs(path)
-                    shutil.rmtree(path)
-                except OSError as e:
-                    if e.errno == 39:
-                        print(f"info: skip: will not remove non-empty dir {path}")
+                pruned.append(path)
+
+    for path in pruned:
+        path_root = find_root_year(path)
+        print(f"info: will remove: '{path_root}'")
+        if args.interactive:
+            choice = input("continue? [y/N]")
+            if choice != 'y':
+                print('info: skip: user skipped')
+                continue
+        try:
+            shutil.rmtree(path_root)
+        except OSError as e:
+            if e.errno == 39:
+                print(f"info: skip: will not remove non-empty dir {path}")
 
 def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
