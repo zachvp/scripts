@@ -181,7 +181,6 @@ if __name__ == '__main__':
             print("exit: user quit")
             sys.exit()
 
-    print('verbose: interactive enabled')
     print(f"verbose: running organize({script_args.xml_collection_path})")
     if script_args.function == FUNCTION_GENERATE:
         organize(script_args, generate_new_paths(script_args))
