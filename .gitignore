@@ -3,6 +3,7 @@
 *.DS_Store
 *.swp
 sftp-config.json
+__sublime*
 
 # auto-generated directories
 .vscode/
