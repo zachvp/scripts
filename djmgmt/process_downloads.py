@@ -175,19 +175,19 @@ def prune_empty(args: argparse.Namespace) -> None:
     for working_dir, dirnames, _ in os.walk(args.input):
         for dirname in dirnames:
             path = os.path.join(working_dir, dirname)
-            if path not in pruned and is_empty_dir(path):
-                pruned.add(path)
+            path_root = find_root_year(path)
+            if path_root not in pruned and is_empty_dir(path):
+                pruned.add(path_root)
 
     for path in pruned:
-        path_root = find_root_year(path)
-        print(f"info: will remove: '{path_root}'")
+        print(f"info: will remove: '{path}'")
         if args.interactive:
             choice = input("continue? [y/N]")
             if choice != 'y':
                 print('info: skip: user skipped')
                 continue
         try:
-            shutil.rmtree(path_root)
+            shutil.rmtree(path)
         except OSError as e:
             if e.errno == 39: # error: directory not empty
                 print(f"info: skip: non-empty dir {path}")
