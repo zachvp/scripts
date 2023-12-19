@@ -33,7 +33,7 @@ class WrapETElement:
 def date_path(date: str, mapping: dict) -> str:
     year, month, day = date.split('-')
 
-    return f"{year}/{month} {mapping[int(month)]}/{day.zfill(2)}"
+    return f"{year}/{month} {mapping[int(month)]}/{day}"
 
 def full_path(node: ET.Element, pivot: str, mapping: dict) -> str:
     date = node.attrib[ATTR_DATE_ADDED]

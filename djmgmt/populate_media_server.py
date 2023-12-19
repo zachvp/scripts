@@ -73,8 +73,8 @@ def sync(args: argparse.Namespace):
             if os.path.exists(output_path_full):
                 print(f"info: skip: output path exists: '{output_path_full}'")
 
-            print(f"info: {args.mode} '{input_path_full}' -> {output_path_full}")
-            date_context = '/'.join(path.split('/')[:2]) # format: 'year/month'
+            print(f"info: {args.mode}: '{input_path_full}' -> {output_path_full}")
+            date_context = '/'.join(path.split('/')[:3]) # format: 'year/month/day'
             if len(previous_date_context) > 0 and previous_date_context != date_context:
                 choice = input(f"info: date context changed from '{previous_date_context}' to '{date_context}' continue? [y/N]")
                 if choice != 'y':
