@@ -29,14 +29,13 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
 
     return args
 
-def clean_dirname(dirname: str) -> str:
+def clean_dirname_fat32(dirname: str) -> str:
     '''cleans according to Fat32 specs
     source: https://stackoverflow.com/questions/4814040/allowed-characters-in-filename
     '''
     output = dirname
     replacements: dict[str,str] = {\
     '\\' : '()',
-     '/' : '&',
      ':' : '()',
      '*' : '()',
      '?' : '()',
@@ -51,6 +50,9 @@ def clean_dirname(dirname: str) -> str:
             output = output.replace(key, value)
 
     return output.strip()
+
+def clean_dirname(dirname: str) -> str:
+    return dirname.replace('/', '&').strip()
 
 def sort_hierarchy(args: argparse.Namespace) -> None:
     # CONSTANTS
@@ -68,18 +70,18 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
                 if tags:
                     artist = tags.artist if tags.artist else unknown_artist
                     artist_raw = artist
+                    artist = clean_dirname(artist)
                     if args.compatibility:
-                        artist = clean_dirname(artist)
+                        artist = clean_dirname_fat32(artist)
                     if artist != artist_raw:
                         print(f"info: artist '{artist_raw}' contains at least one illegal character, replacing")
-                        artist = clean_dirname(artist)
                         print(f"new artist name: '{artist}'")
 
                     album = tags.album if tags.album else unknown_album
                     album_raw = album
+                    album = clean_dirname(album)
                     if args.compatibility:
-                        album = clean_dirname(album)
-
+                        album = clean_dirname_fat32(album)
                     if album != album_raw:
                         print(f"info: album '{album_raw}' contains at least one illegal character, replacing")
                         print(f"new album name: '{album}'")
