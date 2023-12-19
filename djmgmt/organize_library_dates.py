@@ -31,9 +31,9 @@ class WrapETElement:
             yield item
 
 def date_path(date: str, mapping: dict) -> str:
-    year, month, _ = date.split('-')
+    year, month, day = date.split('-')
 
-    return f"{year}/{month} {mapping[int(month)]}"
+    return f"{year}/{month} {mapping[int(month)]}/{day.zfill(2)}"
 
 def full_path(node: ET.Element, pivot: str, mapping: dict) -> str:
     date = node.attrib[ATTR_DATE_ADDED]
@@ -100,10 +100,10 @@ def organize(args: argparse.Namespace, paths: list[str]) -> None:
 
         # validate
         if not os.path.exists(source):
-            print(f"warn: source path '{source}' does not exist, skipping")
+            print(f"info: skip: source path '{source}' does not exist")
             continue
         if os.path.exists(dest):
-            print(f"warn: destination path '{dest}' exists, skipping")
+            print(f"info: skip: destination path '{dest}' exists")
             continue
 
         # create dir if it doesn't exist
