@@ -170,13 +170,13 @@ def find_root_year(path: str) -> str:
     return ''
 
 def prune_empty(args: argparse.Namespace) -> None:
-    pruned = []
+    pruned : set[str] = set()
 
     for working_dir, dirnames, _ in os.walk(args.input):
         for dirname in dirnames:
             path = os.path.join(working_dir, dirname)
-            if is_empty_dir(path):
-                pruned.append(path)
+            if path not in pruned and is_empty_dir(path):
+                pruned.add(path)
 
     for path in pruned:
         path_root = find_root_year(path)
