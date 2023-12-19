@@ -189,8 +189,8 @@ def prune_empty(args: argparse.Namespace) -> None:
         try:
             shutil.rmtree(path_root)
         except OSError as e:
-            if e.errno == 39:
-                print(f"info: skip: will not remove non-empty dir {path}")
+            if e.errno == 39: # error: directory not empty
+                print(f"info: skip: non-empty dir {path}")
 
 def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
