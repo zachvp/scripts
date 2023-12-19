@@ -23,6 +23,12 @@ import os
 import shutil
 import sys
 
+# CONSTANTS
+SCRIPT_MODE_COPY = 'copy'
+SCRIPT_MODE_MOVE = 'move'
+
+SCRIPT_MODES = {SCRIPT_MODE_COPY, SCRIPT_MODE_MOVE}
+
 def parse_args(valid_modes: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', type=str, help=f"The mode to run the script. One of '{valid_modes}'.")
@@ -79,17 +85,15 @@ def sync(args: argparse.Namespace):
             output_parent_path = os.path.split(output_path_full)[0]
             if not os.path.exists(output_parent_path):
                 os.makedirs(output_parent_path)
-            if args.mode == 'copy':
+            if args.mode == SCRIPT_MODE_MOVE:
                 # todo: implement overwrite logic according to script args
                 shutil.copy(input_path_full, output_path_full)
-            elif args.mode == 'move':
+            elif args.mode == SCRIPT_MODE_MOVE:
                 shutil.move(input_path_full, output_path_full)
             else:
                 print(f"error: unrecognized mode: {args.mode}. Exiting")
                 sys.exit()
 
 if __name__ == '__main__':
-    SCRIPT_MODES = {'copy', 'move'}
-
     script_args = parse_args(SCRIPT_MODES)
     sync(script_args)
