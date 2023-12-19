@@ -2,6 +2,7 @@
 *.zip
 *.DS_Store
 *.swp
+sftp-config.json
 
 # auto-generated directories
 .vscode/

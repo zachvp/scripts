@@ -1,5 +1,10 @@
 #_ todo: turn into bash/python script
 
+# On the fly plan
+## TODO:
+* combine `sort_hierarchy_from_tags` and `organize_library_dates`
+* combine `populate_media_server` and `aggregate_tracks`
+
 # End to end process
 
 ## Organize after batch downloading
@@ -17,7 +22,7 @@
 **TODO: likely use rsync daemon
 **TODO: check if 'use chroot' is needed in ~/.config/rsync/
 * copy ~/Music/downloads -> remote@host:/media/zachvp/SOL/media-server/staging
-* copy /path/to/latest/collection.xml -> remote@host/home/zachvp/backup/transfer
+* copy /path/to/latest/collection.xml -> remote@host/home/{USER}/backup/transfer
 
 ## Process on server
     1. python djmgmt/organize_library_dates.py generate /media/zachvp/SOL/data/mac-collection-12-06-2023.xml\
