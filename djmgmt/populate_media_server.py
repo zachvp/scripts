@@ -73,7 +73,7 @@ def sync(args: argparse.Namespace):
             if os.path.exists(output_path_full):
                 print(f"info: skip: output path exists: '{output_path_full}'")
 
-            print(f"info: sync '{input_path_full}' -> {output_path_full}")
+            print(f"info: {args.mode} '{input_path_full}' -> {output_path_full}")
             date_context = '/'.join(path.split('/')[:2]) # format: 'year/month'
             if len(previous_date_context) > 0 and previous_date_context != date_context:
                 choice = input(f"info: date context changed from '{previous_date_context}' to '{date_context}' continue? [y/N]")
@@ -85,7 +85,7 @@ def sync(args: argparse.Namespace):
             output_parent_path = os.path.split(output_path_full)[0]
             if not os.path.exists(output_parent_path):
                 os.makedirs(output_parent_path)
-            if args.mode == SCRIPT_MODE_MOVE:
+            if args.mode == SCRIPT_MODE_COPY:
                 # todo: implement overwrite logic according to script args
                 shutil.copy(input_path_full, output_path_full)
             elif args.mode == SCRIPT_MODE_MOVE:
