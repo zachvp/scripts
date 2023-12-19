@@ -21,9 +21,11 @@ process
 import argparse
 import os
 import shutil
+import sys
 
-def parse_args() -> argparse.Namespace:
+def parse_args(valid_modes: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+    parser.add_argument('mode', type=str, help=f"The mode to run the script. One of '{valid_modes}'.")
     parser.add_argument('input', type=str, help="The top level directory to search.\
         It's expected to be structured in a year/month/audio.file format.")
     parser.add_argument('output', type=str, help="The output directory to populate.")
@@ -32,13 +34,10 @@ def parse_args() -> argparse.Namespace:
     args.input = os.path.normpath(args.input)
     args.output = os.path.normpath(args.output)
 
-    return args
+    if args.mode not in valid_modes:
+        parser.error(f"Invalid mode: '{args.mode}'")
 
-def find_oldest_dir(ordered_names: list[str], dirnames: list[str], excluded_dirnames: list[str]) -> str:
-    for name in ordered_names:
-        if name in dirnames and name not in excluded_dirnames:
-            return name
-    return ''
+    return args
 
 def enumerate_paths(top: str) -> list[str]:
     paths: list[str] = []
@@ -63,8 +62,13 @@ def sync(args: argparse.Namespace):
         if path not in output_paths:
             input_path_full = os.path.join(args.input, path)
             output_path_full = os.path.join(args.output, path)
+
+            # todo: implement overwrite logic according to script args
+            if os.path.exists(output_path_full):
+                print(f"info: skip: output path exists: '{output_path_full}'")
+
             print(f"info: sync '{input_path_full}' -> {output_path_full}")
-            date_context = '/'.join(path.split('/')[:2])
+            date_context = '/'.join(path.split('/')[:2]) # format: 'year/month'
             if len(previous_date_context) > 0 and previous_date_context != date_context:
                 choice = input(f"info: date context changed from '{previous_date_context}' to '{date_context}' continue? [y/N]")
                 if choice != 'y':
@@ -75,8 +79,17 @@ def sync(args: argparse.Namespace):
             output_parent_path = os.path.split(output_path_full)[0]
             if not os.path.exists(output_parent_path):
                 os.makedirs(output_parent_path)
-            shutil.copy(input_path_full, output_path_full)
+            if args.mode == 'copy':
+                # todo: implement overwrite logic according to script args
+                shutil.copy(input_path_full, output_path_full)
+            elif args.mode == 'move':
+                shutil.move(input_path_full, output_path_full)
+            else:
+                print(f"error: unrecognized mode: {args.mode}. Exiting")
+                sys.exit()
 
 if __name__ == '__main__':
-    script_args = parse_args()
+    SCRIPT_MODES = {'copy', 'move'}
+
+    script_args = parse_args(SCRIPT_MODES)
     sync(script_args)
