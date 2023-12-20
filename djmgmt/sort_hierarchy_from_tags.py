@@ -119,58 +119,72 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
             else:
                 print(f"info: skip: unsupported file: '{filepath}'")
 
-def validate_hierarchy(args: argparse.Namespace, expected_depth: int, prune: bool=False) -> None:
-    remove_dirs: list[str] = []
-    remove_files: list[str] = []
+# todo: add function to write invalid paths to file
+def validate_hierarchy(args: argparse.Namespace, expected_depth: int) -> list[str]:
+    invalid_paths: list[str] = []
+    months = {
+        'january',
+        'february',
+        'march',
+        'april',
+        'may',
+        'june',
+        'july',
+        'august',
+        'september',
+        'october',
+        'november',
+        'december',
+    }
 
     for working_dir, dirs, filenames in os.walk(args.input):
         if len(filenames) < 1 and len(dirs) < 1:
-            if prune:
-                remove_dirs.append(working_dir)
+            invalid_paths.append(working_dir)
             print(f"info: invalid: empty directory: {working_dir}")
 
         for filename in filenames:
+            filepath = os.path.join(working_dir, filename)
             if filename.startswith('.'):
                 print(f"info: invalid: illegal prefix: '{filename}'")
-                if prune:
-                    remove_files.append(os.path.join(working_dir, filename))
+                invalid_paths.append(filepath)
                 continue
 
             # check file path depth
-            filepath = os.path.join(working_dir, filename)
             relpath = os.path.relpath(filepath, start=args.input)
-            if len(relpath.split('/')) != expected_depth:
-                print(f"info: invalid: filepath depth: {filepath}; depth is: {len(relpath.split('/'))}")
+            relpath_split = relpath.split('/')
+            if len(relpath_split) != expected_depth:
+                print(f"info: invalid: relative filepath depth: {relpath}; relative depth is: {len(relpath.split('/'))}")
+                invalid_paths.append(filepath)
                 continue
 
-    if args.interactive and prune:
-        print(f"remove_dirs: {remove_dirs}")
-        print(f"remove_files: {remove_files}")
-        choice = input("about to prune, continue? [y/N]")
+            # example path:
+            #  2023/12 december/05/JIGGY (IT)/None/JIGGY (IT) - CAMINANDO (JIGGY (IT) BOOTLEG).aiff; depth is: 6
+            index = 0
+            if not relpath_split[index].isdecimal() or len(relpath_split[index]) != 4:
+                print(f"info: invalid: year path component: '{relpath_split[index]}': expect '4-digit year' format")
+                invalid_paths.append(filepath)
+                continue
+            index += 1
 
-        if choice != 'y':
-            print("info: user quit")
-            return
+            parts = relpath_split[index].split()
+            if len(parts) != 2 or not parts[0].isdecimal() or parts[1] not in months:
+                print(f"info: invalid: month path component: '{relpath_split[index]}': expect '<month_index> <month_name>' format")
+                invalid_paths.append(filepath)
+                continue
+            index += 1
 
-    # prune if necessary
-    for directory in remove_dirs:
-        try:
-            os.removedirs(directory)
-        except OSError as e:
-            if e.errno == 39:
-                print(f"info: skip: will not remove non-empty dir {directory}")
-    for file in remove_files:
-        if not file.startswith('.') and os.path.splitext(file)[1] in {'.aif', '.aiff', '.wav', '.mp3'}:
-            print(f"will not prune visible music file '{file}'")
-            continue
-        os.remove(file)
+            if len(relpath_split[index]) != 2 or not relpath_split[index].isdecimal():
+                print(f"info: invalid: day path component: '{relpath_split[index]}': expect '2-digit day' format")
+                invalid_paths.append(filepath)
+                continue
+
+    return invalid_paths
 
 if __name__ == '__main__':
     FUNCTION_VALIDATE = 'validate'
     FUNCTION_SORT = 'sort'
-    FUNCTION_PRUNE = 'prune'
-    EXPECTED_DEPTH = 5
-    script_functions = {FUNCTION_VALIDATE, FUNCTION_SORT, FUNCTION_PRUNE}
+    EXPECTED_DEPTH = 6
+    script_functions = {FUNCTION_VALIDATE, FUNCTION_SORT}
     script_args = parse_args(script_functions)
 
     print(f"info: running function '{script_args.function}'")
@@ -179,5 +193,3 @@ if __name__ == '__main__':
         validate_hierarchy(script_args, EXPECTED_DEPTH)
     elif script_args.function == FUNCTION_SORT:
         sort_hierarchy(script_args)
-    elif script_args.function == FUNCTION_PRUNE:
-        validate_hierarchy(script_args, EXPECTED_DEPTH, True)
