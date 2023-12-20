@@ -151,10 +151,11 @@ MAPPING_MONTH =\
 def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}")
-    parser.add_argument('xml_collection_path', type=str, help='The rekordbox library path containing the DateAdded history')
+    parser.add_argument('xml_collection_path', type=str, help='The rekordbox library path containing the DateAdded history.')
     parser.add_argument('--output', '-o', type=str,\
-        help='the root path to use in place of the path defined in the rekordbox xml')
-    parser.add_argument('-i', '--interactive', action='store_true', help='run script in interactive mode')
+        help='The relative path to use in place of the root path defined in the rekordbox xml.')
+    parser.add_argument('-i', '--interactive', action='store_true', help='Run script in interactive mode.')
+    parser.add_argument('--force', action='store_true', help='Skip all interaction safeguards and run the script.')
 
     args = parser.parse_args()
 
@@ -173,7 +174,7 @@ if __name__ == '__main__':
         print(f"info: args output root dir: '{script_args.output}'")
 
     # check switches
-    if not script_args.interactive:
+    if not script_args.interactive and not script_args.force:
         main_choice = input("this is a destructive action, and interactive mode is disabled, continue? [y/N]")
         if main_choice == 'y':
             print(f"verbose: running organize({script_args.xml_collection_path})...")
