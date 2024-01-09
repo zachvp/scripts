@@ -2,35 +2,47 @@
 
 '''
 Format
-	Tab-separated
+    Tab-separated
 
-#	Track Title	BPM	Artist	Genre	Date Added	Time	Key	DJ Play Count
+#   Track Title BPM Artist  Genre   Date Added  Time    Key DJ Play Count
 '''
 
-import sys
+import argparse
+import os
 
-NUMBER = 0
-TITLE = 1
-ARTIST = 2
-GENRE = 3
+def extract(path, fields) -> list[str]:
+    output = []
 
-def extract(path, fields):
-	output = []
+    with open(path, 'r', encoding='utf-8') as file:
+        lines = file.readlines()
 
-	with open(path, 'r') as file:
-		lines = file.readlines()
+        for i in range(1, len(lines)):
+            output_line = ''
+            line = lines[i].split('\t')
+            for f in fields:
+                output_line += f"{line[f]}\t"
+            output.append(output_line.strip())
+    return output
 
-		for i in range(1, len(lines)):
-			output_line = ''
-			line = lines[i].split('\t')
-			for f in fields:
-				output_line += f"{line[f]}\t"
-			output.append(output_line.strip())
-	return output
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input', type=str, help="The script input path.")
+
+    args = parser.parse_args()
+    args.input = os.path.normpath(args.input)
+
+    return args
+
+def script(args: argparse.Namespace):
+    NUMBER = 0
+    TITLE = 1
+    ARTIST = 2
+    GENRE = 3
+
+    fields = [TITLE, ARTIST]
+    extracted = extract(args.input, fields)
+    print('\n'.join(extracted))
 
 # main
-path = sys.argv[1]
-
-fields = [TITLE, ARTIST]
-extracted = extract(path, fields)
-print('\n'.join(extracted))
+if __name__ == '__main__':
+    script(parse_args())
