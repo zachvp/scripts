@@ -27,7 +27,8 @@ def extract(path: str, fields: list[int]) -> list[str]:
     return output
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Output each track from a rekordbox-exported playlist.\
+        If no options are provided, all fields will exist in the ouptut.")
     parser.add_argument('input', type=str, help="The script input path.")
     parser.add_argument('--number', '-n', action='store_true', help="Include the track number in the output.")
     parser.add_argument('--title', '-t', action='store_true', help="Include the title in the output.")
