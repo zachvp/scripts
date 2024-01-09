@@ -37,14 +37,6 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     args.input = os.path.normpath(args.input)
 
-    # collect all existing given args into a dictionary
-    options = {k:v for k, v in vars(args).items() if v}
-    if len(options) < 2:
-        args.number = True
-        args.title = True
-        args.artist = True
-        args.genre = True
-
     return args
 
 def script(args: argparse.Namespace):
@@ -62,6 +54,10 @@ def script(args: argparse.Namespace):
         fields.append(artist)
     if args.genre:
         fields.append(genre)
+
+    # if no options are provided, assume all fields for output
+    if len(fields) < 1:
+        fields = [number, title, artist, genre]
 
     extracted = extract(args.input, fields)
     print('\n'.join(extracted))
