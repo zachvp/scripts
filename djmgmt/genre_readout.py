@@ -156,19 +156,34 @@ def script(args: argparse.Namespace) -> None:
         playlist_ids.add(track.attrib['Key'])
 
     # call requested script mode
-    if args.mode == 'short':
+    if args.mode == MODE_SHORT:
         output_genres_short(playlist_ids, collection)
-    elif args.mode == 'verbose':
+    elif args.mode == MODE_VERBOSE:
         output_genres_verbose(playlist_ids, collection)
-    elif args.mode == 'missing':
+    elif args.mode == MODE_MISSING:
         output_missing_tracks(playlist_ids, collection)
-    elif args.mode == 'category':
+    elif args.mode == MODE_CATEGORY:
         output_genre_category(playlist_ids, collection)
-    elif args.mode == 'renamed':
+    elif args.mode == MODE_RENAMED:
         output_renamed_genres(playlist_ids, collection)
-    elif args.mode == 'filter':
+    elif args.mode == MODE_FILTER:
         output_collection_filter(collection, args.parameters)
 
+# constants
+MODE_SHORT = 'short'
+MODE_VERBOSE = 'verbose'
+MODE_MISSING = 'missing'
+MODE_CATEGORY = 'category'
+MODE_RENAMED = 'renamed'
+MODE_FILTER = 'filter'
+
 if __name__ == '__main__':
-    MODES = { 'short', 'verbose', 'missing', 'category', 'renamed', 'filter' }
+    MODES: set[str] = {
+        MODE_SHORT,
+        MODE_VERBOSE,
+        MODE_MISSING,
+        MODE_CATEGORY,
+        MODE_RENAMED,
+        MODE_FILTER
+    }
     script(parse_args(MODES))
