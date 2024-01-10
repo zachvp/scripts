@@ -6,10 +6,10 @@ import os
 import argparse
 from collections import defaultdict
 import xml.etree.ElementTree as ET
-from organize_library_dates import WrapETElement
+import organize_library_dates as ORG
 
 # print the tracks present in collection, but not the given playlist
-def output_missing_tracks(playlist_ids: set[str], collection: WrapETElement):
+def output_missing_tracks(playlist_ids: set[str], collection: ORG.WrapETElement):
     readout = []
 
     for track in collection:
@@ -21,7 +21,7 @@ def output_missing_tracks(playlist_ids: set[str], collection: WrapETElement):
         print(f"{item}")
 
 # print the genre and count for all tracks in the given file
-def output_genres_verbose(playlist_ids: set[str], collection: WrapETElement):
+def output_genres_verbose(playlist_ids: set[str], collection: ORG.WrapETElement):
     readout: dict[str, int] = defaultdict(int)
 
     # search collection for the file tracks,
@@ -35,7 +35,7 @@ def output_genres_verbose(playlist_ids: set[str], collection: WrapETElement):
         line = f"{genre}\t{count}"
         print(line)
 
-def output_genres_short(playlist_ids: set[str], collection: WrapETElement):
+def output_genres_short(playlist_ids: set[str], collection: ORG.WrapETElement):
     readout : dict[str, int] = defaultdict(int)
 
     # search collection for the file tracks,
@@ -57,7 +57,7 @@ def output_genres_short(playlist_ids: set[str], collection: WrapETElement):
         line = f"{genre}\t{count}"
         print(line)
 
-def output_genre_category(playlist_ids: set[str], collection: WrapETElement):
+def output_genre_category(playlist_ids: set[str], collection: ORG.WrapETElement):
     categories: set[str] = set()
 
     for track in collection:
@@ -106,6 +106,14 @@ def create_genre_map(path: str):
 
     return map_data
 
+def output_collection_filter(root: ORG.WrapETElement, genre: str) -> list[str]:
+    output : list[str] = []
+    for track in root:
+        if track.attrib['Genre'] == genre:
+            output.append(ORG.collection_path_to_syspath(track.attrib['Location']))
+    
+    return output
+
 def parse_args(valid_modes: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=str, help="The input path to the XML collection.")
@@ -123,10 +131,10 @@ def script(args: argparse.Namespace):
     # data: input document
     tree = ET.parse(args.input).getroot()
 
-    collection = WrapETElement(tree.find('.//COLLECTION'))
+    collection = ORG.WrapETElement(tree.find('.//COLLECTION'))
     assert collection and collection.element, "invalid node search for 'COLLECTION'"
 
-    pruned = WrapETElement(tree.find('.//NODE[@Name="_pruned"]'))
+    pruned = ORG.WrapETElement(tree.find('.//NODE[@Name="_pruned"]'))
     assert pruned and pruned.element, "invalid node search for '_pruned'"
 
     # data: script
@@ -147,7 +155,9 @@ def script(args: argparse.Namespace):
         output_genre_category(playlist_ids, collection)
     elif args.mode == 'renamed':
         output_renamed_genres(playlist_ids, collection)
+    elif args.mode == 'filter':
+        output_collection_filter(collection, 'zzz')
 
 if __name__ == '__main__':
-    MODES = { 'short', 'verbose', 'missing', 'category', 'renamed' }
+    MODES = { 'short', 'verbose', 'missing', 'category', 'renamed', 'filter' }
     script(parse_args(MODES))
