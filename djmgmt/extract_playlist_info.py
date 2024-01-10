@@ -3,8 +3,8 @@
 '''
 Format
     Tab-separated
-
-#   Track Title BPM Artist  Genre   Date Added  Time    Key DJ Play Count
+    Fields depend on rekordbox view settings, here is an example line format
+        "#   Track Title BPM Artist  Genre   Date Added  Time    Key DJ Play Count"
 '''
 
 import argparse
