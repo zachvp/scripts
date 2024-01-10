@@ -35,3 +35,25 @@
 # Ongoing process loops
 ## Update files on server from DJing source
     TODO: script to determine changes
+
+# Developer help
+
+## Useful snippets
+### XML sandbox
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+
+<DJ_PLAYLISTS Version="1.0.0">
+  <PRODUCT Name="rekordbox" Version="6.8.1" Company="AlphaTheta"/>
+  <COLLECTION Entries="2708"></COLLECTION>
+  <PLAYLISTS>
+      <NODE Type="0" Name="ROOT" Count="4">
+          <NODE Name="sol_reason" Type="0" Count="7">
+              <NODE Name="core" Type="0" Count="4">
+                <NODE Name="_pruned" Type="1" KeyType="0" Entries="2006"></NODE>
+              </NODE>
+          </NODE>
+      </NODE>
+  </PLAYLISTS>
+</DJ_PLAYLISTS>
+```

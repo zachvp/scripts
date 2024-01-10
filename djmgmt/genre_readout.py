@@ -1,11 +1,15 @@
-import xml.etree.ElementTree as ET
-import sys
-from collections import defaultdict
+'''
+Outputs genres according to the given rekordbox XML collection file.
+'''
 
-#-- function definitions
+import os
+import argparse
+from collections import defaultdict
+import xml.etree.ElementTree as ET
+from organize_library_dates import WrapETElement
 
 # print the tracks present in collection, but not the given playlist
-def output_missing_tracks(playlist_ids, collection):
+def output_missing_tracks(playlist_ids: set[str], collection: WrapETElement):
     readout = []
 
     for track in collection:
@@ -17,8 +21,8 @@ def output_missing_tracks(playlist_ids, collection):
         print(f"{item}")
 
 # print the genre and count for all tracks in the given file
-def output_genres_verbose(playlist_ids, collection):
-    readout = defaultdict(int)
+def output_genres_verbose(playlist_ids: set[str], collection: WrapETElement):
+    readout: dict[str, int] = defaultdict(int)
 
     # search collection for the file tracks,
     # and gather the relevant data
@@ -28,11 +32,11 @@ def output_genres_verbose(playlist_ids, collection):
             readout[key] += 1
 
     for genre, count in readout.items():
-        line = '{}\t{}'.format(genre, count)
+        line = f"{genre}\t{count}"
         print(line)
 
-def output_genres_short(playlist_ids, collection):
-    readout = defaultdict(int)
+def output_genres_short(playlist_ids: set[str], collection: WrapETElement):
+    readout : dict[str, int] = defaultdict(int)
 
     # search collection for the file tracks,
     # and gather the relevant data
@@ -50,11 +54,11 @@ def output_genres_short(playlist_ids, collection):
             readout[key] += 1
 
     for genre, count in readout.items():
-        line = '{}\t{}'.format(genre, count)
+        line = f"{genre}\t{count}"
         print(line)
 
-def output_genre_category(playlist_ids, collection):
-    categories = set()
+def output_genre_category(playlist_ids: set[str], collection: WrapETElement):
+    categories: set[str] = set()
 
     for track in collection:
         if track.attrib['TrackID'] in playlist_ids:
@@ -65,7 +69,7 @@ def output_genre_category(playlist_ids, collection):
     for c in categories:
         print(c)
 
-def output_renamed_genres(playlist_ids, collection):
+def output_renamed_genres(playlist_ids: set[str], collection):
     map_data = create_genre_map('data/read/genre-shorthand-mapping.txt')
     genres = set()
 
@@ -74,7 +78,7 @@ def output_renamed_genres(playlist_ids, collection):
             genre_elements = track.attrib['Genre'].split('/')
             if '' in genre_elements:
                 genre_elements.remove('')
-            renamed = ['' for __ in range(len(genre_elements))]
+            renamed : list[str] = ['' for _ in range(len(genre_elements))]
 
             for i, e in enumerate(genre_elements):
                 renamed[i] = map_data[e]
@@ -83,61 +87,67 @@ def output_renamed_genres(playlist_ids, collection):
 
     print(genres)
 
-def create_genre_map(path):
-    map_data = {}
-    validation = set()
+def create_genre_map(path: str):
+    map_data: dict[str, str] = {}
+    validation: set[str] = set()
 
     with open(path, 'r', encoding='utf-8') as genre_map:
         lines = genre_map.readlines()
         for line in lines:
             components = line.strip().split('\t')
             if components[0] in map_data:
-                print(f'error: duplicate genre element: {components[0]}')
-                return None
+                print(f'warn: duplicate genre element: {components[0]}')
+            assert len(components) == 2, f"Invalid components: {components}"
             map_data[components[0]] = components[1]
     for _, item in map_data.items():
         if item in validation:
-            print(f'error: duplicate shorthand: {item}')
+            print(f'warn: duplicate shorthand: {item}')
         validation.add(item)
 
     return map_data
 
-def script():
-    assert len(sys.argv) > 2, 'expected at least 2 args; arg 2: -s, -v, -m, -c, -r'
-    # user input
-    path = sys.argv[1]
-    mode = sys.argv[2]
+def parse_args(valid_modes: set[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('input', type=str, help="The input path to the XML collection.")
+    parser.add_argument('mode', type=str, help="The script output mode.")
 
-    #-- data: input document
-    tree = ET.parse(path)
-    root = tree.getroot()
-    # todo: fix hard-coding
-    collection = root[1]
-    playlists = root[2]
-    pruned = playlists[0][0][0]
+    args = parser.parse_args()
+    args.input = os.path.normpath(args.input)
 
-    assert pruned.attrib['Name'] == '_pruned', f"unexpected playlist: {pruned.attrib['Name']}"
+    if args.mode not in valid_modes:
+        parser.error(f"Invalid function: {args.mode}. Expect one of '{valid_modes}'.")
 
-    #-- data: script
-    playlist_ids = set()
+    return args
+
+def script(args: argparse.Namespace):
+    # data: input document
+    tree = ET.parse(args.input).getroot()
+
+    collection = WrapETElement(tree.find('.//COLLECTION'))
+    assert collection and collection.element, "invalid node search for 'COLLECTION'"
+
+    pruned = WrapETElement(tree.find('.//NODE[@Name="_pruned"]'))
+    assert pruned and pruned.element, "invalid node search for '_pruned'"
+
+    # data: script
+    playlist_ids : set[str] = set()
 
     # collect the playlist IDs
     for track in pruned:
         playlist_ids.add(track.attrib['Key'])
 
-    # call desired function
-    if mode == '-s':
+    # call requested script mode
+    if args.mode == 'short':
         output_genres_short(playlist_ids, collection)
-    elif mode == '-v':
+    elif args.mode == 'verbose':
         output_genres_verbose(playlist_ids, collection)
-    elif mode == '-m':
+    elif args.mode == 'missing':
         output_missing_tracks(playlist_ids, collection)
-    elif mode == '-c':
+    elif args.mode == 'category':
         output_genre_category(playlist_ids, collection)
-    elif mode == '-r':
+    elif args.mode == 'renamed':
         output_renamed_genres(playlist_ids, collection)
-    else:
-        print(f"unrecognized mode: {mode}")
 
 if __name__ == '__main__':
-    script()
+    MODES = { 'short', 'verbose', 'missing', 'category', 'renamed' }
+    script(parse_args(MODES))
