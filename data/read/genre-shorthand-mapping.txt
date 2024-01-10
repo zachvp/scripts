@@ -1,6 +1,6 @@
 Jazzy	JZ
 Dubby	DB
-Acid	AC
+Acid	AD
 Retro	RT
 Minimal	MN
 Somber	SO
@@ -38,3 +38,5 @@ Experimental	EX
 Groove	GV
 Hard	HD
 Progressive	PR
+Modern	MD
+zzz	ZZ
