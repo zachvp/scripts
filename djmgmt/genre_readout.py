@@ -14,7 +14,7 @@ def output_missing_tracks(playlist_ids: set[str], collection: ORG.WrapETElement)
 
     for track in collection:
         if track.attrib['TrackID'] not in playlist_ids:
-            item = f"{track.attrib['Name']}\t{track.attrib['Artist']}"
+            item = f"{track.attrib['Name']}\t{track.attrib['Artist']}\t{track.attrib['Genre']}\t{track.attrib['DateAdded']}"
             readout.append(item)
 
     for item in readout:
@@ -127,7 +127,7 @@ def output_collection_filter(root: ORG.WrapETElement, genre: str) -> list[str]:
 def parse_args(valid_modes: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=str, help="The input path to the XML collection.")
-    parser.add_argument('mode', type=str, help="The script output mode.")
+    parser.add_argument('mode', type=str, help=f"The script output mode. One of '{valid_modes}'.")
     parser.add_argument('--parameters', '-p', type=str, help="The paramaters for the given mode.")
 
     args = parser.parse_args()
