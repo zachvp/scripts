@@ -2,6 +2,7 @@
 
 # TODO: add health check support
 echo "starting script"
+# set -x
 
 RED=15
 GREEN=60
@@ -34,3 +35,4 @@ sendmidi dev "Launch Control XL" ch 1 on 92 $GREEN
 sendmidi dev "Launch Control XL" ch 1 on 108 $ORANGE
 
 echo "done mapping"
+
