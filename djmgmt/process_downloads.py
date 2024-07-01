@@ -8,6 +8,10 @@ bonus
     + flatten C in destination directory
 '''
 
+# -- TODO
+#   Store processed files in DB
+#   Peek into zip: confirm contains music file; check against processed files
+
 import argparse
 import os
 import shutil
@@ -153,15 +157,6 @@ def sweep(args: argparse.Namespace, valid_extensions: set[str], prefix_hints: se
                 shutil.move(input_path, output_path)
     print("swept all files")
 
-def is_empty_dir(top: str) -> bool:
-    paths = os.listdir(top)
-    empty_files = 0
-    for path in paths:
-        if path.startswith('.'):
-            empty_files += 1
-
-    return empty_files == len(paths)
-
 def find_root_year(path: str) -> str:
     parts : list[str] = path.split('/')
     for i, part in enumerate(parts):
@@ -169,16 +164,45 @@ def find_root_year(path: str) -> str:
             return '/'.join(parts[:i+1])
     return ''
 
+def is_empty_dir(top: str) -> bool:
+    if not os.path.isdir(top):
+        return False
+
+    paths = os.listdir(top)
+    files = 0
+    for path in paths:
+        print(f"listed path: {path}")
+        if path.startswith('.') or os.path.isdir(os.path.join(top, path)):
+            files += 1
+
+    print(f"{files} == {len(paths)}")
+    return files == len(paths)
+
+def get_dirs(top: str) -> list[str]:
+    if not os.path.isdir(top):
+        return []
+
+    dirs = []
+    dir_list = os.listdir(top)
+    for item in dir_list:
+        path = os.path.join(top, item)
+        if os.path.isdir(path):
+            dirs.append(path)
+    return dirs
+
+
 def prune_empty(args: argparse.Namespace) -> None:
     pruned : set[str] = set()
 
     for working_dir, dirnames, _ in os.walk(args.input):
         for dirname in dirnames:
             path = os.path.join(working_dir, dirname)
+            print(f"os.path.join({working_dir}, {dirname})")
             path_root = find_root_year(path)
-            if path_root not in pruned and is_empty_dir(path):
+            if path_root not in pruned and is_empty_dir(path) and len(path_root.strip()) > 0:
                 pruned.add(path_root)
 
+    print(f"pruned: {pruned}")
     for path in pruned:
         print(f"info: will remove: '{path}'")
         if args.interactive:
@@ -212,7 +236,7 @@ def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> arg
     if args.output:
         args.output = os.path.normpath(args.output)
     else:
-        args.output = args.input
+        args.output = os.path.normpath(args.input)
 
     return args
 
