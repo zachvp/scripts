@@ -115,11 +115,11 @@ def create_genre_map(path: str) -> dict[str, str]:
 
     return map_data
 
-def output_collection_filter(root: ORG.WrapETElement, genre: str) -> list[str]:
+def output_collection_filter(root: ORG.WrapETElement) -> list[str]:
     output : list[str] = []
     for track in root:
-        if track.attrib['Genre'] == genre:
-            output.append(ORG.collection_path_to_syspath(track.attrib['Location']))
+        path = ORG.collection_path_to_syspath(track.attrib['Location'])
+        output.append(f"{track.attrib['Genre']}\t{path}")
     for line in output:
         print(line)
     return output
@@ -128,7 +128,6 @@ def parse_args(valid_modes: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=str, help="The input path to the XML collection.")
     parser.add_argument('mode', type=str, help=f"The script output mode. One of '{valid_modes}'.")
-    parser.add_argument('--parameters', '-p', type=str, help="The paramaters for the given mode.")
 
     args = parser.parse_args()
     args.input = os.path.normpath(args.input)
@@ -166,8 +165,8 @@ def script(args: argparse.Namespace) -> None:
         output_genre_category(playlist_ids, collection)
     elif args.mode == MODE_RENAMED:
         output_renamed_genres(playlist_ids, collection)
-    elif args.mode == MODE_FILTER:
-        output_collection_filter(collection, args.parameters)
+    elif args.mode == MODE_PATHS:
+        output_collection_filter(collection)
 
 # constants
 MODE_SHORT = 'short'
@@ -175,7 +174,7 @@ MODE_VERBOSE = 'verbose'
 MODE_MISSING = 'missing'
 MODE_CATEGORY = 'category'
 MODE_RENAMED = 'renamed'
-MODE_FILTER = 'filter'
+MODE_PATHS = 'paths'
 
 if __name__ == '__main__':
     MODES: set[str] = {
@@ -184,6 +183,6 @@ if __name__ == '__main__':
         MODE_MISSING,
         MODE_CATEGORY,
         MODE_RENAMED,
-        MODE_FILTER
+        MODE_PATHS
     }
     script(parse_args(MODES))
