@@ -9,18 +9,17 @@ Format
 
 import argparse
 import os
+import csv
 
 def extract(path: str, fields: list[int]) -> list[str]:
     output = []
 
     with open(path, 'r', encoding='utf-8') as file:
-        lines = file.readlines()
-
-        for i in range(1, len(lines)):
+        rows = csv.reader(file)
+        for row in rows:
             output_line = ''
-            line = lines[i].split('\t')
             for f in fields:
-                output_line += f"{line[f]}\t"
+                output_line += f"{row[f]}\t"
             output_line = output_line.strip()
             if len(output_line) > 0:
                 output.append(output_line)
