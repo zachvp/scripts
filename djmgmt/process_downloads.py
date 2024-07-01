@@ -190,19 +190,26 @@ def get_dirs(top: str) -> list[str]:
             dirs.append(path)
     return dirs
 
-
 def prune_empty(args: argparse.Namespace) -> None:
+    search_dirs : list[str] = []
     pruned : set[str] = set()
 
-    for working_dir, dirnames, _ in os.walk(args.input):
-        for dirname in dirnames:
-            path = os.path.join(working_dir, dirname)
-            print(f"os.path.join({working_dir}, {dirname})")
-            path_root = find_root_year(path)
-            if path_root not in pruned and is_empty_dir(path) and len(path_root.strip()) > 0:
-                pruned.add(path_root)
+    dir_list = get_dirs(args.input)
+    search_dirs.append(args.input)
 
-    print(f"pruned: {pruned}")
+    print(f"search_dirs, start: {search_dirs}")
+
+    while len(search_dirs) > 0:
+        search_dir = search_dirs.pop(0)
+        if is_empty_dir_n(search_dir):
+            pruned.add(search_dir)
+        else:
+            print(f"search_dir: {search_dir}")
+
+            dir_list = get_dirs(search_dir)
+            for filename in dir_list:
+                search_dirs.append(os.path.join(search_dir, filename))
+
     for path in pruned:
         print(f"info: will remove: '{path}'")
         if args.interactive:
@@ -215,6 +222,8 @@ def prune_empty(args: argparse.Namespace) -> None:
         except OSError as e:
             if e.errno == 39: # error: directory not empty
                 print(f"info: skip: non-empty dir {path}")
+
+    print(f"search_dirs, end: {search_dirs}")
 
 def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
