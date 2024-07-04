@@ -10,7 +10,6 @@ bonus
 
 # -- TODO
 #   Store processed files in DB
-#   Peek into zip: confirm contains music file; check against processed files
 
 import argparse
 import os
@@ -18,6 +17,7 @@ import shutil
 import zipfile
 
 # todo: record each function's processing list (e.g. list of files extracted or swept)
+# todo: properly document
 
 def compress_dir(input_path: str, output_path: str):
     with zipfile.ZipFile(output_path + '.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
@@ -201,7 +201,7 @@ def prune_empty(args: argparse.Namespace) -> None:
 
     while len(search_dirs) > 0:
         search_dir = search_dirs.pop(0)
-        if is_empty_dir_n(search_dir):
+        if is_empty_dir(search_dir):
             pruned.add(search_dir)
         else:
             print(f"search_dir: {search_dir}")
