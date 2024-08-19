@@ -6,7 +6,7 @@ assists a user in guessing Fallout terminal hacking puzzle.
 import sys
 
 # helpers
-def compare_similarity(lhs : str, rhs : str) -> int :
+def compare_similarity(lhs : str, rhs : str) -> int:
     '''
     Given two strings, returns the number of overlapping letters between the two.
     '''
@@ -19,7 +19,7 @@ def compare_similarity(lhs : str, rhs : str) -> int :
     return similarity
 
 ## main
-def script(path: str):
+def script(path: str) -> None:
     '''
     The main script function.
     '''
@@ -31,7 +31,7 @@ def script(path: str):
         guesses = [guess.rstrip() for guess in file.readlines()]
 
     # validate input
-    assert len(guesses) > 1, 'expecting at least 2 guesses'
+    assert len(guesses) > 1, 'expect at least 2 guesses'
     for i in range(1, len(guesses)):
         assert len(guesses[i]) == len(guesses[i-1]), 'all guesses should be equal length'
 
@@ -66,7 +66,7 @@ def script(path: str):
 
 
 if __name__ == '__main__':
-    print('runing hack helper...')
+    print('run hack helper...')
     ## input
     file_path = sys.argv[1]
     script(file_path)
