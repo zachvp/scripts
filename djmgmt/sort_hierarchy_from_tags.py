@@ -68,7 +68,9 @@ def clean_dirname_simple(dirname: str) -> str:
 
 def date_path() -> str:
     today = datetime.now()
-    return f"{today.year}/{today.month}/{today.day}"
+    month = str(today.month).zfill(2)
+    day = str(today.day).zfill(2)
+    return f"{today.year}/{month}/{day}"
 
 def sort_hierarchy(args: argparse.Namespace) -> None:
     # CONSTANTS
@@ -102,9 +104,11 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
                         print(f"info: album '{album_raw}' contains at least one illegal character, replacing")
                         print(f"new album name: '{album}'")
 
-                    parent_path = os.path.join(working_dir, artist, album)
                     if args.date:
-                        parent_path = os.path.join(date_path(), parent_path)
+                        print("apply date folder structure")
+                        parent_path = os.path.join(working_dir, date_path())
+
+                    parent_path = os.path.join(parent_path, artist, album)
                     output_path = os.path.join(parent_path, filename)
 
                     if os.path.exists(output_path):
