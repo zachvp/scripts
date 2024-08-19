@@ -133,15 +133,29 @@ def sweep(args: argparse.Namespace, valid_extensions: set[str], prefix_hints: se
                 continue
 
             is_valid_archive = False
+            music_files = 0
             if name_split[1] == '.zip':
-                if is_prefix_match(name, prefix_hints):
-                    is_valid_archive = True
-                else:
+                is_valid_archive = True
+                if not is_prefix_match(name, prefix_hints):
                     with zipfile.ZipFile(input_path) as archive:
                         for archive_file in archive.namelist():
-                            is_valid_archive |= os.path.splitext(archive_file)[1] in valid_extensions
-                            if is_valid_archive:
+                            if not is_valid_archive:
                                 break
+
+                            filepath_split = os.path.split(archive_file)
+                            for f in filepath_split:
+                                if '.app' in os.path.splitext(f)[1]:
+                                    print(f"app {archive_file} detected, skipping")
+                                    is_valid_archive = False
+                                    break
+                            
+                            file_ext = os.path.splitext(archive_file)[1]
+                            if file_ext in valid_extensions:
+                                music_files += 1
+                            else:
+                                is_valid_archive &= file_ext in {'.jpg', '.png', 'jpeg'}
+
+            is_valid_archive &= music_files > 0
 
             if name_split[1] in valid_extensions or is_valid_archive:
                 print(f"info: filter matched file '{input_path}'")
