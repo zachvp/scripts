@@ -1,0 +1,206 @@
+                   FOOD ETC
+ ___________________ ________________________________ _________________________
+|RECIPE:            |INGREDIENTS:                    |SURV|EFFECTS:            |
+|=-=-=-=-=-=-=-=-=-=|=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-|=-=-|=-=-=-=-=-=-=-=-=-=-|
+|Antivenom (x2)     |Night Stalker Blood (x1),       | 40 |Cures Animal Poison |
+|                   |Radscorpion Poison Gland (x4)   |    |                    |
+|Bleak Venom (x3)   |Bark Scorpion PG (x3),          | 50 |HP -15(10s)         |
+|                   |Cazador PG (1x)                 |    |                    |
+|                   |White Horsenettle (5x)          |    |                    |
+|Mass Purified Water|Dirty Water (30x) Glass Pitcher | 50 |HP  7(5s)           |
+|(30x)              |(3x), Pressure Cooker (1x),     |    |                    |
+|                   |RadAway (1x), Surgical Tubing(3x|    |                    |
+|Mother Darkness(3x)|Bark Scorpion PG (3x)           | 75 |AGL -3(1m)PER -3(1m)|
+|                   |Cazador PG (1x),                |    |HP -8(10s)          |
+|                   |White Horsenettle (5x)          |    |                    |
+|Rocket             |Box of Detergent (1x), Jet (1x) | 50 |AP  30              |
+|                   |Nuka-Cola (1x)                  |    |                    |
+|Silver Sting (3x)  |Bark Scorpion PG (3x)           | 30 |STR -2(1m),HP-8(10s)|
+|                   |Cazador PG (1x)                 |    |                    |
+|                   |White Horsenettle (5x)          |    |                    |
+|Tremble            |Bark Scorpion PG (3x)           | 90 |Guns -50(20s),      |
+|                   |Cazador PG (1x)                 |    |Explos. -50(20s),   |
+|                   |White Horsenettle (5x)          |    |Melee Weap. -50(20s)|
+|                   |                                |    |Ener. Weap. -50(20s)|
+|                   |                                |    |HP -2(20s)          |
+|Atomic Cocktail(4x)|Mentats (1x), Nuka-Cola Victory | 25 |Ener. Resis  75,    |
+|                   |(2x), Vodka (2x), Wine (1x)     |    |Fire Resis  75, Rads|
+|                   |                                |    | 9                  |
+|Healing Powder     |Broc Flower (1x), Xander Root(1x| -- |PER -3, HP  3(18s)  |
+|Hydra (2x)         |Cave Fungus (5x), Night Stalker | 75 |Restore Limb Condit.|
+|                   |Blood (3x), Radscorpion PG (2x) |    |(60s)               |
+|Party Time Mentats |Honey Mesquite Pod (1x), Mentats| 50 |CHR  5, PER  2, INT |
+|                   |(1x), Whiskey (1x),             |    | 2                  |
+|Slasher            |Banana Yucca Fruit (2x) Psycho  | 50 |Damage  25%,        |
+|                   |(1x), Stimpak (2x)              |    |Dam. Res  25        |
+|Bighorner Steak    |Bighorner Meat (1x)             | 50 |STR  3, Rads  1, HP |
+|                   |                                |    |7(10s)              |
+|Bloatfly Slider    |Bloatfly Meat (1x), Prickly Pear| 20 |Rads  1, HP  10(15s)|
+|                   |Fruit (2x)                      |    |                    |
+|Brahmin Steak (2x) |Brahmin Meat (2x), Wine (1x)    | 35 |STR  3, Rads  1, HP |
+|                   |                                |    |7(15s)              |
+|Cactus Water       |Empty Soda Bottle (1x), Prickly | 30 |HP  7(5s)           |
+|                   |Pear Fruit (3x)                 |    |                    |
+|Caravan Lunch      |Cram (1x), InstaMash (1x),      | 30 |HP  3(15s), Rads -4 |
+|                   |Lunchbox (1x), Pork N’ Beans (1x|    |(10s)               |
+|                   |RadAway (1x)                    |    |                    |
+|Coyote Steak       |Coyote Meat (1x)                | 50 |Rads  1(3s),HP 7(15s|
+|Desert Salad       |Barrel Cactus Fruit (2x)        | 55 |HP  25(15s)         |
+|                   |Brahmin Steak (1x) Pinyon Nuts  |    |                    |
+|Dog Steak          |Dog Meat (1x)                   | 40 |Rads  1, HP  7(10s) |
+|Fire Ant Fricassée |Cazador Egg (1x), Cram (1x),    | 75 |HP  3(1m)           |
+|                   |Fire Ant Meat (2x), Flour (1x)  |    |                    |
+|Gecko Kebab (2x)   |Banana Yucca Fruit (1x), Gecko M| 60 |Rads  1, HP  3(40s) |
+|                   |Jalapeño Pepper (1x), Buffalo GS|    |                    |
+|Gecko Steak        |Gecko Meat (1x)                 | 25 |Rads  1, HP  7(10s) |
+|Grilled Mantis Leg |Honey Musquite Pod (2x) Wine (1x| 30 |Rads  1, HP  3(30s) |
+|Mole Rat Stew      |Beer (1x), Honey Musquite Pod (2| 65 |HP  3(3s)           |
+|                   |Maize (1x), Mole Rat Meat (1x)  |    |                    |
+|                   |Pinto Bean Pod (1x)             |    |                    |
+|Mushroom Cloud     |Gum Drops (1x), Night Stalker E.| 35 |AP  9, HP  10(20s)  |
+|                   |(2x), Sugar Bombs (1x)          |    |                    |
+|Trail Mix          |Fresh Apple (1x), Fresh Pear (1x| 25 |Rads  1, AP  15, HP |
+|                   |Pinyon Nuts (5x) Sugar Bombs    |    | 18(15s)            |
+|Tanned Fire Gecko  |Fire Gecko Hide (1x) Turpentine | 50 | ------------------ |
+|Hide               |White Horsenettle (7x)          |    |                    |
+|Tanned Gecko Hide  |Gecko Hide (1x), Turpentine (1x)| 25 | ------------------ |
+|                   |White Horsenettle (5x)          |    |                    |
+|Tanned Golden Gecko|Golden Gecko Hide (1x) RadAway(1| 65 | ------------------ |
+|Hide               |Turpentine (1x), White Horsen.  |    |                    |
+|                   |(10x)                           |    |                    |
+|Brahmin Wellington |Ant Egg (2x), Blamo Mac & Cheese| 80 |Rads  1, HP  3(15s) |
+|                   |(1x) Brahmin Meat (1x), Flour (1|    |                    |
+|Cook-Cook's Fiend  |Beer (2x), Brahmin Meat (2x),   | 75 |HP  3(5s)           |
+|Stew               |Fresh Carrot (1x), Fresh Potato |    |                    |
+|                   |(2x), Jalapeño Pepper (2x)      |    |                    |
+|Rose's Wasteland   |Blamo Mac & Cheese (2x), Tin Can| 65 |HP  14(1m)          |
+|                   |Cruncy Mutfruit (1x) Deathclaw  |    |                    |
+|                   |Egg (1x), Lakelurk Meat (2x)    |    |                    |
+|Ice Cold Nuka-Cola |Nuka-Cola (3x)                  | 90 |Rads  1, HP  4(20s) |
+|Nuka-Cola Quartz   |Nuka-Cola (3x)                  | 90 |Low-Light Vision,   |
+|                   |                                |    |DT  6, HP  10(20s)  |
+|                   |                                |    |Rads  2             |
+|Nuka-Cola Victory  |Nuka-Cole (3x)                  | 90 |HP  10(20s), AP  30 |
+|                   |                                |    |PER -3, Rads  2     |
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯ ¯¯¯¯ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+
+                                  AMMUNITION
+ __________________________ ___________________________________ _______ _______
+|RECIPE:                   |INGREDIENTS:                       |REPAIR:|VALUE: |
+|=-=-=-=-=-=-=-=-=-=-=-=-=-|=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=|=-=-=-=|=-=-=-=|
+|.308 Round                |Case.308, Lead(0/17), Powder Rifle |     25|      3|
+|                          |(5x), Primer, Large Rifle (1x)     |       |       |
+|.308 JSP Hand Load        |Case.308, Lead (19x), Powder Rifle |     50|      6|
+|                          |(6x), Primer, Large Rifle          |       |       |
+|.357 Magnum Round         |Case.357 Magnum, Lead (16), Powder |     25|      1|
+|                          |Pistol (8x), Primer Small Pistol   |       |       |
+|.357 Magnum, JFP Hand Load|Case.357, Lead (20),Powder Pistol  |     50|      2|
+|                          |(10x), Primer Small Pistol         |       |       |
+|.44 Magnum Round          |Case.44, Lead (30), Powder Pistol  |     50|      2|
+|                          |(10x), Primer Large Pistol         |       |       |
+|,45-70 Gov't Round        |Case.45-70, Lead (30), Powder R. (4|     65|      3|
+|                          |Primer Large Rifle                 |       |       |
+|.45-70 Gov't SWC Hand Load|Case.45-70, Lead (40), Powder R. (5|     90|      7|
+|                          |Primer Large Rifle                 |       |       |
+|.50 MG Round              |Case.50, Lead (70), Powder R. (22x)|     75|      6|
+|                          |Primer, .50 MG                     |       |       |
+|.50 MG Match Hand Load    |Case.50, Lead (75), Powder R. (25x)|    100|      8|
+|                          |Primer, .50 MG                     |       |       |
+|10mm Round                |Case.10, Lead (17), Powder P. (9x) |     25|      1|
+|                          |Primer Large Pistol                |       |       |
+|10mm JHP Hand Load        |Case.10, Lead (21), Powder P. (12x)|     50|      1|
+|                          |Primer Large Pistol                |       |       |
+|12 Ga. Buckshot           |Hull 12 Gauge, Lead (40), Powder P.|     10|      1|
+|                          |(30x), Primer Shotshell            |       |       |
+|12 Ga. Buckshot, Magnum   |Hull 12 Gauge, Lead (40), Powder P.|     25|      3|
+|                          |(40x), Primer Shotshell            |       |       |
+|12 Ga. Coinshot           |Hull 12 Gauge, Legion Denarius (8x)|     25|     40|
+|                          |Powder Pistol (30x), Primer Shots. |       |       |
+|12 Ga. Slug               |Hull 12 Gauge, Lead (45), Powder P.|     25|      2|
+|                          |(30x), Primer Shotshell            |       |       |
+|20 Ga. Buckshot           |Hull 12 Gauge, Lead (30), Powder P.|     10|      1|
+|                          |(20x), Primer Shotshell            |       |       |
+|20 Ga. Buckshot, Magnum   |Hull 12 Gauge, Lead (30), Powder P.|     25|      3|
+|                          |(28x), Primer Shotshell            |       |       |
+|20 Ga. Slug               |Hull 12 Gauge, Lead (33), Powder P.|     25|      2|
+|                          |(20x), Primer Shotshell            |       |       |
+|5.56mm Round              |Case.5.56, Lead (12), Powder Rifle |     25|      1|
+|                          |(4x), Primer Small Rifle           |       |       |
+|5mm Round                 |Case .5, Lead (13), Powder Rifle (5|     25|      1|
+|                          |Primer Small Rifle                 |       |       |
+|9mm Round                 |Case .9, Lead (13), Powder Pistol  |     25|      1|
+|                          |Primer Small Pistol                |       |       |
+|Breakdown .22 LR (3x)     |Lead (2), Powder Pistol (3x)       |     10|      -|
+|Breakdown .308            |Case.308, Lead (15), Powder R. (4x)|     25|      -|
+|                          |Primer Large Rifle                 |       |       |
+|Breakdown .357 Magnum     |Case.357, Lead (15), Powder P. (6x)|     25|      -|
+|                          |Primer Small Pistol                |       |       |
+|Breakdown .44 Magnum      |Case.44, Lead (27), Powder P. (8x) |     50|      -|
+|                          |Primer Large Pistol                |       |       |
+|Breakdown .45-70 Gov't    |Case.45-70, Lead (27), Powder R. (3|     65|      -|
+|                          |Primer Large Rifle                 |       |       |
+|Breakdown .50 MG (20x)    |Case.50, Lead (64), Powder R. (20x)|     75|      -|
+|                          |Primer .50 MG                      |       |       |
+|Breakdown 10mm            |Case.10, Lead (15), Powder P. (7x) |     25|      -|
+|                          |Primer Large Pistol                |       |       |
+|Breakdown 12 Ga.          |Hull, 12 Gauge, Lead (37), Powder P|     10|      -|
+|                          |(26x), Primer Shotshell            |       |       |
+|Breakdown 20 Ga.          |Hull, 20 Gauge, Lead (26), Powder P|     10|      -|
+|                          |(18x), Primer Shotshell            |       |       |
+|Breakdown 5.56mm          |Case.5.56, Lead (10), Powder R. (3x|     25|      -|
+|                          |Primer Small Rifle                 |       |       |
+|Breakdown 5mm             |Case.5, Lead (11), Powder R. (4x)  |     25|      -|
+|                          |Primer Small RIfle                 |       |       |
+|Breakdown 9mm Round       |Case.9, Lead (11), Powder P. (5x), |     25|      -|
+|                          |Primer Small Rifle                 |       |       |
+|Breakdown Scrap Metal to  |Scrap Metal (1x)                   |     10|      -|
+|Lead (200)                |                                   |       |       |
+|Bottlecap Mine            |Bottle Cap (1x), Cherry Bomb (5x)  |       |       |
+|                          |Lunchbox (1x), Sensor Module (1x)  |       |       |
+|Time Bomb                 |Duct Tape (1x), Dynamite (1x),     |       |       |
+|                          |Egg Timer (1x), Scrap Electronic   |       |       |
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯ ¯¯¯¯¯¯¯ ¯¯¯¯¯¯¯
+
+                               ENERGY AMMUNITION
+ __________________________ ___________________________________ ________ ______
+|RECIPE:                   |INGREDIENTS:                       |SCIENCE:|VALUE:|
+|=-=-=-=-=-=-=-=-=-=-=-=-=-|=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=|=-=-=-=-|=-=-=-|
+|Conversion, EPC to MFC    |Electron Charge Pack (3x)          |   45   |     3|
+|Conversion, ECP to SEC    |Electron Charge Pack (2x)          |   25   |     2|
+|Conversion, MFC to ECP(3x)|Microfusion Cell (1x)              |   40   |     1|
+|Conversion, MFC to SEC(3x)|Microfusion Cell (2x)              |   20   |     2|
+|Conversion, SEC to ECP(2x)|Energy Cell (1x)                   |   50   |     1|
+|Conversion, SEC to MFC(2x)|Energy Cell (3x)                   |   30   |     3|
+|Efficient Recycling,      |Drained Electron Charge Pack (3x)  |   65   |     1|
+|Electron Charge Pack      |                                   |        |      |
+|Efficient Recycling,      |Drained Small Energy Cell (3x)     |   35   |     2|
+|Energy Cell               |                                   |        |      |
+|Efficient Recycling,      |Drained Flamer Fuel Tank (3x)      |   40   |     1|
+|Flamer Fuel               |                                   |        |      |
+|Efficient Recycling,      |Drained Microfusion Cell (3x)      |   50   |     3|
+|Microfusion Cell          |                                   |        |      |
+|Electron Charge Pack, MC  |Electron Charge Pack (5x)          |   85   |     1|
+|Electron Charge Pack, OC  |Electron Charge Pack (3x)          |   55   |     1|
+|Energy Cell, MC           |Energy Cell (5x)                   |   70   |     3|
+|Energy Cell, OC           |Energy Cell (3x)                   |   30   |     2|
+|Flamer Fuel, Homemade (20x|Box of Detergent (1x), Maize (2x)  |   50   |     0|
+|                          |Sugar Bombs (1x)                   |        |      |
+|Microfusion Cell, MC      |Microfusion Cell (5x)              |   75   |     8|
+|Microfusion Cell, OC      |Microfusion Cell (3x)              |   45   |     5|
+|                          |                                   |        |      |
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯ ¯¯¯¯¯¯¯¯ ¯¯¯¯¯¯
+
+                                   MEDICINE
+ ___________________ ________________________________ _________________________
+|RECIPE:            |INGREDIENTS:                    |MED:|EFFECTS:            |
+|=-=-=-=-=-=-=-=-=-=|=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-|=-=-|=-=-=-=-=-=-=-=-=-=-|
+|Doctor's Bag       |Forceps (1x), Medical Brace (1x)| 40 |Restore body parts  |
+|                   |Scalpel (1x), Surgical Tubing (1|    |                    |
+|Stimpak            |Broc Flower (1x), Empty Syringe | 70 |HP  129             |
+|                   |Xander Root (1x)                |    |                    |
+|Super Stimpak      |Leather Belt (1x), Mutfruit (1x)| 90 |Super Stimpak Debuff|
+|                   |Nuka-Cola (1x), Stimpak (1x)    |    |HP   259            |
+|Weapon Repair Kit  |Duct Tape (1x), Scrap Electronic| 50 |Restores currently  |
+|                   |(3x), Scrap metal (3x), Wrench  |    |equipped weapon     |
+|                   |(2x), Wonderglue (2x)           |    |                    |
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯ ¯¯¯¯ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
