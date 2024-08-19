@@ -10,8 +10,24 @@ Format
 import argparse
 import os
 import csv
+import sys
 
-def extract(path: str, fields: list[int]) -> list[str]:
+def extract_tsv(path: str, fields: list[int]) -> list[str]:
+    output = []
+
+    with open(path, 'r', encoding='utf-8') as file:
+        rows = file.readlines()
+        for row in rows:
+            line = row.split('\t')
+            output_line = ''
+            for f in fields:
+                output_line += f"{line[f]}\t"
+            output_line = output_line.strip()
+            if len(output_line) > 0:
+                output.append(output_line)
+    return output
+
+def extract_csv(path: str, fields: list[int]) -> list[str]:
     output = []
 
     with open(path, 'r', encoding='utf-8') as file:
@@ -59,7 +75,16 @@ def script(args: argparse.Namespace):
     if len(fields) < 1:
         fields = [number, title, artist, genre]
 
-    extracted = extract(args.input, fields)
+    extension = os.path.splitext(args.input)[1]
+
+    if extension in {'.tsv', '.txt'}:
+        extracted = extract_tsv(args.input, fields)
+    elif extension == '.csv':
+        extracted = extract_csv(args.input, fields)
+    else:
+        print(f"error: unsupported extension: {extension}")
+        sys.exit(1)
+
     print('\n'.join(extracted))
 
 # main
