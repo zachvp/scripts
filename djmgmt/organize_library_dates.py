@@ -10,7 +10,7 @@ attribute in the XML collection.
 
 For example, if the music library file 'TrackA.aiff' has a corresponding 'DateAdded'
 attribute of 01/02/23 (Jan 2, 2023), the new path will be
-    '/library_root/2023/january/TrackA.aiff'
+    '/library_root/2023/january/01/Artist/Album/TrackA.aiff'
 
 '''
 

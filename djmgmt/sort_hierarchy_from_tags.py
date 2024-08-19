@@ -12,6 +12,7 @@ import os
 import shutil
 import find_duplicate_tags
 import process_downloads
+from datetime import datetime
 
 def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -20,6 +21,7 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser.add_argument('--interactive', '-i', action='store_true', help='Run the script in interactive mode')
     parser.add_argument('--compatibility', '-c', action='store_true', help='Run the script in compatibility mode -\
         Directory names will be cleaned according to permitted FAT32 path characters.')
+    parser.add_argument('--date', '-d', action='store_true', help='Place all files in a date-oriented directory structure.')
 
     args = parser.parse_args()
     args.input = os.path.normpath(args.input)
@@ -64,6 +66,10 @@ def clean_dirname_simple(dirname: str) -> str:
 
     return clean_dirname(dirname, replacements)
 
+def date_path() -> str:
+    today = datetime.now()
+    return f"{today.year}/{today.month}/{today.day}"
+
 def sort_hierarchy(args: argparse.Namespace) -> None:
     # CONSTANTS
     unknown_artist = 'UNKNOWN_ARTIST'
@@ -97,6 +103,8 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
                         print(f"new album name: '{album}'")
 
                     parent_path = os.path.join(working_dir, artist, album)
+                    if args.date:
+                        parent_path = os.path.join(date_path(), parent_path)
                     output_path = os.path.join(parent_path, filename)
 
                     if os.path.exists(output_path):
