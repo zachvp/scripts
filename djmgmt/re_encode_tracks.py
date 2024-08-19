@@ -64,8 +64,6 @@ def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream: str) -
         print(f"command: {shlex.join(command)}")
         sys.exit()
 
-    return ''
-
 def check_skip_sample_rate(args: argparse.Namespace, input_path: str) -> bool:
     '''Returns `True` if sample rate for `input_path` is at or below the standardized value.
     '''
