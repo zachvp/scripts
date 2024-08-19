@@ -1,12 +1,14 @@
 #/bin/bash
 
-COREVEGA_IP_ETHERNET="192.168.2.2"
+COREVEGA_IP="192.168.50.84"
 COREVEGA_PATH_HOME="/home/zachvp"
 COREVEGA_USER="zachvp"
 
 COREVEGA_RSYNC_PORT=12000
 COREVEGA_RSYNC_OPTIONS="--progress -auvzi"
 COREVEGA_PATH_RSYNC_PID="$COREVEGA_PATH_HOME/developer/state/rsync/rsyncd.pid"
+
+# set +x
 
 ## UTIL
 cv_echo()
@@ -43,7 +45,7 @@ start_rsyncd()
 	read COREVEGA_CONTINUE
 	if [ $COREVEGA_CONTINUE == "y" ]; then
     	sudo rsync --daemon --config $COREVEGA_DAEMON_CONFIG_FILE -v
-		ps_rsyncd
+		cv_echo "started daemon with config $COREVEGA_DAEMON_CONFIG_FILE"
 	else
 		cv_echo "user declined to continue"
 	fi
@@ -87,7 +89,7 @@ run_docker_media_music_stream()
 #### Preferred: direct ethernet+ssh+daemon transfer
 run_rsync_transfer_daemon()
 {
-    COREVEGA_TRANSFER_DEST="rsync://$COREVEGA_USER@$COREVEGA_IP_ETHERNET:$COREVEGA_RSYNC_PORT"
+    COREVEGA_TRANSFER_DEST="rsync://$COREVEGA_USER@$COREVEGA_IP:$COREVEGA_RSYNC_PORT"
     COREVEGA_ACTION=$2
     COREVEGA_MUSIC_SOURCE=$3
 
@@ -121,7 +123,7 @@ run_rsync_transfer_daemon()
                     exit 0
                 ;;
             *)
-                cv_echo "Unknown argument '$COREVEGA_ACTION'. Usage: $0 run_rsync_transfer_daemon music | prefs <path>"
+                cv_echo "Unknown argument '$COREVEGA_ACTION'. Usage: $0 run_rsync_transfer_daemon (music | prefs) <path>"
                 set +x
                 exit 1
                 ;;
@@ -136,7 +138,7 @@ run_rsync_transfer_daemon()
 run_rsync_transfer()
 {
     COREVEGA_MUSIC_MEDIA_SOURCE=$2
-	time rsync $COREVEGA_MUSIC_MEDIA_SOURCE zachvp@$COREVEGA_IP_ETHERNET:/media/zachvp/SOL/transfer-rsync/rsync_default \
+	time rsync $COREVEGA_MUSIC_MEDIA_SOURCE zachvp@$COREVEGA_IP:/media/zachvp/SOL/transfer-rsync/rsync_default \
         $COREVEGA_RSYNC_OPTIONS --exclude ".*"
 }
 
