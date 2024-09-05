@@ -92,17 +92,18 @@ def clean_dirname_simple(dirname: str) -> str:
 
     return clean_dirname(dirname, replacements)
 
-def date_path(date: datetime) -> str:
+def date_path(date: datetime, months: dict[int, str]) -> str:
     '''Returns a directory path that corresponds to today's date. 'YYYY-MM-DD' returns 'YYYY/MM/DD'.
     Example: '2024-01-02' returns 2024/01/02
     '''
 
-    # todo: this should use the format '02 february' for the month
-    month = str(date.month).zfill(2)
+    month_index = str(date.month).zfill(2)
+    month_name = months[date.month]
+    month = f"{month_index} {month_name}"
     day = str(date.day).zfill(2)
     return f"{date.year}/{month}/{day}"
 
-def sort_hierarchy(args: argparse.Namespace) -> None:
+def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
     ''' One of the main script functions. Performs an in-place sort of all music files in the args.input directory
     into a standardized 'Artist/Album/Track_File' directory format.
 
@@ -154,7 +155,7 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
                     # apply the date option if present
                     if args.date:
                         print("apply date folder structure")
-                        output_path = os.path.join(output_path, date_path(datetime.now()))
+                        output_path = os.path.join(output_path, date_path(datetime.now(), months))
 
                     # define the parent path for the music filename and the full output file path
                     parent_path = os.path.join(output_path, artist, album)
@@ -188,7 +189,7 @@ def sort_hierarchy(args: argparse.Namespace) -> None:
                 print(f"info: skip: unsupported file: '{filepath}'")
 
 # todo: add function to write invalid paths to file
-def validate_hierarchy(args: argparse.Namespace, expected_depth: int) -> list[str]:
+def validate_hierarchy(args: argparse.Namespace, expected_depth: int, months: set[str]) -> list[str]:
     '''
     One of the main script functions. Validates that all files in the args.input directory
     conform to the expected format.
@@ -198,22 +199,6 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int) -> list[st
 
     # define the output
     invalid_paths: list[str] = []
-
-    # define the valid month names
-    months = {
-        'january',
-        'february',
-        'march',
-        'april',
-        'may',
-        'june',
-        'july',
-        'august',
-        'september',
-        'october',
-        'november',
-        'december',
-    }
 
     # scan all files in the input directory
     for working_dir, dirs, filenames in os.walk(args.input):
@@ -271,6 +256,21 @@ if __name__ == '__main__':
     FUNCTION_SORT = 'sort'
     EXPECTED_DEPTH = 6
 
+    MAPPING_MONTH = {
+        1  : 'january',
+        2  : 'february',
+        3  : 'march',
+        4  : 'april',
+        5  : 'may',
+        6  : 'june',
+        7  : 'july',
+        8  : 'august',
+        9  : 'september',
+        10 : 'october',
+        11 : 'november',
+        12 : 'december',
+    }
+
     # script arguments
     script_functions = {FUNCTION_VALIDATE, FUNCTION_SORT}
     script_args = parse_args(script_functions)
@@ -279,6 +279,6 @@ if __name__ == '__main__':
 
     # run the given script function
     if script_args.function == FUNCTION_VALIDATE:
-        validate_hierarchy(script_args, EXPECTED_DEPTH)
+        validate_hierarchy(script_args, EXPECTED_DEPTH, set(MAPPING_MONTH.values()))
     elif script_args.function == FUNCTION_SORT:
-        sort_hierarchy(script_args)
+        sort_hierarchy(script_args, set(MAPPING_MONTH.values()))
