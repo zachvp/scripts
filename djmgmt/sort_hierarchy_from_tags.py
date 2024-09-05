@@ -281,4 +281,4 @@ if __name__ == '__main__':
     if script_args.function == FUNCTION_VALIDATE:
         validate_hierarchy(script_args, EXPECTED_DEPTH, set(MAPPING_MONTH.values()))
     elif script_args.function == FUNCTION_SORT:
-        sort_hierarchy(script_args, set(MAPPING_MONTH.values()))
+        sort_hierarchy(script_args, MAPPING_MONTH)
