@@ -1,8 +1,8 @@
 '''
 This script is rekordbox XML specific.
-Its assumed that the music library is in a flat directory structure.
+It's assumed that the music library is in a flat directory structure.
     Any tracks in subfolders will be ignored.
-Its assumed that the collection XML file paths point to this flat music library.
+It's assumed that the collection XML file paths point to this flat music library.
 
 Given a path to a music library and XML collection, this script will organize all tracks
 in the libary so that its folder structure will be consistent with the 'DateAdded' track

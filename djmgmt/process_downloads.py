@@ -1,5 +1,5 @@
 '''
-goal: sweep downloads folder for music files
+goal: sweep given folder for music files
 
 procedure
     F: filter source directory for eligible files, directories, or archives
@@ -8,16 +8,14 @@ bonus
     + flatten C in destination directory
 '''
 
-# -- TODO
-#   Store processed files in DB
+# todo: properly document
+# todo: store processed files in DB
+# todo: record each function's processing list (e.g. list of files extracted or swept)
 
 import argparse
 import os
 import shutil
 import zipfile
-
-# todo: record each function's processing list (e.g. list of files extracted or swept)
-# todo: properly document
 
 def compress_dir(input_path: str, output_path: str):
     with zipfile.ZipFile(output_path + '.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
