@@ -1,26 +1,21 @@
 '''
-general purpose script to perform some bulk operation on a list of files
-
-read paths containing list of files, perform one of
-    mv
+This script performs bulk operations on a list of files contained in the input file.
 '''
 
 import os
 import shutil
 import argparse
-
-def format_message(message: str) -> str:
-    message_lines = message.split('\n')
-    output = ''
-    for line in message_lines:
-        output += f"{line.lstrip()}\n"
-
-    return output.rstrip()
+from typing import Callable
 
 def parse_args(functions: set[str]) -> argparse.Namespace:
+    '''Returns the parsed command-line arguments.
+
+    Function parameters:
+        functions -- The valid functions that this script can run.
+    '''
     parser = argparse.ArgumentParser()
     parser.add_argument('function', type=str,
-        help="The type of function to perform. One of: 'mv', 'rm'")
+        help=f"The type of function to perform. One of: {functions}")
     parser.add_argument('input_path', type=str,
         help='The input path to the file containing the list of paths. Expects TSV format.')
     parser.add_argument('output_path', type=str, help='The output path that all files will be written to.')
@@ -40,44 +35,70 @@ def parse_args(functions: set[str]) -> argparse.Namespace:
     if not args.column:
         args.column = 0
 
+    # check filetype
     if os.path.splitext(args.input_path)[1] != '.tsv':
         parser.error(f"Invalid parameter {args.input_path} for positional argument 'input_path'. Expect '*.tsv' file.")
 
     return args
 
+def format_message(message: str) -> str:
+    '''Returns a string formatted without any extra internal whitespace.
+    
+    Function parameters:
+        message -- The string to format.
+    '''
+    message_lines = message.split('\n')
+    output = ''
+    for line in message_lines:
+        output += f"{line.lstrip()}\n"
+
+    return output.rstrip()
+
 def script(args: argparse.Namespace) -> None:
+    '''Performs the given operation on each file contained in the input file.
+
+    Function parameters:
+        args -- The command-line arguments.
+    '''
     with open(args.input_path, 'r', encoding='utf-8') as input_file:
         lines : list[str] = input_file.readlines()
+        action: Callable[[str, str], None] = lambda x, y : print(f"default lambda: {x}, {y}")
+
+        if args.function == 'mv':
+            action = shutil.move
+
+        if not os.path.exists(os.path.normpath(args.output_path)):
+            os.makedirs(os.path.normpath(args.output_path))
+
+        # Main loop.
         for line in lines:
             if '\t'not in line:
-                print(f"info: skip: no tab on line '{line}' for TSV file {args.input_path}")
+                print(f"info: skip: no tab on line '{line}' for TSV file '{args.input_path}'")
                 continue
+
             input_path = os.path.normpath(line.split('\t')[args.column])
-            if args.function == 'mv':
-                if not os.path.exists(os.path.normpath(args.output_path)):
-                    os.makedirs(os.path.normpath(args.output_path))
-                if not os.path.exists(input_path):
-                    print(f"info: skip: input path '{input_path} does not exist.'")
-                    continue
+            if not os.path.exists(input_path):
+                print(f"info: skip: input path '{input_path} does not exist.'")
+                continue
 
-                new_path = os.path.normpath(f"{args.output_path}/{os.path.basename(input_path)}")
-                if os.path.exists(new_path):
-                    print(f"info: skip: path '{new_path}' exists")
-                    continue
+            new_path = os.path.normpath(f"{args.output_path}/{os.path.basename(input_path)}")
+            if os.path.exists(new_path):
+                print(f"info: skip: path '{new_path}' exists")
+                continue
 
-                if args.interactive:
-                    choice = input(format_message(f"""input: move
-                        '{os.path.normpath(input_path)}' to '{os.path.normpath(args.output_path)}'
-                        continue? [y/N]"""))
-                    if choice != 'y':
-                        print("info: exit: user quit")
-                        break
+            if args.interactive:
+                choice = input(format_message(f"""input: move
+                    '{os.path.normpath(input_path)}' to '{os.path.normpath(args.output_path)}'
+                    continue? [y/N]"""))
+                if choice != 'y':
+                    print("info: exit: user quit")
+                    break
 
-                shutil.move(os.path.normpath(input_path), os.path.normpath(args.output_path))
+            action(os.path.normpath(input_path), os.path.normpath(args.output_path))
 
 if __name__ == '__main__':
     script_functions = {'mv'}
     script_args = parse_args(script_functions)
 
-    # main processing loop
+    # main function
     script(script_args)
