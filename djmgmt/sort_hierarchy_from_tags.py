@@ -1,10 +1,10 @@
 '''
-given a top/ dir
-    locate each audio file path:
-        /top/path/parent/audio.file
-    new path:
-        /top/path/parent/artist/album/audio.file
+This script adjusts all music files in a given folder so that they're in
+a standard artist/album directory structure.
 
+For example, given a directory 'top/':
+    For each audio file:
+        /top/path/parent/audio.file -> /top/path/parent/artist/album/audio.file
 '''
 
 from datetime import datetime
@@ -190,8 +190,7 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
 
 # todo: add function to write invalid paths to file
 def validate_hierarchy(args: argparse.Namespace, expected_depth: int, months: set[str]) -> list[str]:
-    '''
-    One of the main script functions. Validates that all files in the args.input directory
+    '''One of the main script functions. Validates that all files in the args.input directory
     conform to the expected format.
 
     Valid path format (relative to music root): '/Year/Month_Index Month_Name/Day/Artist/Album/Music_File'

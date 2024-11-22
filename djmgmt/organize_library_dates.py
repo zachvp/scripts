@@ -1,7 +1,8 @@
 '''
-This script is rekordbox XML specific.
+This script is Rekordbox XML specific.
 It's assumed that the music library is in a flat directory structure.
-    Any tracks in subfolders will be ignored.
+Any tracks in subfolders will be ignored.
+
 It's assumed that the collection XML file paths point to this flat music library.
 
 Given a path to a music library and XML collection, this script will organize all tracks
@@ -10,7 +11,7 @@ attribute in the XML collection.
 
 For example, if the music library file 'TrackA.aiff' has a corresponding 'DateAdded'
 attribute of 01/02/23 (Jan 2, 2023), the new path will be
-    '/library_root/2023/january/01/Artist/Album/TrackA.aiff'
+    '/library_root/2023/01 january/02/Artist/Album/TrackA.aiff'
 
 '''
 
@@ -19,23 +20,27 @@ import os
 import shutil
 import xml.etree.ElementTree as ET
 from urllib.parse import unquote
-from typing import Any
 import argparse
 
-class WrapETElement:
-    def __init__(self, e: ET.Element | Any | None):
-        self.element = e
-
-    def __iter__(self):
-        for item in self.element:
-            yield item
-
 def date_path(date: str, mapping: dict) -> str:
+    '''Returns a date-formatted directory path string.
+    
+    Function parameters:
+        date -- The YYYY-MM-DD date string to transform
+        mapping -- The human-readable definitions for the months
+    '''
     year, month, day = date.split('-')
 
     return f"{year}/{month} {mapping[int(month)]}/{day}"
 
 def full_path(node: ET.Element, pivot: str, mapping: dict) -> str:
+    '''Returns a formatted directory path based on the node's DateAdded field.
+
+    Function arguments:
+        node    -- The XML collection track data
+        pivot   -- The substring between the collection root and the rest of the track directory path
+        mapping -- The human-readable months
+    '''
     date = node.attrib[ATTR_DATE_ADDED]
     path_components = node.attrib[ATTR_PATH].split(pivot)
     subpath_date = date_path(date, mapping)
@@ -43,12 +48,23 @@ def full_path(node: ET.Element, pivot: str, mapping: dict) -> str:
     return f"{path_components[0]}{pivot}{subpath_date}/{path_components[1]}"
 
 def collection_path_to_syspath(path: str) -> str:
+    '''Transforms the given XML collection path to a directory path.
+
+    Function arguments:
+        path -- The URL-like collection path
+    '''
     path_parts = path.split('/')
 
     return unquote('/' + '/'.join(path_parts[3:]))
 
 def swap_root(path: str, root: str) -> str:
-    if root[-1] != '/':
+    '''Returns the given path with its root replaced.
+
+    Function arguments:
+        path -- The directory path
+        root -- The new root to use
+    '''
+    if not root.endswith('/'):
         root += '/'
 
     root = path.replace('/Volumes/ZVP-MUSIC/DJing/', root)
@@ -56,10 +72,10 @@ def swap_root(path: str, root: str) -> str:
     return root
 
 def generate_new_paths(args: argparse.Namespace) -> list[str]:
-    collection = WrapETElement(ET.parse(args.xml_collection_path).getroot().find(XPATH_COLLECTION))
+    collection = ET.parse(args.xml_collection_path).getroot().find(XPATH_COLLECTION)
     lines: list[str] = []
 
-    for node in collection:
+    for node in collection: # type: ignore
         # check if track is in collection root folder
         node_path_parts = node.attrib[ATTR_PATH].split('/')
         if node_path_parts[-2] == 'DJing' or args.output:
