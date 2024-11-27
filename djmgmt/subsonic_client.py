@@ -61,19 +61,33 @@ def call_endpoint(endpoint: str) -> Response:
     print(f'send request: {url}')
     return requests.get(url)
 
-def get_response_content(response: Response):
+def get_response_content(response: Response) -> dict[str, str]:
     return ET.fromstring(response.text).attrib
 
+class API:
+    PING = 'ping'
+    START_SCAN = 'startScan'
+    GET_SCAN_STATUS = 'getScanStatus'
+    
+    ENDPOINTS: set[str] = {PING, START_SCAN, GET_SCAN_STATUS}
+    
+    RESPONSE_STATUS = 'status'
+    RESPONSE_SCAN_STATUS = 'scanning'
+
 if __name__ == '__main__':
-    script_args = parse_args({'ping', 'startScan', 'scanStatus'})
+    script_args = parse_args({'ping', 'startScan', 'getScanStatus'})
     response = call_endpoint(script_args.endpoint)
-    response_content = get_response_content(response)
     
     if response.status_code == 200:
         print(f'successful call to {script_args.endpoint}')
-        if script_args.endpoint == 'ping':
-            status = response_content['status']
+        response_content = get_response_content(response)
+        if script_args.endpoint == API.PING:
+            status = response_content[API.RESPONSE_STATUS]
             print(f'status: {status}')
+        if script_args.endpoint == API.GET_SCAN_STATUS:
+            node = ET.fromstring(response.text)
+            scan_status = node[0].attrib[API.RESPONSE_SCAN_STATUS]
+            print(f'scan status: {scan_status}')
     else:
         '''
         0 	A generic error.
