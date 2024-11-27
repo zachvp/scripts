@@ -79,15 +79,15 @@ if __name__ == '__main__':
     response = call_endpoint(script_args.endpoint)
     
     if response.status_code == 200:
-        print(f'successful call to {script_args.endpoint}')
+        print(f"successful call to '{script_args.endpoint}'")
         response_content = get_response_content(response)
         if script_args.endpoint == API.PING:
-            status = response_content[API.RESPONSE_STATUS]
-            print(f'status: {status}')
-        if script_args.endpoint == API.GET_SCAN_STATUS:
+            print(f'json.dumps(response_content, indent=2)')
+        elif script_args.endpoint == API.GET_SCAN_STATUS or\
+            script_args.endpoint == API.START_SCAN:
             node = ET.fromstring(response.text)
-            scan_status = node[0].attrib[API.RESPONSE_SCAN_STATUS]
-            print(f'scan status: {scan_status}')
+            print(f'{json.dumps(node[0].attrib, indent=2)}')
+            
     else:
         '''
         0 	A generic error.
