@@ -75,14 +75,14 @@ class API:
     RESPONSE_SCAN_STATUS = 'scanning'
 
 if __name__ == '__main__':
-    script_args = parse_args({'ping', 'startScan', 'getScanStatus'})
+    script_args = parse_args(API.ENDPOINTS)
     response = call_endpoint(script_args.endpoint)
     
     if response.status_code == 200:
         print(f"successful call to '{script_args.endpoint}'")
         response_content = get_response_content(response)
         if script_args.endpoint == API.PING:
-            print(f'json.dumps(response_content, indent=2)')
+            print(f'{json.dumps(response_content, indent=2)}')
         elif script_args.endpoint == API.GET_SCAN_STATUS or\
             script_args.endpoint == API.START_SCAN:
             node = ET.fromstring(response.text)
