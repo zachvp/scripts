@@ -1,18 +1,14 @@
 '''
-This script is Rekordbox XML specific.
-It's assumed that the music library is in a flat directory structure.
-Any tracks in subfolders will be ignored.
-
-It's assumed that the collection XML file paths point to this flat music library.
-
-Given a path to a music library and XML collection, this script will organize all tracks
-in the libary so that its folder structure will be consistent with the 'DateAdded' track
-attribute in the XML collection.
+# Summary
+Given a Rekordbox music collection, moves each file to a directory path that corresponds to the date it was added.
 
 For example, if the music library file 'TrackA.aiff' has a corresponding 'DateAdded'
 attribute of 01/02/23 (Jan 2, 2023), the new path will be
     '/library_root/2023/01 january/02/Artist/Album/TrackA.aiff'
 
+## Assumptions
+* The music library source files are in a flat directory structure. Any tracks in subfolders will be ignored.
+* The XML collection file paths point to this flat music library.
 '''
 
 import sys
@@ -23,7 +19,9 @@ from urllib.parse import unquote
 import argparse
 
 def date_path(date: str, mapping: dict) -> str:
-    '''Returns a date-formatted directory path string.
+    '''Returns a date-formatted directory path string. e.g:
+        YYYY/MM MONTH_NAME / DD
+        2024/ 01 january / 02
     
     Function parameters:
         date -- The YYYY-MM-DD date string to transform
@@ -72,6 +70,9 @@ def swap_root(path: str, root: str) -> str:
     return root
 
 def generate_new_paths(args: argparse.Namespace) -> list[str]:
+    '''Generates a list of path mappings.
+    Each item maps from the source path in the collection to the structured directory destination.
+    '''
     collection = ET.parse(args.xml_collection_path).getroot().find(XPATH_COLLECTION)
     lines: list[str] = []
 
@@ -101,9 +102,10 @@ def generate_new_paths(args: argparse.Namespace) -> list[str]:
             print(f"warn: unexpected root {node_path_parts[-2]}, will skip")
     return lines
 
-def organize(args: argparse.Namespace, paths: list[str]) -> None:
-    for path in paths:
-        source, dest = path.split(DELIMITER)
+def move_files(args: argparse.Namespace, path_mappings: list[str]) -> None:
+    '''Moves files according to the paths input mapping.'''
+    for mapping in path_mappings:
+        source, dest = mapping.split(DELIMITER)
 
         # interactive session
         if args.interactive:
@@ -112,7 +114,8 @@ def organize(args: argparse.Namespace, paths: list[str]) -> None:
                 print("exit: user quit")
                 sys.exit()
 
-        target_dir_path =  '/'.join(dest.split('/')[:-1])
+        # get the destination file's directory
+        dest_dir =  '/'.join(dest.split('/')[:-1])
 
         # validate
         if not os.path.exists(source):
@@ -123,8 +126,8 @@ def organize(args: argparse.Namespace, paths: list[str]) -> None:
             continue
 
         # create dir if it doesn't exist
-        if not os.path.exists(target_dir_path):
-            os.makedirs(target_dir_path)
+        if not os.path.exists(dest_dir):
+            os.makedirs(dest_dir)
 
         shutil.move(source, dest)
 
@@ -166,7 +169,7 @@ MAPPING_MONTH =\
 
 def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}")
+    parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}.")
     parser.add_argument('xml_collection_path', type=str, help='The rekordbox library path containing the DateAdded history.')
     parser.add_argument('--output', '-o', type=str,\
         help='The relative path to use in place of the root path defined in the rekordbox xml.')
@@ -200,4 +203,4 @@ if __name__ == '__main__':
 
     print(f"verbose: running organize({script_args.xml_collection_path})")
     if script_args.function == FUNCTION_GENERATE:
-        organize(script_args, generate_new_paths(script_args))
+        move_files(script_args, generate_new_paths(script_args))

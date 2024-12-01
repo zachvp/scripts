@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 import organize_library_dates as ORG
 
 # print the tracks present in collection, but not the given playlist
-def output_missing_tracks(playlist_ids: set[str], collection: ORG.WrapETElement) -> list[str]:
+def output_missing_tracks(playlist_ids: set[str], collection: ET.Element) -> list[str]:
     readout = []
 
     for track in collection:
@@ -22,7 +22,7 @@ def output_missing_tracks(playlist_ids: set[str], collection: ORG.WrapETElement)
     return readout
 
 # print the genre and count for all tracks in the given file
-def output_genres_verbose(playlist_ids: set[str], collection: ORG.WrapETElement) -> list[str]:
+def output_genres_verbose(playlist_ids: set[str], collection: ET.Element) -> list[str]:
     readout: dict[str, int] = defaultdict(int)
     lines: list[str] = []
 
@@ -39,7 +39,7 @@ def output_genres_verbose(playlist_ids: set[str], collection: ORG.WrapETElement)
         print(line)
     return lines
 
-def output_genres_short(playlist_ids: set[str], collection: ORG.WrapETElement) -> list[str]:
+def output_genres_short(playlist_ids: set[str], collection: ET.Element) -> list[str]:
     readout : dict[str, int] = defaultdict(int)
     lines : list[str] = []
 
@@ -64,7 +64,7 @@ def output_genres_short(playlist_ids: set[str], collection: ORG.WrapETElement) -
         print(line)
     return lines
 
-def output_genre_category(playlist_ids: set[str], collection: ORG.WrapETElement) -> set[str]:
+def output_genre_category(playlist_ids: set[str], collection: ET.Element) -> set[str]:
     categories: set[str] = set()
 
     for track in collection:
@@ -115,7 +115,7 @@ def create_genre_map(path: str) -> dict[str, str]:
 
     return map_data
 
-def output_collection_filter(root: ORG.WrapETElement) -> list[str]:
+def output_collection_filter(root: ET.Element) -> list[str]:
     output : list[str] = []
     for track in root:
         path = ORG.collection_path_to_syspath(track.attrib['Location'])
@@ -141,11 +141,11 @@ def script(args: argparse.Namespace) -> None:
     # data: input document
     tree = ET.parse(args.input).getroot()
 
-    collection = ORG.WrapETElement(tree.find('.//COLLECTION'))
-    assert collection and collection.element, "invalid node search for 'COLLECTION'"
+    collection = tree.find('.//COLLECTION')
+    assert collection, "invalid node search for 'COLLECTION'"
 
-    pruned = ORG.WrapETElement(tree.find('.//NODE[@Name="_pruned"]'))
-    assert pruned and pruned.element, "invalid node search for '_pruned'"
+    pruned = tree.find('.//NODE[@Name="_pruned"]')
+    assert pruned, "invalid node search for '_pruned'"
 
     # data: script
     playlist_ids : set[str] = set()

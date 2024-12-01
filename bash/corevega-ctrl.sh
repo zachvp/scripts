@@ -1,9 +1,9 @@
-#/bin/bash
+#!/bin/bash
 
 COREVEGA_IP="192.168.50.84"
 COREVEGA_PATH_HOME="/home/zachvp"
-COREVEGA_USER="zachvp"
 
+COREVEGA_USER="zachvp"
 COREVEGA_RSYNC_PORT=12000
 COREVEGA_RSYNC_OPTIONS="--progress -auvzi"
 COREVEGA_PATH_RSYNC_PID="$COREVEGA_PATH_HOME/developer/state/rsync/rsyncd.pid"
