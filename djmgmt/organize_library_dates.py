@@ -3,7 +3,7 @@
 Given a Rekordbox music collection, moves each file to a directory path that corresponds to the date it was added.
 
 For example, if the music library file 'TrackA.aiff' has a corresponding 'DateAdded'
-attribute of 01/02/23 (Jan 2, 2023), the new path will be
+attribute of '01/02/23 (Jan 2, 2023)', the new path will be
     '/library_root/2023/01 january/02/Artist/Album/TrackA.aiff'
 
 ## Assumptions
@@ -18,6 +18,31 @@ import xml.etree.ElementTree as ET
 from urllib.parse import unquote
 import argparse
 
+# GLOBALS
+## Read-only
+ATTR_DATE_ADDED = 'DateAdded'
+ATTR_PATH = 'Location'
+PATH_LIBRARY_PIVOT = '/ZVP-MUSIC/DJing/'
+XPATH_COLLECTION = './/COLLECTION'
+DELIMITER = '->'
+
+MAPPING_MONTH =\
+{
+    1  : 'january',
+    2  : 'february',
+    3  : 'march',
+    4  : 'april',
+    5  : 'may',
+    6  : 'june',
+    7  : 'july',
+    8  : 'august',
+    9  : 'september',
+    10 : 'october',
+    11 : 'november',
+    12 : 'december',
+}
+
+# Helper functions
 def date_path(date: str, mapping: dict) -> str:
     '''Returns a date-formatted directory path string. e.g:
         YYYY/MM MONTH_NAME / DD
@@ -69,14 +94,29 @@ def swap_root(path: str, root: str) -> str:
 
     return root
 
+# Dev functions
+def dev_debug():
+    test_str =\
+    '''
+        <TRACK TrackID="109970693" Name="花と鳥と山" Artist="haircuts for men" Composer="" Album="京都コネクション" Grouping="" Genre="Lounge/Ambient" Kind="AIFF File" Size="84226278" TotalTime="476" DiscNumber="0" TrackNumber="5" Year="2023" AverageBpm="134.00" DateAdded="2023-04-27" BitRate="1411" SampleRate="44100" Comments="8A - 1" PlayCount="1" Rating="0" Location="file://localhost/Volumes/ZVP-MUSIC/DJing/haircuts%20for%20men%20-%20%e8%8a%b1%e3%81%a8%e9%b3%a5%e3%81%a8%e5%b1%b1.aiff" Remixer="" Tonality="8A" Label="" Mix="">
+          <TEMPO Inizio="0.126" Bpm="134.00" Metro="4/4" Battito="1" />
+        </TRACK>'''
+    t = ET.fromstring(test_str)
+    print(t.tag)
+
+    u = full_path(t, '/ZVP-MUSIC/DJing/', MAPPING_MONTH)
+    print(u)
+
+# Primary functions
 def generate_new_paths(args: argparse.Namespace) -> list[str]:
     '''Generates a list of path mappings.
     Each item maps from the source path in the collection to the structured directory destination.
     '''
     collection = ET.parse(args.xml_collection_path).getroot().find(XPATH_COLLECTION)
+    assert collection, f"unable to find {XPATH_COLLECTION} for path '{args.xml_collection_path}'"
     lines: list[str] = []
 
-    for node in collection: # type: ignore
+    for node in collection:
         # check if track is in collection root folder
         node_path_parts = node.attrib[ATTR_PATH].split('/')
         if node_path_parts[-2] == 'DJing' or args.output:
@@ -131,48 +171,12 @@ def move_files(args: argparse.Namespace, path_mappings: list[str]) -> None:
 
         shutil.move(source, dest)
 
-def dev_debug():
-    test_str =\
-    '''
-        <TRACK TrackID="109970693" Name="花と鳥と山" Artist="haircuts for men" Composer="" Album="京都コネクション" Grouping="" Genre="Lounge/Ambient" Kind="AIFF File" Size="84226278" TotalTime="476" DiscNumber="0" TrackNumber="5" Year="2023" AverageBpm="134.00" DateAdded="2023-04-27" BitRate="1411" SampleRate="44100" Comments="8A - 1" PlayCount="1" Rating="0" Location="file://localhost/Volumes/ZVP-MUSIC/DJing/haircuts%20for%20men%20-%20%e8%8a%b1%e3%81%a8%e9%b3%a5%e3%81%a8%e5%b1%b1.aiff" Remixer="" Tonality="8A" Label="" Mix="">
-          <TEMPO Inizio="0.126" Bpm="134.00" Metro="4/4" Battito="1" />
-        </TRACK>'''
-    t = ET.fromstring(test_str)
-    print(t.tag)
-
-    u = full_path(t, '/ZVP-MUSIC/DJing/', MAPPING_MONTH)
-    print(u)
-
-# GLOBALS
-## Read-only
-ATTR_DATE_ADDED = 'DateAdded'
-ATTR_PATH = 'Location'
-PATH_LIBRARY_PIVOT = '/ZVP-MUSIC/DJing/'
-XPATH_COLLECTION = './/COLLECTION'
-DELIMITER = '->'
-
-MAPPING_MONTH =\
-{
-    1  : 'january',
-    2  : 'february',
-    3  : 'march',
-    4  : 'april',
-    5  : 'may',
-    6  : 'june',
-    7  : 'july',
-    8  : 'august',
-    9  : 'september',
-    10 : 'october',
-    11 : 'november',
-    12 : 'december',
-}
-
 def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}.")
     parser.add_argument('xml_collection_path', type=str, help='The rekordbox library path containing the DateAdded history.')
     parser.add_argument('--output', '-o', type=str,\
-        help='The relative path to use in place of the root path defined in the rekordbox xml.')
+        help='The path to use in place of the root path defined in the rekordbox xml.')
     parser.add_argument('-i', '--interactive', action='store_true', help='Run script in interactive mode.')
     parser.add_argument('--force', action='store_true', help='Skip all interaction safeguards and run the script.')
 
@@ -192,7 +196,7 @@ if __name__ == '__main__':
     if script_args.output:
         print(f"info: args output root dir: '{script_args.output}'")
 
-    # check switches
+    # check argument switches
     if not script_args.interactive and not script_args.force:
         main_choice = input("this is a destructive action, and interactive mode is disabled, continue? [y/N]")
         if main_choice == 'y':

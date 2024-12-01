@@ -1,8 +1,9 @@
 '''
-Script steps
+# Summary
     1. Scans an input directory of date-structured audio files in chronological order.
     2. Transfers each audio file into the output directory, maintaining the
         date and subdirectory structure of the source directory.
+      2a. Suspends process when scan switches from one day to another.
 
 Usage:
     `populate_media_server.py -h`
@@ -99,6 +100,8 @@ def sync(args: argparse.Namespace):
         print(f"error: unrecognized mode: {args.mode}. Exiting.")
         return
 
+    # Performs the configured action for each input and output path
+    # Waits for user input when input path date context changes
     for path in input_paths:
         # Skip any existing valid output paths.
         output_path_full = os.path.join(args.output, path)
