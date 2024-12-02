@@ -1,10 +1,14 @@
 '''
-This script adjusts all music files in a given folder so that they're in
-a standard artist/album directory structure.
+# Summary
+* Standardizes all music files in a given directory to an artist/album or year/month/day/artist/album directory structure
+    according to music file metadata and today's date.
+* Validates a given directory to match the expected directory structure.
 
-For example, given a directory 'top/':
-    For each audio file:
-        /top/path/parent/audio.file -> /top/path/parent/artist/album/audio.file
+# Example
+For a directory 'top/':
+    top/parent/audio.file -> top/parent/artist/album/audio.file
+                            or
+    top/parent/audio.file -> top/parent/year/month/day/artist/album/audio.file
 '''
 
 from datetime import datetime
@@ -13,43 +17,9 @@ import os
 import shutil
 
 import find_duplicate_tags
-import process_downloads
+import batch_operations_music
 
-
-def parse_args(valid_functions: set[str]) -> argparse.Namespace:
-    '''Returns the parsed command-line arguments.
-
-    valid_functions -- defines the supported script functions
-    
-
-    Required command-line arguments:
-    function -- the function to run
-    input -- the input path context
-
-    Optional command-line arguments:
-    interactive -- run the script interactively, requiring user input to execute each operation
-    compatibility -- Run the script for FAT32 compatibility mode
-    '''
-
-    # define the supported arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}")
-    parser.add_argument('input', type=str, help='The top/root path to scan and organize.')
-    parser.add_argument('--interactive', '-i', action='store_true', help='Run the script in interactive mode')
-    parser.add_argument('--compatibility', '-c', action='store_true', help='Run the script in compatibility mode -\
-        Directory names will be cleaned according to permitted FAT32 path characters.')
-    parser.add_argument('--date', '-d', action='store_true', help='Place all files in a date-oriented directory structure.')
-
-    # parse the arguments and clean input
-    args = parser.parse_args()
-    args.input = os.path.normpath(args.input)
-
-    # check for errors
-    if args.function not in valid_functions:
-        parser.error(f"invalid function: '{args.function}'")
-
-    return args
-
+# Helper functions
 def clean_dirname(dirname: str, replacements: dict[str, str]) -> str:
     '''Cleans any dirty substrings in `dirname`.
 
@@ -103,22 +73,22 @@ def date_path(date: datetime, months: dict[int, str]) -> str:
     day = str(date.day).zfill(2)
     return f"{date.year}/{month}/{day}"
 
+# Primary functions
 def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
     ''' One of the main script functions. Performs an in-place sort of all music files in the args.input directory
     into a standardized 'Artist/Album/Track_File' directory format.
 
     If the args.date option is passed, today's date is used to construct the start of the modified path.
     So the full path would be 'Year/Month/Day/Artist/Album/Track_File'
-    ''
     '''
 
-    # CONSTANTS - placeholders when the corresponding file metadata is missing
-    unknown_artist = 'UNKNOWN_ARTIST'
-    unknown_album = 'UNKNOWN_ALBUM'
+    # placeholders for missing file metadata
+    UNKNOWN_ARTIST = 'UNKNOWN_ARTIST'
+    UNKNOWN_ALBUM = 'UNKNOWN_ALBUM'
 
     # scan the input directory
     for working_dir, _, filenames in os.walk(args.input):
-        process_downloads.prune(working_dir, [], filenames)
+        batch_operations_music.prune(working_dir, [], filenames)
 
         # scan all filenames
         for filename in filenames:
@@ -130,7 +100,7 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
                 tags = find_duplicate_tags.read_tags(filepath)
                 if tags:
                     # extract and clean up the artist string
-                    artist = tags.artist if tags.artist else unknown_artist
+                    artist = tags.artist if tags.artist else UNKNOWN_ARTIST
                     artist_raw = artist
                     artist = clean_dirname_simple(artist)
                     if args.compatibility:
@@ -140,7 +110,7 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
                         print(f"new artist name: '{artist}'")
 
                     # extract and clean up the album string
-                    album = tags.album if tags.album else unknown_album
+                    album = tags.album if tags.album else UNKNOWN_ALBUM
                     album_raw = album
                     album = clean_dirname_simple(album)
                     if args.compatibility:
@@ -188,7 +158,6 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
                 # skip non-music files
                 print(f"info: skip: unsupported file: '{filepath}'")
 
-# todo: add function to write invalid paths to file
 def validate_hierarchy(args: argparse.Namespace, expected_depth: int, months: set[str]) -> list[str]:
     '''One of the main script functions. Validates that all files in the args.input directory
     conform to the expected format.
@@ -249,6 +218,41 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int, months: se
 
     return invalid_paths
 
+def parse_args(valid_functions: set[str]) -> argparse.Namespace:
+    '''Returns the parsed command-line arguments.
+
+    valid_functions -- defines the supported script functions
+    
+
+    Required command-line arguments:
+    function -- the function to run
+    input -- the input path context
+
+    Optional command-line arguments:
+    interactive -- run the script interactively, requiring user input to execute each operation
+    compatibility -- Run the script for FAT32 compatibility mode
+    '''
+
+    # define the supported arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}")
+    parser.add_argument('input', type=str, help='The top/root path to scan and organize.')
+    parser.add_argument('--interactive', '-i', action='store_true', help='Run the script in interactive mode')
+    parser.add_argument('--compatibility', '-c', action='store_true', help='Run the script in compatibility mode -\
+        Directory names will be cleaned according to permitted FAT32 path characters.')
+    parser.add_argument('--date', '-d', action='store_true', help='Place all files in a date-oriented directory structure.')
+
+    # parse the arguments and clean input
+    args = parser.parse_args()
+    args.input = os.path.normpath(args.input)
+
+    # check for errors
+    if args.function not in valid_functions:
+        parser.error(f"invalid function: '{args.function}'")
+
+    return args
+
+# Main
 if __name__ == '__main__':
     # constants
     FUNCTION_VALIDATE = 'validate'

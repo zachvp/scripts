@@ -7,40 +7,6 @@ import shutil
 import argparse
 from typing import Callable
 
-def parse_args(functions: set[str]) -> argparse.Namespace:
-    '''Returns the parsed command-line arguments.
-
-    Function parameters:
-        functions -- The valid functions that this script can run.
-    '''
-    parser = argparse.ArgumentParser()
-    parser.add_argument('function', type=str,
-        help=f"The type of function to perform. One of: {functions}")
-    parser.add_argument('input_path', type=str,
-        help='The input path to the file containing the list of paths. Expects TSV format.')
-    parser.add_argument('output_path', type=str, help='The output path that all files will be written to.')
-    parser.add_argument('--column', '-c', type=int, help="The column to process in the input file. Defaults to '0'")
-    parser.add_argument('--interactive', '-i', action='store_true',
-        help="Run the script in interactive mode. Defaults to 'False'")
-
-    args = parser.parse_args()
-
-    # validate arguments
-    if args.function not in functions:
-        parser.error(f"Invalid parameter '{args.function}' for positional argument 'function'. Expect one of: {functions}.")
-
-    # normalize arguments
-    args.input_path = os.path.normpath(args.input_path)
-    args.output_path = os.path.normpath(args.output_path)
-    if not args.column:
-        args.column = 0
-
-    # check filetype
-    if os.path.splitext(args.input_path)[1] != '.tsv':
-        parser.error(f"Invalid parameter {args.input_path} for positional argument 'input_path'. Expect '*.tsv' file.")
-
-    return args
-
 def format_message(message: str) -> str:
     '''Returns a string formatted without any extra internal whitespace.
     
@@ -87,18 +53,53 @@ def script(args: argparse.Namespace) -> None:
                 continue
 
             if args.interactive:
-                choice = input(format_message(f"""input: move
+                choice = input(format_message(f"""input: {args.function}
                     '{os.path.normpath(input_path)}' to '{os.path.normpath(args.output_path)}'
                     continue? [y/N]"""))
                 if choice != 'y':
                     print("info: exit: user quit")
+    
                     break
 
             action(os.path.normpath(input_path), os.path.normpath(args.output_path))
 
+def parse_args(functions: set[str]) -> argparse.Namespace:
+    '''Returns the parsed command-line arguments.
+
+    Function parameters:
+        functions -- The valid functions that this script can run.
+    '''
+    parser = argparse.ArgumentParser()
+    parser.add_argument('function', type=str,
+        help=f"The type of function to perform. One of: {functions}")
+    parser.add_argument('input_path', type=str,
+        help='The input path to the file containing the list of paths. Expects TSV format.')
+    parser.add_argument('output_path', type=str, help='The output path that all files will be written to.')
+    parser.add_argument('--column', '-c', type=int, help="The column to process in the input file. Defaults to '0'")
+    parser.add_argument('--interactive', '-i', action='store_true',
+        help="Run the script in interactive mode. Defaults to 'False'")
+
+    args = parser.parse_args()
+
+    # validate arguments
+    if args.function not in functions:
+        parser.error(f"Invalid parameter '{args.function}' for positional argument 'function'. Expect one of: {functions}.")
+
+    # normalize arguments
+    args.input_path = os.path.normpath(args.input_path)
+    args.output_path = os.path.normpath(args.output_path)
+    if not args.column:
+        args.column = 0
+
+    # check filetype
+    if os.path.splitext(args.input_path)[1] != '.tsv':
+        parser.error(f"Invalid parameter {args.input_path} for positional argument 'input_path'. Expect '*.tsv' file.")
+
+    return args
+
+# Main
 if __name__ == '__main__':
     script_functions = {'mv'}
     script_args = parse_args(script_functions)
 
-    # main function
     script(script_args)
