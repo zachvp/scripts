@@ -48,6 +48,7 @@ def dev_print_relevant_values(track: mutagen.FileType, relevant_keys: set[str]) 
     return printed
 
 def get_track_key(track: mutagen.FileType, options: set[str]) -> Optional[str]:
+    '''Tries to find a key present in the given track based on the given options.'''
     try:
         for o in options:
             if o in track:
@@ -66,7 +67,6 @@ def read_tags(path: str) -> Optional[Tags]:
     # load track tags, check for errors
     try:
         track = mutagen.File(path)
-        # track = ID3(path)
     except mutagen.MutagenError as e:
         print(f"mutagen.MutagenError: {e}\npath: '{path}'")
         return None

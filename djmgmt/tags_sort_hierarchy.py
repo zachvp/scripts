@@ -16,7 +16,7 @@ import argparse
 import os
 import shutil
 
-import find_duplicate_tags
+import tags_find_duplicates
 import batch_operations_music
 
 # Helper functions
@@ -97,7 +97,7 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
             # filter for music files
             if os.path.splitext(filename)[1] in {'.aiff', '.aif', '.mp3', '.wav'}:
                 # read the artist and album
-                tags = find_duplicate_tags.read_tags(filepath)
+                tags = tags_find_duplicates.read_tags(filepath)
                 if tags:
                     # extract and clean up the artist string
                     artist = tags.artist if tags.artist else UNKNOWN_ARTIST

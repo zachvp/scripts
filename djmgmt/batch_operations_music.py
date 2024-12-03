@@ -43,11 +43,11 @@ def flatten_zip(zip_path: str, extract_path: str) -> None:
 def prune(working_dir: str, directories: list[str], filenames: list[str]) -> None:
     for index, directory in enumerate(directories):
         if is_prefix_match(directory, {'.', '_'}) or '.app' in directory:
-            print(f"info: skip: hidden directory or '.app' archive '{os.path.join(working_dir, directory)}'")
+            print(f"info: prune: hidden directory or '.app' archive '{os.path.join(working_dir, directory)}'")
             del directories[index]
     for index, name in enumerate(filenames):
         if name.startswith('.'):
-            print(f"info: skip: hidden file '{name}'")
+            print(f"info: prune: hidden file '{name}'")
             del filenames[index]
 
 def find_root_year(path: str) -> str:
@@ -229,7 +229,7 @@ def prune_empty(args: argparse.Namespace) -> None:
         try:
             shutil.rmtree(path)
         except OSError as e:
-            if e.errno == 39: # error: directory not empty
+            if e.errno == 39: # directory not empty
                 print(f"info: skip: non-empty dir {path}")
 
     print(f"search_dirs, end: {search_dirs}")
