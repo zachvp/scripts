@@ -18,16 +18,18 @@ import xml.etree.ElementTree as ET
 from urllib.parse import unquote
 import argparse
 
-# GLOBALS
-## Read-only
+import constants
+
+# Constants
 ATTR_DATE_ADDED = 'DateAdded'
 ATTR_PATH = 'Location'
-PATH_LIBRARY_PIVOT = '/ZVP-MUSIC/DJing/'
+ATTR_ARTIST = 'Artist'
+ATTR_ALBUM = 'Album'
+REKORDBOX_ROOT = 'file://localhost'
 XPATH_COLLECTION = './/COLLECTION'
 DELIMITER = '->'
 
-MAPPING_MONTH =\
-{
+MAPPING_MONTH = {
     1  : 'january',
     2  : 'february',
     3  : 'march',
@@ -48,7 +50,7 @@ def date_path(date: str, mapping: dict) -> str:
         YYYY/MM MONTH_NAME / DD
         2024/ 01 january / 02
     
-    Function parameters:
+    Arguments:
         date -- The YYYY-MM-DD date string to transform
         mapping -- The human-readable definitions for the months
     '''
@@ -56,43 +58,63 @@ def date_path(date: str, mapping: dict) -> str:
 
     return f"{year}/{month} {mapping[int(month)]}/{day}"
 
-def full_path(node: ET.Element, pivot: str, mapping: dict) -> str:
+def full_path(node: ET.Element, library_root: str, mapping: dict, metadata_path: bool=False) -> str:
     '''Returns a formatted directory path based on the node's DateAdded field.
 
-    Function arguments:
+    Arguments:
         node    -- The XML collection track data
         pivot   -- The substring between the collection root and the rest of the track directory path
         mapping -- The human-readable months
+        include_metadata -- Whether the path should include album and artist metadata
     '''
+    # path components
     date = node.attrib[ATTR_DATE_ADDED]
-    path_components = node.attrib[ATTR_PATH].split(pivot)
+    path_components = os.path.split(node.attrib[ATTR_PATH].lstrip(library_root))
     subpath_date = date_path(date, mapping)
-
-    return f"{path_components[0]}{pivot}{subpath_date}/{path_components[1]}"
+    
+    # construct the path
+    path = os.path.join('/', path_components[0], subpath_date)
+    if metadata_path:
+        artist = node.attrib[ATTR_ARTIST]
+        album = node.attrib[ATTR_ALBUM]
+        if not artist:
+            artist = constants.UNKNOWN_ARTIST
+        if not album:
+            album = constants.UNKNOWN_ALBUM
+        path = os.path.join(path, artist, album)   # append metadata
+    path = os.path.join(path, path_components[-1]) # append file name
+    return path
+    # return f"{path_components[0]}{pivot}{subpath_date}/{path_components[1]}"
 
 def collection_path_to_syspath(path: str) -> str:
     '''Transforms the given XML collection path to a directory path.
 
-    Function arguments:
+    Arguments:
         path -- The URL-like collection path
     '''
-    path_parts = path.split('/')
-
-    return unquote('/' + '/'.join(path_parts[3:]))
+    syspath = unquote(path).lstrip(REKORDBOX_ROOT)
+    if not syspath.startswith('/'):
+        syspath = '/' + syspath
+    return syspath # todo: fix
 
 def swap_root(path: str, root: str) -> str:
     '''Returns the given path with its root replaced.
 
-    Function arguments:
+    Arguments:
         path -- The directory path
         root -- The new root to use
     '''
     if not root.endswith('/'):
         root += '/'
 
-    root = path.replace('/Volumes/ZVP-MUSIC/DJing/', root)
+    root = path.replace('/Users/zachvp/', root)
 
     return root
+
+def get_collection(file_path, xpath) -> ET.Element:
+    collection = ET.parse(file_path).getroot().find(xpath)
+    assert collection, f"unable to find {xpath} for path '{file_path}'"
+    return collection
 
 # Dev functions
 def dev_debug():
@@ -108,40 +130,42 @@ def dev_debug():
     print(u)
 
 # Primary functions
-def generate_new_paths(args: argparse.Namespace) -> list[str]:
+def generate_date_paths(args: argparse.Namespace) -> list[str]:
     '''Generates a list of path mappings.
     Each item maps from the source path in the collection to the structured directory destination.
+    The structure includes the date added and optionally track metadata.
     '''
-    collection = ET.parse(args.xml_collection_path).getroot().find(XPATH_COLLECTION)
-    assert collection, f"unable to find {XPATH_COLLECTION} for path '{args.xml_collection_path}'"
+    collection = get_collection(args.xml_collection_path, XPATH_COLLECTION)
     lines: list[str] = []
 
     for node in collection:
-        # check if track is in collection root folder
-        node_path_parts = node.attrib[ATTR_PATH].split('/')
-        if node_path_parts[-2] == 'DJing' or args.output:
-            # build each entry for the old and new path
-            track_path_old = collection_path_to_syspath(node.attrib[ATTR_PATH])
-            if args.output:
-                track_path_old = swap_root(track_path_old, args.output)
+        # check if track file is in expected library folder
+        if REKORDBOX_ROOT not in node.attrib[ATTR_PATH]:
+            print(f"warn: unexpected path {collection_path_to_syspath(node.attrib[ATTR_PATH])}, will skip")
+            continue
+        
+        # build each entry for the old and new path
+        track_path_old = collection_path_to_syspath(node.attrib[ATTR_PATH])
+        if args.root_path:
+            track_path_old = swap_root(track_path_old, args.root_path)
 
-            track_path_new = full_path(node, PATH_LIBRARY_PIVOT, MAPPING_MONTH)
-            track_path_new = collection_path_to_syspath(track_path_new)
-            if args.output:
-                track_path_new = swap_root(track_path_new, args.output)
+        track_path_new = full_path(node, REKORDBOX_ROOT, MAPPING_MONTH, metadata_path=args.metadata_path)
+        track_path_new = collection_path_to_syspath(track_path_new)
+        if args.root_path:
+            track_path_new = swap_root(track_path_new, args.root_path)
 
-            if DELIMITER in track_path_old or DELIMITER in track_path_new:
-                print(f'''
-                    fatal: delimeter already exists in either {track_path_old} or {track_path_new}
-                    exiting..
-                    ''')
-                sys.exit()
+        if DELIMITER in track_path_old or DELIMITER in track_path_new:
+            print(f'''
+                fatal: delimeter already exists in either {track_path_old} or {track_path_new}
+                exiting..
+                ''')
+            sys.exit()
 
-            lines.append(f"{track_path_old}{DELIMITER}{track_path_new}")
-        else:
-            print(f"warn: unexpected root {node_path_parts[-2]}, will skip")
+        lines.append(f"{track_path_old}{DELIMITER}{track_path_new}")
+            
     return lines
 
+# todo: replace with call to bulk operations script
 def move_files(args: argparse.Namespace, path_mappings: list[str]) -> None:
     '''Moves files according to the paths input mapping.'''
     for mapping in path_mappings:
@@ -175,9 +199,9 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}.")
     parser.add_argument('xml_collection_path', type=str, help='The rekordbox library path containing the DateAdded history.')
-    parser.add_argument('--output', '-o', type=str,\
-        help='The path to use in place of the root path defined in the rekordbox xml.')
-    parser.add_argument('-i', '--interactive', action='store_true', help='Run script in interactive mode.')
+    parser.add_argument('--root-path', '-p', type=str, help='The path to use in place of the root path defined in the rekordbox xml.')
+    parser.add_argument('--metadata-path', '-m', action='store_true', help='Include artist and album in path.')
+    parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode.')
     parser.add_argument('--force', action='store_true', help='Skip all interaction safeguards and run the script.')
 
     args = parser.parse_args()
@@ -189,12 +213,12 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
 
 # MAIN
 if __name__ == '__main__':
-    FUNCTION_GENERATE = 'generate'
-    script_functions = {FUNCTION_GENERATE}
+    FUNCTION_DATE_PATHS = 'date-paths'
+    script_functions = {FUNCTION_DATE_PATHS}
     script_args = parse_args(script_functions)
 
-    if script_args.output:
-        print(f"info: args output root dir: '{script_args.output}'")
+    if script_args.root_path:
+        print(f"info: args output root dir: '{script_args.root_path}'")
 
     # check argument switches
     if not script_args.interactive and not script_args.force:
@@ -206,5 +230,6 @@ if __name__ == '__main__':
             sys.exit()
 
     print(f"verbose: running organize({script_args.xml_collection_path})")
-    if script_args.function == FUNCTION_GENERATE:
-        move_files(script_args, generate_new_paths(script_args))
+    if script_args.function == FUNCTION_DATE_PATHS:
+        print(generate_date_paths(script_args))
+        # move_files(script_args, generate_date_paths(script_args))

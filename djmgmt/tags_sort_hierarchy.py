@@ -18,6 +18,7 @@ import shutil
 
 import tags_find_duplicates
 import batch_operations_music
+import constants
 
 # Helper functions
 def clean_dirname(dirname: str, replacements: dict[str, str]) -> str:
@@ -83,8 +84,7 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
     '''
 
     # placeholders for missing file metadata
-    UNKNOWN_ARTIST = 'UNKNOWN_ARTIST'
-    UNKNOWN_ALBUM = 'UNKNOWN_ALBUM'
+    # todo: replace with constants.py refs
 
     # scan the input directory
     for working_dir, _, filenames in os.walk(args.input):
@@ -100,7 +100,7 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
                 tags = tags_find_duplicates.read_tags(filepath)
                 if tags:
                     # extract and clean up the artist string
-                    artist = tags.artist if tags.artist else UNKNOWN_ARTIST
+                    artist = tags.artist if tags.artist else constants.UNKNOWN_ARTIST
                     artist_raw = artist
                     artist = clean_dirname_simple(artist)
                     if args.compatibility:
@@ -110,7 +110,7 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
                         print(f"new artist name: '{artist}'")
 
                     # extract and clean up the album string
-                    album = tags.album if tags.album else UNKNOWN_ALBUM
+                    album = tags.album if tags.album else constants.UNKNOWN_ALBUM
                     album_raw = album
                     album = clean_dirname_simple(album)
                     if args.compatibility:
