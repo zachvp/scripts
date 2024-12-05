@@ -7,6 +7,11 @@ import argparse
 import os
 import sys
 import shlex
+import logging
+import sys
+
+import common
+import constants
 
 def process_args() -> argparse.Namespace:
     '''Process the script's command line aruments.
@@ -28,15 +33,23 @@ def process_args() -> argparse.Namespace:
 
     return args
 
-def build_ffmpeg_command(input_path: str, output_path: str) -> list:
+def ffmpeg_base(input_path: str, output_path: str, options: str) -> list:
+    all_options = f"-ar 44100 -map 0 -write_id3v2 1  {options}"
+    return ['ffmpeg', '-i', input_path] + shlex.split(all_options) + ['-y', output_path]
+
+def ffmpeg_standardize(input_path: str, output_path: str) -> list:
     '''Returns a list of ffmpeg command line arguments that will encode the `input_path` to the `output_path`.
     Core command:
         ffmpeg -i /path/to/input.foo -ar 44100 -c:a pcm_s16be -write_id3v2 1 -y path/to/output.bar
-        ffmpeg options: 44100 Hz sample rate, 16-bit PCM big-endian, write ID3V2 tags
+        ffmpeg options: 44100 Hz sample rate, decode audio stream, 16-bit PCM big-endian, write ID3V2 tags
     '''
-    options_str = '-ar 44100 -c:a pcm_s16be -write_id3v2 1 -y'
+    options = '-c:a pcm_s16be'
 
-    return ['ffmpeg', '-i', input_path] + shlex.split(options_str) + [output_path]
+    return ffmpeg_base(input_path, output_path, options)
+
+def ffmpeg_mp3(input_path: str, output_path: str) -> list:
+    options = '-b:a 320k'
+    return ffmpeg_base(input_path, output_path, options)
 
 def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream: str) -> str:
     '''Uses ffprobe command line tool. Reads the ffprobe value for a particular stream entry.
@@ -54,14 +67,14 @@ def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream: str) -
 
     try:
         if args.verbose:
-            print(f"info: read_ffprobe_value: {command}")
+            logging.info(f"read_ffprobe_value: {command}")
         value = subprocess.run(command, check=True, capture_output=True, encoding='utf-8').stdout.strip()
         if args.verbose:
-            print(f"info: read_ffprobe_value: {value}")
+            logging.info(f"read_ffprobe_value: {value}")
         return value
     except subprocess.CalledProcessError as error:
-        print(f"error: fatal: read_ffprobe_value: CalledProcessError:\n{error.stderr.strip()}")
-        print(f"command: {shlex.join(command)}")
+        logging.error(f"fatal: read_ffprobe_value: CalledProcessError:\n{error.stderr.strip()}")
+        logging.info(f"command: {shlex.join(command)}")
         sys.exit()
 
 def check_skip_sample_rate(args: argparse.Namespace, input_path: str) -> bool:
@@ -91,7 +104,7 @@ def setup_storage(args: argparse.Namespace, filename: str) -> str:
     store_path = os.path.join(storage_dir, filename)
     with open(store_path, 'w', encoding='utf-8'):
         pass
-    print(f"set up store path: {store_path}")
+    logging.info(f"set up store path: {store_path}")
 
     return store_path
 
@@ -107,22 +120,25 @@ def re_encode(args: argparse.Namespace) -> None:
     '''
 
     if not args.extension.startswith('.'):
-        print(f"error: fatal: invalid extension {args.extension}, exiting")
+        logging.error(f"fatal: invalid extension {args.extension}, exiting")
         sys.exit()
     size_diff_sum = 0.0
 
     # set up storage
+    store_path_size_diff: str | None = None
+    store_path_skipped: str | None = None
+    skipped_files: list[str] | None = None
     if args.store_path:
         store_path_size_diff = setup_storage(args, 'size-diff.tsv')
     if args.store_skipped:
         store_path_skipped = setup_storage(args, 'skipped.tsv')
-        skipped_files : list[str] = []
+        skipped_files = []
 
     # confirm storage with user
     if args.interactive and args.store_path:
         choice = input("storage set up, does everything look okay? [y/N]")
         if choice != 'y':
-            print("user quit")
+            logging.info("user quit")
             return
 
     # main processing loop
@@ -130,7 +146,7 @@ def re_encode(args: argparse.Namespace) -> None:
         # prune hidden directories
         for index, directory in enumerate(dirnames):
             if directory.startswith('.'):
-                print(f"info: skip: hidden directory '{os.path.join(working_dir, directory)}'")
+                logging.info(f"skip: hidden directory '{os.path.join(working_dir, directory)}'")
                 del dirnames[index]
 
         for name in filenames:
@@ -138,18 +154,20 @@ def re_encode(args: argparse.Namespace) -> None:
             name_split = os.path.splitext(name)
 
             if name.startswith('.'):
-                print(f"info: skip: hidden file '{input_path}'")
-                print(f"info: skip: hidden files are not written to skip storage '{input_path}'")
+                logging.info(f"skip: hidden file '{input_path}'")
+                logging.info(f"skip: hidden files are not written to skip storage '{input_path}'")
                 continue
             if name_split[1] not in { '.aif', '.aiff', '.wav', }:
-                print(f"info: skip: unsupported file: '{input_path}'")
-                skipped_files.append(f"{input_path}\n")
+                logging.info(f"skip: unsupported file: '{input_path}'")
+                if skipped_files:
+                    skipped_files.append(f"{input_path}\n")
                 continue
             if not name.endswith('.wav') and\
             check_skip_sample_rate(args, input_path) and\
             check_skip_bit_depth(args, input_path):
-                print(f"info: skip: optimal sample rate and bit depth: '{input_path}'")
-                skipped_files.append(f"{input_path}\n")
+                logging.info(f"skip: optimal sample rate and bit depth: '{input_path}'")
+                if skipped_files:
+                    skipped_files.append(f"{input_path}\n")
                 continue
 
             # -- build the output path
@@ -160,47 +178,70 @@ def re_encode(args: argparse.Namespace) -> None:
             if os.path.splitext(os.path.basename(input_path))[0] != os.path.splitext(os.path.basename(output_path))[0]:
                 choice = input(f"warn: mismatched file names for '{input_path}' and '{output_path}'. Continue? [y/N]")
                 if choice != 'y' or choice.lower() == 'n':
-                    print('exit, user quit')
+                    logging.info('exit, user quit')
                     break
 
             # interactive mode
             if args.interactive:
                 choice = input(f"re-encode '{input_path}'? [y/N]")
                 if choice != 'y':
-                    print('exit, user quit')
+                    logging.info('exit, user quit')
                     break
 
             # -- build and run the ffmpeg encode command
-            command = build_ffmpeg_command(input_path, output_path)
+            command = ffmpeg_standardize(input_path, output_path)
             if args.verbose:
-                print(f"run cmd:\n\t{command}")
+                logging.info(f"run cmd:\n\t{command}")
             try:
                 subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-                print(f"success: {output_path}")
+                logging.info(f"success: {output_path}")
             except subprocess.CalledProcessError as error:
-                print(f"error subprocess:\n{error.stderr.strip()}")
+                logging.error(f"subprocess:\n{error.stderr.strip()}")
 
             # compute (input - output) size difference after encoding
             size_diff = os.path.getsize(input_path)/10**6 - os.path.getsize(output_path)/10**6
             size_diff_sum += size_diff
             size_diff = round(size_diff, 2)
-            print(f"info: file size diff: {size_diff} MB")
+            logging.info(f"file size diff: {size_diff} MB")
 
-            if args.store_path:
+            if args.store_path and store_path_size_diff:
                 with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
                     store_file.write(f"{input_path}\t{output_path}\t{size_diff}\n")
-            # newline to separate entries
-            print()
+            # separate entries
+            logging.info("= = = =")
 
-    if args.store_path:
+    if args.store_path and store_path_size_diff:
         with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
             store_file.write(f"\n=> size diff sum: {round(size_diff_sum, 2)} MB")
-            print(f"info: wrote cumulative size difference to '{store_path_size_diff}'")
-    if args.store_skipped:
+            logging.info(f"wrote cumulative size difference to '{store_path_size_diff}'")
+    if args.store_skipped and store_path_skipped and skipped_files:
         with open(store_path_skipped, 'a', encoding='utf-8') as store_file:
             store_file.writelines(skipped_files)
-            print(f"info: wrote skipped files to '{store_path_skipped}'")
+            logging.info(f"wrote skipped files to '{store_path_skipped}'")
 
-# MAIN
+def encode_mp3(path_mappings: list[str]):
+    '''Parse each path mapping entry into an encoding operation.'''
+    logging.info('encoding mp3')
+    for mapping in path_mappings:
+        source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
+        dest = os.path.splitext(dest)[0] + '.mp3'
+        print(mapping)
+        print(f"encode from {source} to {dest}")
+        command = ffmpeg_mp3(source, dest)
+        
+        try:
+            subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
+            logging.info(f"success: {dest}")
+        except subprocess.CalledProcessError as error:
+            logging.error(f"subprocess:\n{error.stderr.strip()}")
+        break
+
+# Main
 if __name__ == '__main__':
-    re_encode(process_args())
+    # configure logging
+    common.configure_log(__file__)
+    
+    # primary script
+    # re_encode(process_args())
+    # encode_mp3(sys.stdin.readlines())
+    encode_mp3(["/Users/zachvp/developer/test-private/data/tracks/2020/03 march/21/album/artist/2pole - Atom (Original Mix).aiff->/Users/zachvp/developer/test-private/data/tracks-output/2pole - Atom (Original Mix).mp3"])

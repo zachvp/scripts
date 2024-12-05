@@ -17,3 +17,6 @@ MAPPING_MONTH = {
         11 : 'november',
         12 : 'december',
     }
+
+# delimiters
+FILE_OPERATION_DELIMITER = '->'

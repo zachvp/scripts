@@ -29,7 +29,6 @@ ATTR_ARTIST = 'Artist'
 ATTR_ALBUM = 'Album'
 REKORDBOX_ROOT = 'file://localhost'
 XPATH_COLLECTION = './/COLLECTION'
-DELIMITER = '->'
 
 # Helper functions
 def date_path(date: str, mapping: dict) -> str:
@@ -141,25 +140,25 @@ def generate_date_paths(args: argparse.Namespace) -> list[str]:
         if args.root_path:
             track_path_new = swap_root(track_path_new, args.root_path)
 
-        if DELIMITER in track_path_old or DELIMITER in track_path_new:
+        if constants.FILE_OPERATION_DELIMITER in track_path_old or constants.FILE_OPERATION_DELIMITER in track_path_new:
             logging.error(f"delimeter already exists in either {track_path_old} or {track_path_new} exiting")
             sys.exit()
 
-        lines.append(f"{track_path_old}{DELIMITER}{track_path_new}")
+        lines.append(f"{track_path_old}{constants.FILE_OPERATION_DELIMITER}{track_path_new}")
             
     return lines
 
 def get_pipe_output(structure: list[str]) -> str:
     output = ''
     for item in structure:
-        output += item
-    return output
+        output += f"{item.strip()}\n"
+    return output.strip()
 
 # todo: replace with call to bulk operations script
 def move_files(args: argparse.Namespace, path_mappings: list[str]) -> None:
     '''Moves files according to the paths input mapping.'''
     for mapping in path_mappings:
-        source, dest = mapping.split(DELIMITER)
+        source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
 
         # interactive session
         if args.interactive:
