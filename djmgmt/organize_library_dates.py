@@ -17,6 +17,8 @@ import shutil
 import xml.etree.ElementTree as ET
 from urllib.parse import unquote
 import argparse
+import logging
+import common
 
 import constants
 
@@ -109,10 +111,10 @@ def dev_debug():
           <TEMPO Inizio="0.126" Bpm="134.00" Metro="4/4" Battito="1" />
         </TRACK>'''
     t = ET.fromstring(test_str)
-    print(t.tag)
+    logging.debug(t.tag)
 
     u = full_path(t, '/ZVP-MUSIC/DJing/', constants.MAPPING_MONTH)
-    print(u)
+    logging.debug(u)
 
 # Primary functions
 def generate_date_paths(args: argparse.Namespace) -> list[str]:
@@ -126,7 +128,7 @@ def generate_date_paths(args: argparse.Namespace) -> list[str]:
     for node in collection:
         # check if track file is in expected library folder
         if REKORDBOX_ROOT not in node.attrib[ATTR_PATH]:
-            print(f"warn: unexpected path {collection_path_to_syspath(node.attrib[ATTR_PATH])}, will skip")
+            logging.warning(f"unexpected path {collection_path_to_syspath(node.attrib[ATTR_PATH])}, will skip")
             continue
         
         # build each entry for the old and new path
@@ -140,15 +142,18 @@ def generate_date_paths(args: argparse.Namespace) -> list[str]:
             track_path_new = swap_root(track_path_new, args.root_path)
 
         if DELIMITER in track_path_old or DELIMITER in track_path_new:
-            print(f'''
-                fatal: delimeter already exists in either {track_path_old} or {track_path_new}
-                exiting..
-                ''')
+            logging.error(f"delimeter already exists in either {track_path_old} or {track_path_new} exiting")
             sys.exit()
 
         lines.append(f"{track_path_old}{DELIMITER}{track_path_new}")
             
     return lines
+
+def get_pipe_output(structure: list[str]) -> str:
+    output = ''
+    for item in structure:
+        output += item
+    return output
 
 # todo: replace with call to bulk operations script
 def move_files(args: argparse.Namespace, path_mappings: list[str]) -> None:
@@ -160,7 +165,7 @@ def move_files(args: argparse.Namespace, path_mappings: list[str]) -> None:
         if args.interactive:
             choice = input(f"info: will move file from '{source}' to '{dest}', continue? [Y/n]")
             if len(choice) > 0 and choice not in 'Yy':
-                print("exit: user quit")
+                logging.info("exit: user quit")
                 sys.exit()
 
         # get the destination file's directory
@@ -168,10 +173,10 @@ def move_files(args: argparse.Namespace, path_mappings: list[str]) -> None:
 
         # validate
         if not os.path.exists(source):
-            print(f"info: skip: source path '{source}' does not exist")
+            logging.info(f"skip: source path '{source}' does not exist")
             continue
         if os.path.exists(dest):
-            print(f"info: skip: destination path '{dest}' exists")
+            logging.info(f"skip: destination path '{dest}' exists")
             continue
 
         # create dir if it doesn't exist
@@ -200,21 +205,23 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
 if __name__ == '__main__':
     FUNCTION_DATE_PATHS = 'date-paths'
     script_functions = {FUNCTION_DATE_PATHS}
+    
+    # configure logging
+    common.configure_log(__file__)
+    
+    # parse arguments
     script_args = parse_args(script_functions)
 
     if script_args.root_path:
-        print(f"info: args output root dir: '{script_args.root_path}'")
+        logging.info(f"args output root dir: '{script_args.root_path}'")
 
     # check argument switches
     if not script_args.interactive and not script_args.force:
         main_choice = input("this is a destructive action, and interactive mode is disabled, continue? [y/N]")
-        if main_choice == 'y':
-            print(f"verbose: running organize({script_args.xml_collection_path})...")
-        else:
-            print("exit: user quit")
+        if main_choice != 'y':
+            logging.info("exit: user quit")
             sys.exit()
 
-    print(f"verbose: running organize({script_args.xml_collection_path})")
+    logging.info(f"running organize('{script_args.xml_collection_path}')")
     if script_args.function == FUNCTION_DATE_PATHS:
-        print(generate_date_paths(script_args))
-        # move_files(script_args, generate_date_paths(script_args))
+        print(get_pipe_output(generate_date_paths(script_args)))

@@ -270,6 +270,7 @@ if __name__ == '__main__':
     EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', 'flac'}
     PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
 
+    # parse arguments
     script_args = parse_args(FUNCTIONS, FUNCTIONS_SINGLE_ARG)
     print(f"will execute: '{script_args.function}'")
 
