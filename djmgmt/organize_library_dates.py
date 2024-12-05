@@ -29,21 +29,6 @@ REKORDBOX_ROOT = 'file://localhost'
 XPATH_COLLECTION = './/COLLECTION'
 DELIMITER = '->'
 
-MAPPING_MONTH = {
-    1  : 'january',
-    2  : 'february',
-    3  : 'march',
-    4  : 'april',
-    5  : 'may',
-    6  : 'june',
-    7  : 'july',
-    8  : 'august',
-    9  : 'september',
-    10 : 'october',
-    11 : 'november',
-    12 : 'december',
-}
-
 # Helper functions
 def date_path(date: str, mapping: dict) -> str:
     '''Returns a date-formatted directory path string. e.g:
@@ -126,7 +111,7 @@ def dev_debug():
     t = ET.fromstring(test_str)
     print(t.tag)
 
-    u = full_path(t, '/ZVP-MUSIC/DJing/', MAPPING_MONTH)
+    u = full_path(t, '/ZVP-MUSIC/DJing/', constants.MAPPING_MONTH)
     print(u)
 
 # Primary functions
@@ -149,7 +134,7 @@ def generate_date_paths(args: argparse.Namespace) -> list[str]:
         if args.root_path:
             track_path_old = swap_root(track_path_old, args.root_path)
 
-        track_path_new = full_path(node, REKORDBOX_ROOT, MAPPING_MONTH, metadata_path=args.metadata_path)
+        track_path_new = full_path(node, REKORDBOX_ROOT, constants.MAPPING_MONTH, metadata_path=args.metadata_path)
         track_path_new = collection_path_to_syspath(track_path_new)
         if args.root_path:
             track_path_new = swap_root(track_path_new, args.root_path)

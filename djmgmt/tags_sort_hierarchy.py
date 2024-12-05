@@ -259,21 +259,6 @@ if __name__ == '__main__':
     FUNCTION_SORT = 'sort'
     EXPECTED_DEPTH = 6
 
-    MAPPING_MONTH = {
-        1  : 'january',
-        2  : 'february',
-        3  : 'march',
-        4  : 'april',
-        5  : 'may',
-        6  : 'june',
-        7  : 'july',
-        8  : 'august',
-        9  : 'september',
-        10 : 'october',
-        11 : 'november',
-        12 : 'december',
-    }
-
     # script arguments
     script_functions = {FUNCTION_VALIDATE, FUNCTION_SORT}
     script_args = parse_args(script_functions)
@@ -282,6 +267,6 @@ if __name__ == '__main__':
 
     # run the given script function
     if script_args.function == FUNCTION_VALIDATE:
-        validate_hierarchy(script_args, EXPECTED_DEPTH, set(MAPPING_MONTH.values()))
+        validate_hierarchy(script_args, EXPECTED_DEPTH, set(constants.MAPPING_MONTH.values()))
     elif script_args.function == FUNCTION_SORT:
-        sort_hierarchy(script_args, MAPPING_MONTH)
+        sort_hierarchy(script_args, constants.MAPPING_MONTH)
