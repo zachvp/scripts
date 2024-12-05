@@ -225,8 +225,7 @@ def encode_mp3(path_mappings: list[str]):
     for mapping in path_mappings:
         source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
         dest = os.path.splitext(dest)[0] + '.mp3'
-        print(mapping)
-        print(f"encode from {source} to {dest}")
+        logging.info(f"encode from {source} to {dest}")
         command = ffmpeg_mp3(source, dest)
         
         try:
@@ -243,5 +242,5 @@ if __name__ == '__main__':
     
     # primary script
     # re_encode(process_args())
-    # encode_mp3(sys.stdin.readlines())
     encode_mp3(["/Users/zachvp/developer/test-private/data/tracks/2020/03 march/21/album/artist/2pole - Atom (Original Mix).aiff->/Users/zachvp/developer/test-private/data/tracks-output/2pole - Atom (Original Mix).mp3"])
+
