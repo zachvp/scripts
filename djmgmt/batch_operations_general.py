@@ -7,20 +7,7 @@ import shutil
 import argparse
 from typing import Callable
 
-def format_message(message: str) -> str:
-    '''Returns a string formatted without any extra internal whitespace.
-    
-    Function parameters:
-        message -- The string to format.
-    '''
-    message_lines = message.split('\n')
-    output = ''
-    for line in message_lines:
-        output += f"{line.lstrip()}\n"
-
-    return output.rstrip()
-
-def script(args: argparse.Namespace) -> None:
+def batch_file_operation(args: argparse.Namespace) -> None:
     '''Performs the given operation on each file contained in the input file.
 
     Function parameters:
@@ -53,15 +40,13 @@ def script(args: argparse.Namespace) -> None:
                 continue
 
             if args.interactive:
-                choice = input(format_message(f"""input: {args.function}
-                    '{os.path.normpath(input_path)}' to '{os.path.normpath(args.output_path)}'
-                    continue? [y/N]"""))
+                choice = input(f"input: {args.function} '{input_path}' to '{args.output_path}' continue? [y/N]")
                 if choice != 'y':
                     print("info: exit: user quit")
     
                     break
 
-            action(os.path.normpath(input_path), os.path.normpath(args.output_path))
+            action(input_path, args.output_path)
 
 def parse_args(functions: set[str]) -> argparse.Namespace:
     '''Returns the parsed command-line arguments.
@@ -99,7 +84,9 @@ def parse_args(functions: set[str]) -> argparse.Namespace:
 
 # Main
 if __name__ == '__main__':
-    script_functions = {'mv'}
-    script_args = parse_args(script_functions)
+    FUNCTION_MOVE = 'move'
+    SCRIPT_FUNCTIONS = {'move'}
+    script_args = parse_args(SCRIPT_FUNCTIONS)
 
-    script(script_args)
+    if script_args.function == FUNCTION_MOVE:
+        batch_file_operation(script_args)
