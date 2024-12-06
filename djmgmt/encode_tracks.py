@@ -225,15 +225,19 @@ def encode_mp3(path_mappings: list[str]):
     for mapping in path_mappings:
         source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
         dest = os.path.splitext(dest)[0] + '.mp3'
-        logging.info(f"encode from {source} to {dest}")
-        command = ffmpeg_mp3(source, dest)
         
+        dest_dir = os.path.split(dest)[0]
+        if not os.path.exists(dest_dir):
+            logging.info(f"path '{dest_dir}' does not exist, creating")
+            os.makedirs(dest_dir)
+        
+        command = ffmpeg_mp3(source, dest)
         try:
+            logging.info(f"encode from '{source}' to '{dest}'")
             subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-            logging.info(f"success: {dest}")
+            logging.info(f"success: '{dest}'")
         except subprocess.CalledProcessError as error:
             logging.error(f"subprocess:\n{error.stderr.strip()}")
-        break
 
 # Main
 if __name__ == '__main__':
@@ -242,5 +246,8 @@ if __name__ == '__main__':
     
     # primary script
     # re_encode(process_args())
-    encode_mp3(["/Users/zachvp/developer/test-private/data/tracks/2020/03 march/21/album/artist/2pole - Atom (Original Mix).aiff->/Users/zachvp/developer/test-private/data/tracks-output/2pole - Atom (Original Mix).mp3"])
+    root_input = '/Users/zachvp/developer/test-private/data/tracks'
+    paths = common.collect_paths(root_input)
+    paths = common.add_output_path('/Users/zachvp/developer/test-private/data/tracks-output', paths, root_input)
+    encode_mp3(paths)
 
