@@ -13,7 +13,11 @@ def configure_log(python_filename: str) -> None:
 def collect_paths(root: str) -> list[str]:
     '''Returns the paths of all files for the given root.'''
     paths: list[str] = []
-    for working_dir, _, names in os.walk(root):
+    for working_dir, dirnames, names in os.walk(root):
+        for index, directory in enumerate(dirnames):
+            if directory.startswith('.'):
+                del dirnames[index]
+        
         for name in names:
             if name.startswith('.'):
                 continue
@@ -27,9 +31,16 @@ def add_output_path(output_path, input_paths: list[str], root_input_path: str) -
     for input_path in input_paths:
         full_output_path = os.path.join(output_path, os.path.relpath(input_path, root_input_path))
         paths.append(f"{input_path}{constants.FILE_OPERATION_DELIMITER}{full_output_path}")
+        
     return paths
 
-# import sys
-# root_input = sys.argv[1]
-# paths = collect_paths(root_input)
-# print(add_output_path('/Users/zachvp/developer/test-private/data/tracks-output', paths, root_input))
+def raise_exception(error: Exception):
+    logging.exception(error)
+    raise error
+
+def dev_testing():
+    import sys
+    root_input = sys.argv[1]
+    paths = collect_paths(root_input)
+    print(paths)
+    # print(add_output_path('/Users/zachvp/developer/test-private/data/tracks-output', paths, root_input))
