@@ -87,26 +87,26 @@ run_docker_media_music_stream()
 ### run rsync
 
 #### Preferred: direct ethernet+ssh+daemon transfer
+##### Example: $ bash corevega-ctrl.sh run_rsync_transfer_daemon music /Users/zachvp/developer/test-private/data/tracks-output navidrome
 run_rsync_transfer_daemon()
 {
     COREVEGA_TRANSFER_DEST="rsync://$COREVEGA_USER@$COREVEGA_IP:$COREVEGA_RSYNC_PORT"
     COREVEGA_ACTION=$2
     COREVEGA_MUSIC_SOURCE=$3
+    COREVEGA_RSYNC_PATH=$4
 
     while [[ $# -gt 0 ]]; do case "$COREVEGA_ACTION" in
             music)
-                cv_echo "selected transfer music"
-                cv_echo "transfer source: $COREVEGA_MUSIC_SOURCE"
-                cv_echo "transfer destination: $COREVEGA_TRANSFER_DEST/music"
+                cv_echo "transfer from: $COREVEGA_MUSIC_SOURCE"
+                cv_echo "transfer to $COREVEGA_TRANSFER_DEST/$COREVEGA_RSYNC_PATH"
                 
                 cv_check_continue
 
                 set -x
-                time rsync "$COREVEGA_MUSIC_SOURCE/" "$COREVEGA_TRANSFER_DEST/music" \
+                time rsync "$COREVEGA_MUSIC_SOURCE/" "$COREVEGA_TRANSFER_DEST/$COREVEGA_RSYNC_PATH" \
                     $COREVEGA_RSYNC_OPTIONS \
                     --exclude '.*'
                 exit 0
-
                 ;;
             prefs)
                 cv_echo "selected transfer prefs"

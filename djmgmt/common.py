@@ -1,5 +1,7 @@
 import logging
 import os
+from typing import Callable, Any
+
 import constants
 
 def configure_log(python_filename: str) -> None:
@@ -24,7 +26,7 @@ def collect_paths(root: str) -> list[str]:
             paths.append(os.path.join(working_dir, name))
     return paths
 
-def add_output_path(output_path, input_paths: list[str], root_input_path: str) -> list[str]:
+def add_output_path(output_path: str, input_paths: list[str], root_input_path: str) -> list[str]:
     '''Adds the given path + filename as the output path for each input path.
     Maintains the path structure relative to the root input path.'''
     paths: list[str] = []

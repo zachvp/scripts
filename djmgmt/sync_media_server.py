@@ -20,37 +20,19 @@ Definitions
 import argparse
 import os
 import shutil
+import logging
 from typing import Callable
+import subprocess
 
 import common
+import constants
+import encode_tracks
+import subsonic_client
 
-# Script modes
-SCRIPT_MODE_COPY = 'copy'
-SCRIPT_MODE_MOVE = 'move'
+# module setup
+common.configure_log(__file__)
 
-SCRIPT_MODES = {SCRIPT_MODE_COPY, SCRIPT_MODE_MOVE}
-
-def parse_args(valid_modes: set[str]) -> argparse.Namespace:
-    ''' Returns the parsed command-line arguments.
-
-    Function arguments:
-        valid_modes -- defines the supported script modes
-    '''
-    parser = argparse.ArgumentParser()
-    parser.add_argument('mode', type=str, help=f"The mode to run the script. One of '{valid_modes}'.")
-    parser.add_argument('input', type=str, help="The top level directory to search.\
-        It's expected to be structured in a year/month/audio.file format.")
-    parser.add_argument('output', type=str, help="The output directory to populate.")
-
-    args = parser.parse_args()
-    args.input = os.path.normpath(args.input)
-    args.output = os.path.normpath(args.output)
-
-    if args.mode not in valid_modes:
-        parser.error(f"Invalid mode: '{args.mode}'")
-
-    return args
-
+# Helper functions
 def normalize_paths(paths: list[str], parent: str) -> list[str]:
     '''Returns a collection with the given paths transformed to be relative to the given parent directory.
 
@@ -81,9 +63,9 @@ def sync(args: argparse.Namespace):
 
     # Assign the action based on the given mode.
     action: Callable[[str, str], None] = lambda x, y : print(f"dummy: {x}, {y}")
-    if args.mode == SCRIPT_MODE_COPY:
+    if args.mode == MODE_COPY:
         action = shutil.copy
-    elif args.mode == SCRIPT_MODE_MOVE:
+    elif args.mode == MODE_MOVE:
         action = shutil.move
     else:
         print(f"error: unrecognized mode: {args.mode}. Exiting.")
@@ -115,6 +97,55 @@ def sync(args: argparse.Namespace):
             os.makedirs(output_parent_path)
         action(input_path_full, output_path_full)
 
+def sync_from_collection(mappings:list[str]) -> None: # , mapping_action: Callable[[str, str], None], context_action: Callable[[str], Any]
+    # process path mapping list
+    # perform action for each mapping
+    # when path date context changes, call other function, wait for it to finish
+    batch: list[str] = []
+    previous_source = mappings[0].split(constants.FILE_OPERATION_DELIMITER)[0]
+    for mapping in mappings:
+        source = mapping.split(constants.FILE_OPERATION_DELIMITER)[0]
+        date_context_previous = common.find_date_context(previous_source)
+        if date_context_previous == common.find_date_context(source):
+            batch.append(mapping)
+        else:
+            logging.info(f"encoding batch in date context {date_context_previous}:\n{batch}")
+            encode_tracks.encode_lossy(batch, '.mp3')
+            # todo: upload tracks in output path to server
+            subsonic_client.call_endpoint(subsonic_client.API.START_SCAN)
+        previous_source = source
+    
+def parse_args(valid_modes: set[str]) -> argparse.Namespace:
+    ''' Returns the parsed command-line arguments.
+
+    Function arguments:
+        valid_modes -- defines the supported script modes
+    '''
+    parser = argparse.ArgumentParser()
+    parser.add_argument('mode', type=str, help=f"The mode to apply for the function. One of '{valid_modes}'.")
+    parser.add_argument('input', type=str, help="The top level directory to search.\
+        It's expected to be structured in a year/month/audio.file format.")
+    parser.add_argument('output', type=str, help="The output directory to populate.")
+
+    args = parser.parse_args()
+    args.input = os.path.normpath(args.input)
+    args.output = os.path.normpath(args.output)
+
+    if args.mode not in valid_modes:
+        parser.error(f"Invalid mode: '{args.mode}'")
+
+    return args
+
 if __name__ == '__main__':
-    script_args = parse_args(SCRIPT_MODES)
-    sync(script_args)
+    # Script modes
+    MODE_COPY = 'copy'
+    MODE_MOVE = 'move'
+
+    MODES = {MODE_COPY, MODE_MOVE}
+    script_args = parse_args(MODES)
+    
+    input_path = '/Users/zachvp/developer/test-private/data/tracks'
+    mappings = common.collect_paths(input_path)
+    mappings = common.add_output_path('/Users/zachvp/developer/test-private/data/tracks-output', mappings, input_path)
+    sync_from_collection(mappings)
+    # sync(script_args)

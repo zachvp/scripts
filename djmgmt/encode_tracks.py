@@ -200,14 +200,16 @@ def encode_lossless(args: argparse.Namespace) -> None:
             store_file.writelines(skipped_files)
             logging.info(f"wrote skipped files to '{store_path_skipped}'")
 
-def encode_lossy(args: argparse.Namespace):
+def encode_lossy_cli(args: argparse.Namespace) -> None:
     '''Parse each path mapping entry into an encoding operation.'''
-    logging.info('encoding mp3')
-    path_mappings: list[str] = common.collect_paths(args.input)
+    path_mappings = common.collect_paths(args.input)
     path_mappings = common.add_output_path(args.output, path_mappings, args.input)
+    return encode_lossy(path_mappings, args.extension)
+
+def encode_lossy(path_mappings: list[str], extension: str) -> None:
     for mapping in path_mappings:
         source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
-        dest = os.path.splitext(dest)[0] + '.mp3' # todo: use extension from input
+        dest = os.path.splitext(dest)[0] + extension
         
         dest_dir = os.path.split(dest)[0]
         if not os.path.exists(dest_dir):
@@ -223,8 +225,7 @@ def encode_lossy(args: argparse.Namespace):
             logging.error(f"subprocess:\n{error.stderr.strip()}")
 
 def process_args(functions: set[str]) -> argparse.Namespace:
-    '''Process the script's command line aruments.
-    '''
+    '''Process the script's command line aruments.'''
     parser = argparse.ArgumentParser()
     parser.add_argument('function', type=str, help=f"the function to run; one of: '{functions}'")
     parser.add_argument('input', type=str, help='the input directory to recursively process')
@@ -259,4 +260,4 @@ if __name__ == '__main__':
     if args.function == FUNCTION_LOSSLESS:
         encode_lossless(args)
     elif args.function == FUNCTION_LOSSY:
-        encode_lossy(args)
+        encode_lossy_cli(args)
