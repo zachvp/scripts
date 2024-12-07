@@ -13,26 +13,6 @@ import sys
 import common
 import constants
 
-def process_args() -> argparse.Namespace:
-    '''Process the script's command line aruments.
-    '''
-    parser = argparse.ArgumentParser()
-    parser.add_argument('input', type=str, help='the input directory to recursively process')
-    parser.add_argument('output', type=str, help='the output directory to contain all the files in a flat structure')
-    parser.add_argument('extension', type=str, help='the output extension for each file')
-
-    parser.add_argument('--store-path', type=str, help='the script storage path to write to')
-    parser.add_argument('--store-skipped', action='store_true', help='store the skipped files in store path')
-    parser.add_argument('--interactive', '-i', action='store_true', help='run the script in interactive mode')
-    parser.add_argument('--verbose', '-v', action='store_true', help='run the script with verbose output')
-
-    args = parser.parse_args()
-
-    if args.store_skipped and not args.store_path:
-        parser.error("if option '--store-skipped' is set, option '--store-path' is required")
-
-    return args
-
 def ffmpeg_base(input_path: str, output_path: str, options: str) -> list:
     all_options = f"-ar 44100 -map 0 -write_id3v2 1  {options}"
     return ['ffmpeg', '-i', input_path] + shlex.split(all_options) + ['-y', output_path]
@@ -108,7 +88,7 @@ def setup_storage(args: argparse.Namespace, filename: str) -> str:
 
     return store_path
 
-def re_encode(args: argparse.Namespace) -> None:
+def encode_lossless(args: argparse.Namespace) -> None:
     '''Primary script function. Recursively walks the input path specified in `args` to re-encode each eligible file.
     A file is eligible if:
         1) It is an uncompressed `aiff` or `wav` type.
@@ -120,8 +100,9 @@ def re_encode(args: argparse.Namespace) -> None:
     '''
 
     if not args.extension.startswith('.'):
-        logging.error(f"fatal: invalid extension {args.extension}, exiting")
-        sys.exit()
+        error = ValueError(f"invalid extension {args.extension}")
+        logging.error(error)
+        raise error
     size_diff_sum = 0.0
 
     # set up storage
@@ -219,16 +200,18 @@ def re_encode(args: argparse.Namespace) -> None:
             store_file.writelines(skipped_files)
             logging.info(f"wrote skipped files to '{store_path_skipped}'")
 
-def encode_mp3(path_mappings: list[str]):
+def encode_lossy(args: argparse.Namespace):
     '''Parse each path mapping entry into an encoding operation.'''
     logging.info('encoding mp3')
+    path_mappings: list[str] = common.collect_paths(args.input)
+    path_mappings = common.add_output_path(args.output, path_mappings, args.input)
     for mapping in path_mappings:
         source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
-        dest = os.path.splitext(dest)[0] + '.mp3'
+        dest = os.path.splitext(dest)[0] + '.mp3' # todo: use extension from input
         
         dest_dir = os.path.split(dest)[0]
         if not os.path.exists(dest_dir):
-            logging.info(f"path '{dest_dir}' does not exist, creating")
+            logging.info(f"create path '{dest_dir}'")
             os.makedirs(dest_dir)
         
         command = ffmpeg_mp3(source, dest)
@@ -239,15 +222,41 @@ def encode_mp3(path_mappings: list[str]):
         except subprocess.CalledProcessError as error:
             logging.error(f"subprocess:\n{error.stderr.strip()}")
 
+def process_args(functions: set[str]) -> argparse.Namespace:
+    '''Process the script's command line aruments.
+    '''
+    parser = argparse.ArgumentParser()
+    parser.add_argument('function', type=str, help=f"the function to run; one of: '{functions}'")
+    parser.add_argument('input', type=str, help='the input directory to recursively process')
+    parser.add_argument('output', type=str, help='the output directory to contain all the files in a flat structure')
+    parser.add_argument('extension', type=str, help='the output extension for each file')
+
+    parser.add_argument('--store-path', type=str, help='the script storage path to write to')
+    parser.add_argument('--store-skipped', action='store_true', help='store the skipped files in store path')
+    parser.add_argument('--interactive', '-i', action='store_true', help='run the script in interactive mode')
+    parser.add_argument('--verbose', '-v', action='store_true', help='run the script with verbose output')
+
+    args = parser.parse_args()
+    
+    if args.function not in functions:
+        parser.error(f"invalid function '{args.function}', expect one of: '{functions}'")
+
+    if args.store_skipped and not args.store_path:
+        parser.error("if option '--store-skipped' is set, option '--store-path' is required")
+
+    return args
+
+# Configure module logging
+common.configure_log(__file__)
+
 # Main
 if __name__ == '__main__':
-    # configure logging
-    common.configure_log(__file__)
+    FUNCTION_LOSSLESS = 'lossless'
+    FUNCTION_LOSSY = 'lossy'
+    FUNCTIONS = {FUNCTION_LOSSLESS, FUNCTION_LOSSY}
+    args = process_args(FUNCTIONS)
     
-    # primary script
-    # re_encode(process_args())
-    root_input = '/Users/zachvp/developer/test-private/data/tracks'
-    paths = common.collect_paths(root_input)
-    paths = common.add_output_path('/Users/zachvp/developer/test-private/data/tracks-output', paths, root_input)
-    encode_mp3(paths)
-
+    if args.function == FUNCTION_LOSSLESS:
+        encode_lossless(args)
+    elif args.function == FUNCTION_LOSSY:
+        encode_lossy(args)

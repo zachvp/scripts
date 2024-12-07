@@ -200,13 +200,13 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
 
     return args
 
+# Configure module logging
+common.configure_log(__file__)
+
 # MAIN
 if __name__ == '__main__':
     FUNCTION_DATE_PATHS = 'date-paths'
     script_functions = {FUNCTION_DATE_PATHS}
-    
-    # configure logging
-    common.configure_log(__file__)
     
     # parse arguments
     script_args = parse_args(script_functions)
