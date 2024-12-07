@@ -38,9 +38,36 @@ def raise_exception(error: Exception):
     logging.exception(error)
     raise error
 
+def find_date_context(path: str) -> str:
+    '''Extracts the date subpath from the input path.
+    Example path: '/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'
+    Example output: '2022/04 april/24'
+    '''
+    components = path.split(os.sep)
+    found: dict[str, int] = {}
+    context: list[str] = []
+    
+    for i, component in enumerate(components):
+        if len(component) == 4 and component.isdecimal():
+            found['y'] = i
+            context.append(component)
+        if 'y' in found and found['y'] == i - 1:
+            month_label = component.split()
+            month_num = month_label[0]
+            if len(month_num) == 2 and month_num.isdecimal()\
+                and int(month_num) in constants.MAPPING_MONTH and constants.MAPPING_MONTH[int(month_num)] == month_label[1]:
+                    found['m'] = i
+                    context.append(component)
+        if 'm' in found and found['m'] == i - 1:
+            if len(component) == 2 and component.isdecimal():
+                found['d'] = i
+                context.append(component)
+    return '/'.join(context)
+
+# Devepoment
 def dev_testing():
-    import sys
-    root_input = sys.argv[1]
-    paths = collect_paths(root_input)
-    print(paths)
-    # print(add_output_path('/Users/zachvp/developer/test-private/data/tracks-output', paths, root_input))
+    pass
+    # print(find_date_context('/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3', ''))
+
+# dev_testing()
+    

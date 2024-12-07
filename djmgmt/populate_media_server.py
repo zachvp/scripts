@@ -22,6 +22,8 @@ import os
 import shutil
 from typing import Callable
 
+import common
+
 # Script modes
 SCRIPT_MODE_COPY = 'copy'
 SCRIPT_MODE_MOVE = 'move'
@@ -49,19 +51,6 @@ def parse_args(valid_modes: set[str]) -> argparse.Namespace:
 
     return args
 
-def enumerate_paths(top: str) -> list[str]:
-    '''Returns a collection with the full paths of all relevant files in the given directory.
-
-    Function arguments:
-        top -- The input directory to scan.
-    '''
-    paths: list[str] = []
-    for working_dir, _, filenames in os.walk(top):
-        for name in filenames:
-            if not name.startswith('.'):
-                paths.append(os.path.join(working_dir, name))
-    return paths
-
 def normalize_paths(paths: list[str], parent: str) -> list[str]:
     '''Returns a collection with the given paths transformed to be relative to the given parent directory.
 
@@ -85,7 +74,7 @@ def sync(args: argparse.Namespace):
     '''
 
     # Collect the sorted input paths relative to the input directory.
-    input_paths = sorted(normalize_paths(enumerate_paths(args.input), args.input))
+    input_paths = sorted(normalize_paths(common.collect_paths(args.input), args.input))
 
     # Define the date context tracker to determine when a new date context is entered.
     previous_date_context = ''
