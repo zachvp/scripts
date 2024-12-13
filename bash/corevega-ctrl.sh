@@ -93,17 +93,17 @@ run_rsync_transfer_daemon()
     COREVEGA_TRANSFER_DEST="rsync://$COREVEGA_USER@$COREVEGA_IP:$COREVEGA_RSYNC_PORT"
     COREVEGA_ACTION=$2
     COREVEGA_MUSIC_SOURCE=$3
-    COREVEGA_RSYNC_PATH=$4
+    COREVEGA_RSYNC_MODULE=$4
 
     while [[ $# -gt 0 ]]; do case "$COREVEGA_ACTION" in
             music)
                 cv_echo "transfer from: $COREVEGA_MUSIC_SOURCE"
-                cv_echo "transfer to $COREVEGA_TRANSFER_DEST/$COREVEGA_RSYNC_PATH"
+                cv_echo "transfer to $COREVEGA_TRANSFER_DEST/$COREVEGA_RSYNC_MODULE"
                 
                 cv_check_continue
 
                 set -x
-                time rsync "$COREVEGA_MUSIC_SOURCE/" "$COREVEGA_TRANSFER_DEST/$COREVEGA_RSYNC_PATH" \
+                time rsync "$COREVEGA_MUSIC_SOURCE/" "$COREVEGA_TRANSFER_DEST/$COREVEGA_RSYNC_MODULE" \
                     $COREVEGA_RSYNC_OPTIONS \
                     --exclude '.*'
                 exit 0

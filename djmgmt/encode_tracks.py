@@ -13,11 +13,11 @@ import sys
 import common
 import constants
 
-def ffmpeg_base(input_path: str, output_path: str, options: str) -> list:
+def ffmpeg_base(input_path: str, output_path: str, options: str) -> list[str]:
     all_options = f"-ar 44100 -map 0 -write_id3v2 1  {options}"
     return ['ffmpeg', '-i', input_path] + shlex.split(all_options) + ['-y', output_path]
 
-def ffmpeg_standardize(input_path: str, output_path: str) -> list:
+def ffmpeg_standardize(input_path: str, output_path: str) -> list[str]:
     '''Returns a list of ffmpeg command line arguments that will encode the `input_path` to the `output_path`.
     Core command:
         ffmpeg -i /path/to/input.foo -ar 44100 -c:a pcm_s16be -write_id3v2 1 -y path/to/output.bar
@@ -27,7 +27,7 @@ def ffmpeg_standardize(input_path: str, output_path: str) -> list:
 
     return ffmpeg_base(input_path, output_path, options)
 
-def ffmpeg_mp3(input_path: str, output_path: str) -> list:
+def ffmpeg_mp3(input_path: str, output_path: str) -> list[str]:
     options = '-b:a 320k'
     return ffmpeg_base(input_path, output_path, options)
 
@@ -246,9 +246,6 @@ def process_args(functions: set[str]) -> argparse.Namespace:
         parser.error("if option '--store-skipped' is set, option '--store-path' is required")
 
     return args
-
-# Configure module logging
-common.configure_log(__file__)
 
 # Main
 if __name__ == '__main__':

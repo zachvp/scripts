@@ -1,12 +1,11 @@
 import logging
 import os
-from typing import Callable, Any
 
 import constants
 
 def configure_log(python_filename: str) -> None:
     '''Standard log configuration.'''
-    filename = os.path.splitext(os.path.basename(python_filename))[0]
+    filename = os.path.basename(os.path.dirname(python_filename))
     logging.basicConfig(filename=f"logs/{filename}.log",
                         level=logging.DEBUG,
                         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -65,6 +64,9 @@ def find_date_context(path: str) -> str:
                 found['d'] = i
                 context.append(component)
     return '/'.join(context)
+
+# Module setup
+configure_log(__file__)
 
 # Devepoment
 def dev_testing():

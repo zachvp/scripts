@@ -22,15 +22,9 @@ import os
 import shutil
 import logging
 from typing import Callable
-import subprocess
 
 import common
 import constants
-import encode_tracks
-import subsonic_client
-
-# module setup
-common.configure_log(__file__)
 
 # Helper functions
 def normalize_paths(paths: list[str], parent: str) -> list[str]:
@@ -98,13 +92,15 @@ def sync(args: argparse.Namespace):
         action(input_path_full, output_path_full)
 
 def sync_from_collection(mappings:list[str]) -> None: # , mapping_action: Callable[[str, str], None], context_action: Callable[[str], Any]
+    import subsonic_client
+    import encode_tracks
     # process path mapping list
     # perform action for each mapping
     # when path date context changes, call other function, wait for it to finish
     batch: list[str] = []
     previous_source = mappings[0].split(constants.FILE_OPERATION_DELIMITER)[0]
     for mapping in mappings:
-        source = mapping.split(constants.FILE_OPERATION_DELIMITER)[0]
+        source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
         date_context_previous = common.find_date_context(previous_source)
         if date_context_previous == common.find_date_context(source):
             batch.append(mapping)
@@ -112,8 +108,34 @@ def sync_from_collection(mappings:list[str]) -> None: # , mapping_action: Callab
             logging.info(f"encoding batch in date context {date_context_previous}:\n{batch}")
             encode_tracks.encode_lossy(batch, '.mp3')
             # todo: upload tracks in output path to server
+            
+            transfer_music(os.path.dirname(dest), constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
             subsonic_client.call_endpoint(subsonic_client.API.START_SCAN)
         previous_source = source
+
+def format_timing(timestamp: float) -> str:
+    if timestamp > 60:
+        hours, remainder = divmod(timestamp, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{hours}h {minutes}m {seconds}s"
+    return f"{timestamp:.3}s"
+    
+
+def transfer_music(source_path: str, dest_address: str, rsync_module: str) -> None:
+    import subprocess
+    import shlex
+    import time
+    
+    options = "--progress -auvzi --exclude '.*'"
+    command = shlex.split(f"time rsync {source_path} {dest_address}/{rsync_module} {options}")
+    try:
+        logging.info(f'run rsync command: "{command}"')
+        timestamp = time.time()
+        process = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
+        timestamp = time.time() - timestamp
+        logging.info(f"total time: {format_timing(timestamp)}\n{process.stdout.strip()}")
+    except subprocess.CalledProcessError as error:
+        logging.error(f"subprocess return code '{error.returncode}':\n{error.stderr.strip()}")
     
 def parse_args(valid_modes: set[str]) -> argparse.Namespace:
     ''' Returns the parsed command-line arguments.
@@ -145,7 +167,10 @@ if __name__ == '__main__':
     script_args = parse_args(MODES)
     
     input_path = '/Users/zachvp/developer/test-private/data/tracks'
+    output_path = '/Users/zachvp/developer/test-private/data/tracks-output/'
     mappings = common.collect_paths(input_path)
-    mappings = common.add_output_path('/Users/zachvp/developer/test-private/data/tracks-output', mappings, input_path)
-    sync_from_collection(mappings)
+    mappings = common.add_output_path(output_path, mappings, input_path)
+    # sync_from_collection(mappings)
+    print(format_timing(656))
+    transfer_music(output_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
     # sync(script_args)
