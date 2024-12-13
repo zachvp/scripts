@@ -15,7 +15,7 @@ import constants
 
 def ffmpeg_base(input_path: str, output_path: str, options: str) -> list[str]:
     all_options = f"-ar 44100 -map 0 -write_id3v2 1  {options}"
-    return ['ffmpeg', '-i', input_path] + shlex.split(all_options) + ['-y', output_path]
+    return ['ffmpeg', '-i', input_path] + shlex.split(all_options) + [output_path]
 
 def ffmpeg_standardize(input_path: str, output_path: str) -> list[str]:
     '''Returns a list of ffmpeg command line arguments that will encode the `input_path` to the `output_path`.
@@ -206,6 +206,7 @@ def encode_lossy_cli(args: argparse.Namespace) -> None:
     path_mappings = common.add_output_path(args.output, path_mappings, args.input)
     return encode_lossy(path_mappings, args.extension)
 
+# todo: extend to encode multiple files at a time
 def encode_lossy(path_mappings: list[str], extension: str) -> None:
     for mapping in path_mappings:
         source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
@@ -216,6 +217,9 @@ def encode_lossy(path_mappings: list[str], extension: str) -> None:
             logging.info(f"create path '{dest_dir}'")
             os.makedirs(dest_dir)
         
+        if os.path.exists(dest):
+            logging.info(f"path '{dest}' exists, skipping.")
+            continue
         command = ffmpeg_mp3(source, dest)
         try:
             logging.info(f"encode from '{source}' to '{dest}'")

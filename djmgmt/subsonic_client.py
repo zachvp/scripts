@@ -22,6 +22,8 @@ import xml.etree.ElementTree as ET
 import keyring
 import argparse
 
+import logging
+
 def parse_args(valid_endpoints: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('endpoint', type=str, help=f"Which endpoint to call. One of: '{valid_endpoints}'")
@@ -58,7 +60,7 @@ def call_endpoint(endpoint: str) -> Response:
     query_string = create_query_string()
     base_url = f"http://corevega.local:4533/rest"
     url = f"{base_url}/{endpoint}.view?{query_string}"
-    print(f'send request: {url}')
+    logging.info(f'send request: {url}')
     return requests.get(url)
 
 def get_response_content(response: Response) -> dict[str, str]:
@@ -79,14 +81,14 @@ if __name__ == '__main__':
     response = call_endpoint(script_args.endpoint)
     
     if response.status_code == 200:
-        print(f"successful call to '{script_args.endpoint}'")
+        logging.info(f"successful call to '{script_args.endpoint}'")
         response_content = get_response_content(response)
         if script_args.endpoint == API.PING:
-            print(f'{json.dumps(response_content, indent=2)}')
+            logging.info(f'{json.dumps(response_content, indent=2)}')
         elif script_args.endpoint == API.GET_SCAN_STATUS or\
             script_args.endpoint == API.START_SCAN:
             node = ET.fromstring(response.text)
-            print(f'{json.dumps(node[0].attrib, indent=2)}')
+            logging.info(f'{json.dumps(node[0].attrib, indent=2)}')
             
     else:
         '''
@@ -100,5 +102,5 @@ if __name__ == '__main__':
         60 	The trial period for the Subsonic server is over. Please upgrade to Subsonic Premium. Visit subsonic.org for details.
         70 	The requested data was not found.
         '''
-        print(f'error: {response.text}')
+        logging.error(f'error: {response.text}')
 

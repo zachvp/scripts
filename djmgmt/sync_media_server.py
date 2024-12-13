@@ -42,7 +42,7 @@ def normalize_paths(paths: list[str], parent: str) -> list[str]:
         normalized.append(os.path.relpath(path, start=parent))
     return normalized
 
-def sync(args: argparse.Namespace):
+def sync_from_path(args: argparse.Namespace):
     '''The main script function.
 
     Function arguments:
@@ -91,27 +91,40 @@ def sync(args: argparse.Namespace):
             os.makedirs(output_parent_path)
         action(input_path_full, output_path_full)
 
-def sync_from_collection(mappings:list[str]) -> None: # , mapping_action: Callable[[str, str], None], context_action: Callable[[str], Any]
+def transform_implied_path(path: str) -> str:
+    # input : /Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3
+    # output: /Users/zachvp/developer/test-private/data/tracks-output/./2022/04 april/24/
+    components = path.split(os.sep)[1:]
+    transformed = ''
+    for i, c in enumerate(components):
+        if len(c) == 4 and c.isdecimal() and components[i+1].split()[1] in constants.MAPPING_MONTH.values():
+            transformed += f"{os.sep}."
+        transformed += f"{os.sep}{c}"
+    return transformed
+
+def sync_from_mappings(mappings:list[str]) -> None: # , mapping_action: Callable[[str, str], None], context_action: Callable[[str], Any]
     import subsonic_client
     import encode_tracks
-    # process path mapping list
-    # perform action for each mapping
-    # when path date context changes, call other function, wait for it to finish
+
     batch: list[str] = []
     previous_source = mappings[0].split(constants.FILE_OPERATION_DELIMITER)[0]
+    previous_dest = mappings[0].split(constants.FILE_OPERATION_DELIMITER)[1]
     for mapping in mappings:
         source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
         date_context_previous = common.find_date_context(previous_source)
-        if date_context_previous == common.find_date_context(source):
+        date_context = common.find_date_context(source)
+        if date_context_previous == date_context:
             batch.append(mapping)
         else:
             logging.info(f"encoding batch in date context {date_context_previous}:\n{batch}")
             encode_tracks.encode_lossy(batch, '.mp3')
-            # todo: upload tracks in output path to server
             
-            transfer_music(os.path.dirname(dest), constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
+            transfer_path = transform_implied_path(previous_dest) # todo: add error handling
+            transfer_files(os.path.dirname(transfer_path), f"{constants.RSYNC_URL}", constants.RSYNC_MODULE_NAVIDROME)
             subsonic_client.call_endpoint(subsonic_client.API.START_SCAN)
+            batch.clear()
         previous_source = source
+        previous_dest = dest
 
 def format_timing(timestamp: float) -> str:
     if timestamp > 60:
@@ -120,14 +133,13 @@ def format_timing(timestamp: float) -> str:
         return f"{hours}h {minutes}m {seconds}s"
     return f"{timestamp:.3}s"
     
-
-def transfer_music(source_path: str, dest_address: str, rsync_module: str) -> None:
+def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> None:
     import subprocess
     import shlex
     import time
     
-    options = "--progress -auvzi --exclude '.*'"
-    command = shlex.split(f"time rsync {source_path} {dest_address}/{rsync_module} {options}")
+    options = "--progress -auvziR --exclude '.*'"
+    command = shlex.split(f"rsync \"{source_path}\" {dest_address}/{rsync_module} {options}")
     try:
         logging.info(f'run rsync command: "{command}"')
         timestamp = time.time()
@@ -170,7 +182,9 @@ if __name__ == '__main__':
     output_path = '/Users/zachvp/developer/test-private/data/tracks-output/'
     mappings = common.collect_paths(input_path)
     mappings = common.add_output_path(output_path, mappings, input_path)
-    # sync_from_collection(mappings)
-    print(format_timing(656))
-    transfer_music(output_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
+    mappings.sort()
+    sync_from_mappings(mappings)
+    # print(transform_implied_path('/Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'))
+    # print(date_path_root('/Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'))
+    # transfer_files(output_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
     # sync(script_args)
