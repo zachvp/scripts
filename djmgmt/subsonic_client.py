@@ -23,6 +23,7 @@ import keyring
 import argparse
 
 import logging
+import common
 
 def parse_args(valid_endpoints: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -38,10 +39,10 @@ def parse_args(valid_endpoints: set[str]) -> argparse.Namespace:
 def create_token(password: str, salt: str) -> str:
     return hashlib.md5((password + salt).encode()).hexdigest()
 
-def create_salt(length):
+def create_salt(length) -> str:
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
-def create_query_string():
+def create_query(params: dict[str, str] = {}) -> str:
     # construct query params
     password = keyring.get_password('navidrome_client', 'api_client')
     assert password, f'unable to fetch password'
@@ -53,11 +54,14 @@ def create_query_string():
         'v': '1.16.1',                          # version
         'c': 'corevega_client'                  # client id
     }
+    # add any params
+    for key, value in params.items():
+        base_params[key] = value
     return urlencode(base_params)
 
-def call_endpoint(endpoint: str) -> Response:
+def call_endpoint(endpoint: str, params: dict[str, str]) -> Response:
     # call the endpoint
-    query_string = create_query_string()
+    query_string = create_query(params)
     base_url = f"http://corevega.local:4533/rest"
     url = f"{base_url}/{endpoint}.view?{query_string}"
     logging.info(f'send request: {url}')
@@ -66,30 +70,16 @@ def call_endpoint(endpoint: str) -> Response:
 def get_response_content(response: Response) -> dict[str, str]:
     return ET.fromstring(response.text).attrib
 
-class API:
-    PING = 'ping'
-    START_SCAN = 'startScan'
-    GET_SCAN_STATUS = 'getScanStatus'
-    
-    ENDPOINTS: set[str] = {PING, START_SCAN, GET_SCAN_STATUS}
-    
-    RESPONSE_STATUS = 'status'
-    RESPONSE_SCAN_STATUS = 'scanning'
-
-if __name__ == '__main__':
-    script_args = parse_args(API.ENDPOINTS)
-    response = call_endpoint(script_args.endpoint)
-    
+def handle_response(response, endpoint):
     if response.status_code == 200:
-        logging.info(f"successful call to '{script_args.endpoint}'")
+        logging.info(f"successful call to '{endpoint}'")
         response_content = get_response_content(response)
-        if script_args.endpoint == API.PING:
+        if endpoint == API.PING:
             logging.info(f'{json.dumps(response_content, indent=2)}')
-        elif script_args.endpoint == API.GET_SCAN_STATUS or\
-            script_args.endpoint == API.START_SCAN:
+        elif endpoint == API.GET_SCAN_STATUS or\
+            endpoint == API.START_SCAN:
             node = ET.fromstring(response.text)
             logging.info(f'{json.dumps(node[0].attrib, indent=2)}')
-            
     else:
         '''
         0 	A generic error.
@@ -104,3 +94,28 @@ if __name__ == '__main__':
         '''
         logging.error(f'error: {response.text}')
 
+class API:
+    PING = 'ping'
+    START_SCAN = 'startScan'
+    GET_SCAN_STATUS = 'getScanStatus'
+    
+    ENDPOINTS: set[str] = {PING, START_SCAN, GET_SCAN_STATUS}
+    
+    RESPONSE_STATUS = 'status'
+    RESPONSE_SCAN_STATUS = 'scanning'
+
+if __name__ == '__main__':
+    # setup
+    common.configure_log()
+    
+    # DEV testing
+    endpoint = API.GET_SCAN_STATUS
+    # main_response = call_endpoint(endpoint, { 'fullScan': 'true' })
+    main_response = call_endpoint(endpoint, {})
+    handle_response(main_response, endpoint)
+    
+    
+    # exit()
+    
+    # script_args = parse_args(API.ENDPOINTS)
+    # response = call_endpoint(script_args.endpoint, {})

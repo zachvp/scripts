@@ -3,9 +3,9 @@ import os
 
 import constants
 
-def configure_log(python_filename: str) -> None:
+def configure_log() -> None:
     '''Standard log configuration.'''
-    filename = os.path.basename(os.path.dirname(python_filename))
+    filename = 'scripts'
     logging.basicConfig(filename=f"logs/{filename}.log",
                         level=logging.DEBUG,
                         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -39,7 +39,7 @@ def raise_exception(error: Exception):
     logging.exception(error)
     raise error
 
-def find_date_context(path: str) -> str:
+def find_date_context(path: str) -> str | None:
     '''Extracts the date subpath from the input path.
     Example path: '/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'
     Example output: '2022/04 april/24'
@@ -63,10 +63,11 @@ def find_date_context(path: str) -> str:
             if len(component) == 2 and component.isdecimal():
                 found['d'] = i
                 context.append(component)
+    # check for valid date context
+    if len(context) != 3:
+        return None
+    
     return '/'.join(context)
-
-# Module setup
-configure_log(__file__)
 
 # Devepoment
 def dev_testing():

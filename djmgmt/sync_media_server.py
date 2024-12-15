@@ -91,10 +91,12 @@ def sync_from_path(args: argparse.Namespace):
             os.makedirs(output_parent_path)
         action(input_path_full, output_path_full)
 
-def transform_implied_path(path: str) -> str:
+def transform_implied_path(path: str) -> str | None:
     # input : /Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3
     # output: /Users/zachvp/developer/test-private/data/tracks-output/./2022/04 april/24/
     components = path.split(os.sep)[1:]
+    if not common.find_date_context(path):
+        return None
     transformed = ''
     for i, c in enumerate(components):
         if len(c) == 4 and c.isdecimal() and components[i+1].split()[1] in constants.MAPPING_MONTH.values():
@@ -102,29 +104,55 @@ def transform_implied_path(path: str) -> str:
         transformed += f"{os.sep}{c}"
     return transformed
 
-def sync_from_mappings(mappings:list[str]) -> None: # , mapping_action: Callable[[str, str], None], context_action: Callable[[str], Any]
+def sync_batch(batch: list[str], date_context: str, source: str, dest: str) -> None:
     import subsonic_client
     import encode_tracks
+            
+    logging.info(f"encoding batch in date context {date_context}:\n{batch}")
+    encode_tracks.encode_lossy(batch, '.mp3')
+    
+    transfer_path = transform_implied_path(dest)
+    if transfer_path:        
+        transfer_files(os.path.dirname(transfer_path), f"{constants.RSYNC_URL}", constants.RSYNC_MODULE_NAVIDROME)
+        subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {})
+    else:
+        logging.error(f"unable to transfer from '{source}' to '{dest}'")
 
+def sync_from_mappings(mappings:list[str]) -> None:
     batch: list[str] = []
-    previous_source = mappings[0].split(constants.FILE_OPERATION_DELIMITER)[0]
-    previous_dest = mappings[0].split(constants.FILE_OPERATION_DELIMITER)[1]
+    source_previous, dest_previous = mappings[0].split(constants.FILE_OPERATION_DELIMITER)
+    date_context, source, dest = '', '', ''
+    
+    # process the file mappings
+    logging.info(f"mappings:\n{mappings}")
     for mapping in mappings:
         source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
-        date_context_previous = common.find_date_context(previous_source)
+        date_context_previous = common.find_date_context(source_previous)
         date_context = common.find_date_context(source)
+        
+        # validate date contexts
+        if not date_context_previous:
+            logging.error(f"no previous date context in path '{date_context_previous}'")
+            break
+        if not date_context:
+            logging.error(f"no date context in path '{date_context}'")
+            break
+        
+        # collect each mapping in a given date context
         if date_context_previous == date_context:
             batch.append(mapping)
+            logging.info(f"add to batch: {mapping}")
         else:
-            logging.info(f"encoding batch in date context {date_context_previous}:\n{batch}")
-            encode_tracks.encode_lossy(batch, '.mp3')
-            
-            transfer_path = transform_implied_path(previous_dest) # todo: add error handling
-            transfer_files(os.path.dirname(transfer_path), f"{constants.RSYNC_URL}", constants.RSYNC_MODULE_NAVIDROME)
-            subsonic_client.call_endpoint(subsonic_client.API.START_SCAN)
+            sync_batch(batch, date_context_previous, source_previous, dest_previous)
             batch.clear()
-        previous_source = source
-        previous_dest = dest
+            batch.append(mapping)
+            logging.info(f"add to batch: {mapping}")
+        source_previous = source
+        dest_previous = dest
+    
+    # process the final batch
+    if batch and date_context and source and dest:
+        sync_batch(batch, date_context, source, dest)
 
 def format_timing(timestamp: float) -> str:
     if timestamp > 60:
@@ -171,6 +199,9 @@ def parse_args(valid_modes: set[str]) -> argparse.Namespace:
     return args
 
 if __name__ == '__main__':
+    # setup
+    common.configure_log()
+    
     # Script modes
     MODE_COPY = 'copy'
     MODE_MOVE = 'move'
@@ -183,7 +214,9 @@ if __name__ == '__main__':
     mappings = common.collect_paths(input_path)
     mappings = common.add_output_path(output_path, mappings, input_path)
     mappings.sort()
+    # print(mappings)
     sync_from_mappings(mappings)
+    
     # print(transform_implied_path('/Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'))
     # print(date_path_root('/Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'))
     # transfer_files(output_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
