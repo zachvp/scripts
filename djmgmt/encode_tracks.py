@@ -206,27 +206,34 @@ def encode_lossy_cli(args: argparse.Namespace) -> None:
     path_mappings = common.add_output_path(args.output, path_mappings, args.input)
     return encode_lossy(path_mappings, args.extension)
 
+def run_command(command: list[str]):
+    try:
+        logging.info(f"run command: {shlex.join(command)}")
+        subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
+        logging.info(f"command success")
+    except subprocess.CalledProcessError as error:
+        logging.error(f"subprocess:\n{error.stderr.strip()}")
+
 # todo: extend to encode multiple files at a time
 def encode_lossy(path_mappings: list[str], extension: str) -> None:
+    import threading
+    
+    processed = 0
     for mapping in path_mappings:
         source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
         dest = os.path.splitext(dest)[0] + extension
         
         dest_dir = os.path.split(dest)[0]
         if not os.path.exists(dest_dir):
-            logging.info(f"create path '{dest_dir}'")
+            logging.info(f"create path: '{dest_dir}'")
             os.makedirs(dest_dir)
         
         if os.path.exists(dest):
-            logging.info(f"path '{dest}' exists, skipping.")
+            logging.info(f"path exists, skipping: '{dest}'")
             continue
         command = ffmpeg_mp3(source, dest)
-        try:
-            logging.info(f"encode from '{source}' to '{dest}'")
-            subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-            logging.info(f"success: '{dest}'")
-        except subprocess.CalledProcessError as error:
-            logging.error(f"subprocess:\n{error.stderr.strip()}")
+        # thread = threading.Thread(target=run_command, args=[command, source, dest])
+        run_command(command)
 
 def process_args(functions: set[str]) -> argparse.Namespace:
     '''Process the script's command line aruments.'''

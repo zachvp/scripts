@@ -9,7 +9,8 @@ def configure_log() -> None:
     logging.basicConfig(filename=f"logs/{filename}.log",
                         level=logging.DEBUG,
                         format="%(asctime)s [%(levelname)s] %(message)s",
-                        datefmt="%D %H:%M:%S")
+                        datefmt="%D %H:%M:%S",
+                        filemode='w')
 
 def collect_paths(root: str) -> list[str]:
     '''Returns the paths of all files for the given root.'''

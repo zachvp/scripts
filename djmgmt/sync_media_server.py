@@ -92,6 +92,7 @@ def sync_from_path(args: argparse.Namespace):
         action(input_path_full, output_path_full)
 
 def transform_implied_path(path: str) -> str | None:
+    '''Rsync-specific. Transforms the given path into a format that will include the required subdirectories.'''
     # input : /Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3
     # output: /Users/zachvp/developer/test-private/data/tracks-output/./2022/04 april/24/
     components = path.split(os.sep)[1:]
@@ -104,7 +105,31 @@ def transform_implied_path(path: str) -> str | None:
         transformed += f"{os.sep}{c}"
     return transformed
 
+def format_timing(timestamp: float) -> str:
+    if timestamp > 60:
+        hours, remainder = divmod(timestamp, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{hours}h {minutes}m {seconds}s"
+    return f"{timestamp:.3}s"
+    
+def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> None:
+    import subprocess
+    import shlex
+    import time
+    
+    options = "--progress -auvziR --exclude '.*'"
+    command = shlex.split(f"rsync \"{source_path}\" {dest_address}/{rsync_module} {options}")
+    try:
+        logging.info(f'run rsync command: "{command}"')
+        timestamp = time.time()
+        process = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
+        timestamp = time.time() - timestamp
+        logging.info(f"total time: {format_timing(timestamp)}\n{process.stdout.strip()}")
+    except subprocess.CalledProcessError as error:
+        logging.error(f"subprocess return code '{error.returncode}':\n{error.stderr.strip()}")
+
 def sync_batch(batch: list[str], date_context: str, source: str, dest: str) -> None:
+    '''Transfers all files in the batch to the given destination, then tells the music server to perform a scan.'''
     import subsonic_client
     import encode_tracks
             
@@ -145,7 +170,7 @@ def sync_from_mappings(mappings:list[str]) -> None:
         else:
             sync_batch(batch, date_context_previous, source_previous, dest_previous)
             batch.clear()
-            batch.append(mapping)
+            batch.append(mapping) # add the first mapping of the new context
             logging.info(f"add to batch: {mapping}")
         source_previous = source
         dest_previous = dest
@@ -154,29 +179,6 @@ def sync_from_mappings(mappings:list[str]) -> None:
     if batch and date_context and source and dest:
         sync_batch(batch, date_context, source, dest)
 
-def format_timing(timestamp: float) -> str:
-    if timestamp > 60:
-        hours, remainder = divmod(timestamp, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        return f"{hours}h {minutes}m {seconds}s"
-    return f"{timestamp:.3}s"
-    
-def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> None:
-    import subprocess
-    import shlex
-    import time
-    
-    options = "--progress -auvziR --exclude '.*'"
-    command = shlex.split(f"rsync \"{source_path}\" {dest_address}/{rsync_module} {options}")
-    try:
-        logging.info(f'run rsync command: "{command}"')
-        timestamp = time.time()
-        process = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-        timestamp = time.time() - timestamp
-        logging.info(f"total time: {format_timing(timestamp)}\n{process.stdout.strip()}")
-    except subprocess.CalledProcessError as error:
-        logging.error(f"subprocess return code '{error.returncode}':\n{error.stderr.strip()}")
-    
 def parse_args(valid_modes: set[str]) -> argparse.Namespace:
     ''' Returns the parsed command-line arguments.
 
@@ -214,7 +216,7 @@ if __name__ == '__main__':
     mappings = common.collect_paths(input_path)
     mappings = common.add_output_path(output_path, mappings, input_path)
     mappings.sort()
-    # print(mappings)
+    
     sync_from_mappings(mappings)
     
     # print(transform_implied_path('/Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'))
