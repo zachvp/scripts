@@ -15,7 +15,7 @@ import common
 import constants
 
 def ffmpeg_base(input_path: str, output_path: str, options: str) -> list[str]:
-    all_options = f"-ar 44100 -write_id3v2 1  {options}"
+    all_options = f"-ar 44100 -map 0 -write_id3v2 1 {options}"
     return ['ffmpeg', '-i', input_path] + shlex.split(all_options) + [output_path]
 
 def ffmpeg_standardize(input_path: str, output_path: str) -> list[str]:
@@ -285,6 +285,7 @@ async def run_command_async(command: list[str]) -> bool:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE)
     
+    # wait for process to finish
     stdout, stderr = await process.communicate()
     if process.returncode == 0:
         message = f"command output:\n"
@@ -306,13 +307,38 @@ if __name__ == '__main__':
     FUNCTIONS = {FUNCTION_LOSSLESS, FUNCTION_LOSSY}
     
     # testing
-    source = "/Users/zachvp/developer/test-private/data/tracks/2020/03 march/21/album/artist/2pole - Atom (Original Mix).aiff"
-    dest = "/Users/zachvp/developer/test-private/data/tracks-output/2020/03 march/21/album/artist/2pole - Atom (Original Mix).aiff"
-    command = ffmpeg_mp3(source, dest)
-    if not os.path.exists(os.path.dirname(dest)):
-        os.makedirs(os.path.dirname(dest))
-    process = asyncio.run(run_command_async(command))
-    # processes = [process]
+    async def wrapper():
+        source = "/Users/zachvp/developer/test-private/data/tracks/2020/03 march/21/album/artist/2pole - Atom (Original Mix).aiff"
+        dest = "/Users/zachvp/developer/test-private/data/tracks-output/2020/03 march/21/album/artist/2pole - Atom (Original Mix).mp3"
+        command = ffmpeg_mp3(source, dest)
+        if not os.path.exists(os.path.dirname(dest)):
+            os.makedirs(os.path.dirname(dest))
+        # process_0 = asyncio.run(run_command_async(command))
+        loop = asyncio.get_event_loop()
+        task_command_0 = loop.create_task(run_command_async(command))
+        
+        source = '/Users/zachvp/developer/test-private/data/tracks/2021/03 march/07/01 Crystal.aiff'
+        dest = '/Users/zachvp/developer/test-private/data/tracks-output/2021/03 march/07/01 Crystal.mp3'
+        if not os.path.exists(os.path.dirname(dest)):
+            os.makedirs(os.path.dirname(dest))
+        command = ffmpeg_mp3(source, dest)
+        task_command_1 = loop.create_task(run_command_async(command))
+        
+        await asyncio.gather(task_command_0, task_command_1)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(wrapper())
+    # asyncio.run(handle_process(process_0))
+    
+    exit()
+    
+
+    process_1 = asyncio.run(run_command_async(command))
+    # print(process.returncode)
+    
+    
+    
+    processes = [process_0, process_1]
     # if processes:
     #     result = asyncio.run(handle_process(processes[0]))
     #     print(f"result: {result}")
