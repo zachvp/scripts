@@ -9,12 +9,13 @@ import sys
 import shlex
 import logging
 import sys
+import asyncio
 
 import common
 import constants
 
 def ffmpeg_base(input_path: str, output_path: str, options: str) -> list[str]:
-    all_options = f"-ar 44100 -map 0 -write_id3v2 1  {options}"
+    all_options = f"-ar 44100 -write_id3v2 1  {options}"
     return ['ffmpeg', '-i', input_path] + shlex.split(all_options) + [output_path]
 
 def ffmpeg_standardize(input_path: str, output_path: str) -> list[str]:
@@ -27,7 +28,7 @@ def ffmpeg_standardize(input_path: str, output_path: str) -> list[str]:
 
     return ffmpeg_base(input_path, output_path, options)
 
-def ffmpeg_mp3(input_path: str, output_path: str) -> list[str]:
+def ffmpeg_mp3(input_path: str, output_path: str) -> list[str]: # todo: use shlex.quote()
     options = '-b:a 320k'
     return ffmpeg_base(input_path, output_path, options)
 
@@ -206,18 +207,16 @@ def encode_lossy_cli(args: argparse.Namespace) -> None:
     path_mappings = common.add_output_path(args.output, path_mappings, args.input)
     return encode_lossy(path_mappings, args.extension)
 
-def run_command(command: list[str]):
+def run_command(command: list[str]) -> None:
     try:
         logging.info(f"run command: {shlex.join(command)}")
         subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
         logging.info(f"command success")
     except subprocess.CalledProcessError as error:
-        logging.error(f"subprocess:\n{error.stderr.strip()}")
+        logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
 
 # todo: extend to encode multiple files at a time
 def encode_lossy(path_mappings: list[str], extension: str) -> None:
-    import threading
-    
     processed = 0
     for mapping in path_mappings:
         source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
@@ -233,7 +232,13 @@ def encode_lossy(path_mappings: list[str], extension: str) -> None:
             continue
         command = ffmpeg_mp3(source, dest)
         # thread = threading.Thread(target=run_command, args=[command, source, dest])
-        run_command(command)
+        # run_command(command)
+        while processed > 2:
+            pass
+        processed += 1
+        result = asyncio.run(run_command_async(command))
+        if result:
+            processed -= 1
 
 def process_args(functions: set[str]) -> argparse.Namespace:
     '''Process the script's command line aruments.'''
@@ -258,11 +263,61 @@ def process_args(functions: set[str]) -> argparse.Namespace:
 
     return args
 
+async def handle_process(process: asyncio.subprocess.Process) -> bool:
+    stdout, stderr = await process.communicate()
+    if process.returncode == 0:
+        message = f"command output:\n"
+        if stdout:
+            message += stdout.decode()
+            logging.info(message)
+        elif stderr:
+            message += stderr.decode()
+            logging.info(message)
+        return True
+    else:
+        logging.error(f"return code '{process.returncode}':\n{stderr.decode()}")
+    return False
+
+async def run_command_async(command: list[str]) -> bool:
+    logging.info(f"run command: {shlex.join(command)}")
+    process = await asyncio.create_subprocess_shell(
+        shlex.join(command),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE)
+    
+    stdout, stderr = await process.communicate()
+    if process.returncode == 0:
+        message = f"command output:\n"
+        if stdout:
+            message += stdout.decode()
+            logging.info(message)
+        elif stderr:
+            message += stderr.decode()
+            logging.info(message)
+        return True
+    else:
+        logging.error(f"return code '{process.returncode}':\n{stderr.decode()}")
+    return False
+
 # Main
 if __name__ == '__main__':
     FUNCTION_LOSSLESS = 'lossless'
     FUNCTION_LOSSY = 'lossy'
     FUNCTIONS = {FUNCTION_LOSSLESS, FUNCTION_LOSSY}
+    
+    # testing
+    source = "/Users/zachvp/developer/test-private/data/tracks/2020/03 march/21/album/artist/2pole - Atom (Original Mix).aiff"
+    dest = "/Users/zachvp/developer/test-private/data/tracks-output/2020/03 march/21/album/artist/2pole - Atom (Original Mix).aiff"
+    command = ffmpeg_mp3(source, dest)
+    if not os.path.exists(os.path.dirname(dest)):
+        os.makedirs(os.path.dirname(dest))
+    process = asyncio.run(run_command_async(command))
+    # processes = [process]
+    # if processes:
+    #     result = asyncio.run(handle_process(processes[0]))
+    #     print(f"result: {result}")
+    
+    exit()
     args = process_args(FUNCTIONS)
     
     if args.function == FUNCTION_LOSSLESS:

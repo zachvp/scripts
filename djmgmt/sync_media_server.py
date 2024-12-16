@@ -118,15 +118,15 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> No
     import time
     
     options = "--progress -auvziR --exclude '.*'"
-    command = shlex.split(f"rsync \"{source_path}\" {dest_address}/{rsync_module} {options}")
+    command = shlex.split(f"rsync \"{source_path}\" {dest_address}/{rsync_module} {options}") # todo: use shlex.quote()
     try:
-        logging.info(f'run rsync command: "{command}"')
+        logging.info(f'run command: "{shlex.join(command)}"')
         timestamp = time.time()
         process = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
         timestamp = time.time() - timestamp
         logging.info(f"total time: {format_timing(timestamp)}\n{process.stdout.strip()}")
     except subprocess.CalledProcessError as error:
-        logging.error(f"subprocess return code '{error.returncode}':\n{error.stderr.strip()}")
+        logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
 
 def sync_batch(batch: list[str], date_context: str, source: str, dest: str) -> None:
     '''Transfers all files in the batch to the given destination, then tells the music server to perform a scan.'''
