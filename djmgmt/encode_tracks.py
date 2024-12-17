@@ -217,7 +217,9 @@ def run_command(command: list[str]) -> None:
 
 # todo: extend to encode multiple files at a time
 def encode_lossy(path_mappings: list[str], extension: str) -> None:
-    processed = 0
+    tasks = []
+    loop = asyncio.get_event_loop()
+    
     for mapping in path_mappings:
         source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
         dest = os.path.splitext(dest)[0] + extension
@@ -233,12 +235,48 @@ def encode_lossy(path_mappings: list[str], extension: str) -> None:
         command = ffmpeg_mp3(source, dest)
         # thread = threading.Thread(target=run_command, args=[command, source, dest])
         # run_command(command)
-        while processed > 2:
-            pass
-        processed += 1
-        result = asyncio.run(run_command_async(command))
-        if result:
-            processed -= 1
+        task = loop.create_task(run_command_async(command))
+        tasks.append(task)
+        print(f"add task: {len(tasks)}")
+        logging.info(f"add task: {len(tasks)}")
+        if len(tasks) > 15:
+            run_tasks = tasks.copy()
+            loop.run_until_complete(collect_tasks(run_tasks))
+            print(f"ran {len(run_tasks)} tasks")
+            logging.info(f"ran {len(run_tasks)} tasks")
+            tasks.clear()
+    if tasks:
+        run_tasks = tasks.copy()
+        loop.run_until_complete(collect_tasks(run_tasks))
+        print(f"ran {len(tasks)} tasks")
+        logging.info(f"ran {len(tasks)} tasks")
+        tasks.clear()
+        
+        
+async def collect_tasks(tasks: list[asyncio.Task]) -> list[asyncio.Future]:
+    return await asyncio.gather(*tasks)
+
+async def run_command_async(command: list[str]) -> bool:
+    logging.info(f"run command: {shlex.join(command)}")
+    process = await asyncio.create_subprocess_shell(
+        shlex.join(command),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE)
+    
+    # wait for process to finish
+    stdout, stderr = await process.communicate()
+    if process.returncode == 0:
+        message = f"command output:\n"
+        if stdout:
+            message += stdout.decode()
+            logging.info(message)
+        elif stderr:
+            message += stderr.decode()
+            logging.info(message)
+        return True
+    else:
+        logging.error(f"return code '{process.returncode}':\n{stderr.decode()}")
+    return False                
 
 def process_args(functions: set[str]) -> argparse.Namespace:
     '''Process the script's command line aruments.'''
@@ -262,43 +300,6 @@ def process_args(functions: set[str]) -> argparse.Namespace:
         parser.error("if option '--store-skipped' is set, option '--store-path' is required")
 
     return args
-
-async def handle_process(process: asyncio.subprocess.Process) -> bool:
-    stdout, stderr = await process.communicate()
-    if process.returncode == 0:
-        message = f"command output:\n"
-        if stdout:
-            message += stdout.decode()
-            logging.info(message)
-        elif stderr:
-            message += stderr.decode()
-            logging.info(message)
-        return True
-    else:
-        logging.error(f"return code '{process.returncode}':\n{stderr.decode()}")
-    return False
-
-async def run_command_async(command: list[str]) -> bool:
-    logging.info(f"run command: {shlex.join(command)}")
-    process = await asyncio.create_subprocess_shell(
-        shlex.join(command),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE)
-    
-    # wait for process to finish
-    stdout, stderr = await process.communicate()
-    if process.returncode == 0:
-        message = f"command output:\n"
-        if stdout:
-            message += stdout.decode()
-            logging.info(message)
-        elif stderr:
-            message += stderr.decode()
-            logging.info(message)
-        return True
-    else:
-        logging.error(f"return code '{process.returncode}':\n{stderr.decode()}")
-    return False
 
 # Main
 if __name__ == '__main__':
