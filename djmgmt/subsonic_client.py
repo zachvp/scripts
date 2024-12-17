@@ -59,7 +59,7 @@ def create_query(params: dict[str, str] = {}) -> str:
         base_params[key] = value
     return urlencode(base_params)
 
-def call_endpoint(endpoint: str, params: dict[str, str]) -> Response:
+def call_endpoint(endpoint: str, params: dict[str, str] = {}) -> Response:
     # call the endpoint
     query_string = create_query(params)
     base_url = f"http://corevega.local:4533/rest"
@@ -68,18 +68,18 @@ def call_endpoint(endpoint: str, params: dict[str, str]) -> Response:
     return requests.get(url)
 
 def get_response_content(response: Response) -> dict[str, str]:
-    return ET.fromstring(response.text).attrib
+    content = ET.fromstring(response.text)
+    if len(content) > 0:
+        return content[0].attrib
+    else:
+        return content.attrib
 
-def handle_response(response, endpoint):
+def handle_response(response: Response, endpoint: str) -> dict[str, str]:
     if response.status_code == 200:
-        logging.info(f"successful call to '{endpoint}'")
-        response_content = get_response_content(response)
-        if endpoint == API.PING:
-            logging.info(f'{json.dumps(response_content, indent=2)}')
-        elif endpoint == API.GET_SCAN_STATUS or\
-            endpoint == API.START_SCAN:
-            node = ET.fromstring(response.text)
-            logging.info(f'{json.dumps(node[0].attrib, indent=2)}')
+        content = get_response_content(response)
+        logging.info(f"successful call to '{endpoint}'\n{json.dumps(content, indent=2)}")
+        
+        return content
     else:
         '''
         0 	A generic error.
@@ -93,6 +93,7 @@ def handle_response(response, endpoint):
         70 	The requested data was not found.
         '''
         logging.error(f'error: {response.text}')
+        return { 'error': response.text }
 
 class API:
     PING = 'ping'
@@ -109,9 +110,14 @@ if __name__ == '__main__':
     common.configure_log()
     
     # DEV testing
+    endpoint = API.PING
+    # main_response = call_endpoint(endpoint, { 'fullScan': 'true' })
+    main_response = call_endpoint(endpoint)
+    handle_response(main_response, endpoint)
+    
     endpoint = API.GET_SCAN_STATUS
     # main_response = call_endpoint(endpoint, { 'fullScan': 'true' })
-    main_response = call_endpoint(endpoint, {})
+    main_response = call_endpoint(endpoint)
     handle_response(main_response, endpoint)
     
     

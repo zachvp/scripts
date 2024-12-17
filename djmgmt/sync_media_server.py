@@ -139,7 +139,10 @@ def sync_batch(batch: list[str], date_context: str, source: str, dest: str) -> N
     transfer_path = transform_implied_path(dest)
     if transfer_path:        
         transfer_files(os.path.dirname(transfer_path), f"{constants.RSYNC_URL}", constants.RSYNC_MODULE_NAVIDROME)
-        subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {})
+        subsonic_client.call_endpoint(subsonic_client.API.START_SCAN)
+        # todo: block until scan completes
+        subsonic_client.call_endpoint(subsonic_client.API.GET_SCAN_STATUS)
+        
     else:
         logging.error(f"unable to transfer from '{source}' to '{dest}'")
 
