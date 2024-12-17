@@ -22,6 +22,7 @@ import os
 import shutil
 import logging
 from typing import Callable
+import time
 
 import common
 import constants
@@ -115,18 +116,17 @@ def format_timing(timestamp: float) -> str:
 def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> None:
     import subprocess
     import shlex
-    import time
     
     options = "--progress -auvziR --exclude '.*'"
-    command = shlex.split(f"rsync \"{source_path}\" {dest_address}/{rsync_module} {options}")
+    command = shlex.split(f"rsync \"{source_path}\" {dest_address}/{rsync_module} {options}") # todo: use shlex.quote()
     try:
-        logging.info(f'run rsync command: "{command}"')
+        logging.info(f'run command: "{shlex.join(command)}"')
         timestamp = time.time()
         process = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
         timestamp = time.time() - timestamp
         logging.info(f"total time: {format_timing(timestamp)}\n{process.stdout.strip()}")
     except subprocess.CalledProcessError as error:
-        logging.error(f"subprocess return code '{error.returncode}':\n{error.stderr.strip()}")
+        logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
 
 def sync_batch(batch: list[str], date_context: str, source: str, dest: str) -> None:
     '''Transfers all files in the batch to the given destination, then tells the music server to perform a scan.'''
@@ -209,7 +209,7 @@ if __name__ == '__main__':
     MODE_MOVE = 'move'
 
     MODES = {MODE_COPY, MODE_MOVE}
-    script_args = parse_args(MODES)
+    # script_args = parse_args(MODES)
     
     input_path = '/Users/zachvp/developer/test-private/data/tracks'
     output_path = '/Users/zachvp/developer/test-private/data/tracks-output/'
@@ -217,7 +217,11 @@ if __name__ == '__main__':
     mappings = common.add_output_path(output_path, mappings, input_path)
     mappings.sort()
     
+    # todo: time
+    timestamp = time.time()
     sync_from_mappings(mappings)
+    timestamp = time.time() - timestamp
+    logging.info(f"sync time: {format_timing(timestamp)}")
     
     # print(transform_implied_path('/Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'))
     # print(date_path_root('/Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'))
