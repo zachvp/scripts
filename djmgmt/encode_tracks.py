@@ -48,14 +48,14 @@ def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream: str) -
 
     try:
         if args.verbose:
-            logging.info(f"read_ffprobe_value: {command}")
+            logging.debug(f"read_ffprobe_value: {command}")
         value = subprocess.run(command, check=True, capture_output=True, encoding='utf-8').stdout.strip()
         if args.verbose:
-            logging.info(f"read_ffprobe_value: {value}")
+            logging.debug(f"read_ffprobe_value: {value}")
         return value
     except subprocess.CalledProcessError as error:
         logging.error(f"fatal: read_ffprobe_value: CalledProcessError:\n{error.stderr.strip()}")
-        logging.info(f"command: {shlex.join(command)}")
+        logging.debug(f"command: {shlex.join(command)}")
         sys.exit()
 
 def check_skip_sample_rate(args: argparse.Namespace, input_path: str) -> bool:
@@ -85,7 +85,7 @@ def setup_storage(args: argparse.Namespace, filename: str) -> str:
     store_path = os.path.join(storage_dir, filename)
     with open(store_path, 'w', encoding='utf-8'):
         pass
-    logging.info(f"set up store path: {store_path}")
+    logging.debug(f"set up store path: {store_path}")
 
     return store_path
 
@@ -128,7 +128,7 @@ def encode_lossless(args: argparse.Namespace) -> None:
         # prune hidden directories
         for index, directory in enumerate(dirnames):
             if directory.startswith('.'):
-                logging.info(f"skip: hidden directory '{os.path.join(working_dir, directory)}'")
+                logging.debug(f"skip: hidden directory '{os.path.join(working_dir, directory)}'")
                 del dirnames[index]
 
         for name in filenames:
@@ -136,18 +136,18 @@ def encode_lossless(args: argparse.Namespace) -> None:
             name_split = os.path.splitext(name)
 
             if name.startswith('.'):
-                logging.info(f"skip: hidden file '{input_path}'")
-                logging.info(f"skip: hidden files are not written to skip storage '{input_path}'")
+                logging.debug(f"skip: hidden file '{input_path}'")
+                logging.debug(f"skip: hidden files are not written to skip storage '{input_path}'")
                 continue
             if name_split[1] not in { '.aif', '.aiff', '.wav', }:
-                logging.info(f"skip: unsupported file: '{input_path}'")
+                logging.debug(f"skip: unsupported file: '{input_path}'")
                 if skipped_files:
                     skipped_files.append(f"{input_path}\n")
                 continue
             if not name.endswith('.wav') and\
             check_skip_sample_rate(args, input_path) and\
             check_skip_bit_depth(args, input_path):
-                logging.info(f"skip: optimal sample rate and bit depth: '{input_path}'")
+                logging.debug(f"skip: optimal sample rate and bit depth: '{input_path}'")
                 if skipped_files:
                     skipped_files.append(f"{input_path}\n")
                 continue
@@ -173,10 +173,10 @@ def encode_lossless(args: argparse.Namespace) -> None:
             # -- build and run the ffmpeg encode command
             command = ffmpeg_standardize(input_path, output_path)
             if args.verbose:
-                logging.info(f"run cmd:\n\t{command}")
+                logging.debug(f"run cmd:\n\t{command}")
             try:
                 subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-                logging.info(f"success: {output_path}")
+                logging.debug(f"success: {output_path}")
             except subprocess.CalledProcessError as error:
                 logging.error(f"subprocess:\n{error.stderr.strip()}")
 
@@ -209,9 +209,9 @@ def encode_lossy_cli(args: argparse.Namespace) -> None:
 
 def run_command(command: list[str]) -> None:
     try:
-        logging.info(f"run command: {shlex.join(command)}")
+        logging.debug(f"run command: {shlex.join(command)}")
         subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-        logging.info(f"command success")
+        logging.debug(f"command success")
     except subprocess.CalledProcessError as error:
         logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
 
@@ -224,13 +224,13 @@ def encode_lossy(path_mappings: list[str], extension: str) -> None:
         source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
         dest = os.path.splitext(dest)[0] + extension
         
-        dest_dir = os.path.split(dest)[0]
+        dest_dir = os.path.dirname(dest)
         if not os.path.exists(dest_dir):
-            logging.info(f"create path: '{dest_dir}'")
+            logging.debug(f"create path: '{dest_dir}'")
             os.makedirs(dest_dir)
         
         if os.path.exists(dest):
-            logging.info(f"path exists, skipping: '{dest}'")
+            logging.debug(f"path exists, skipping: '{dest}'")
             continue
         command = ffmpeg_mp3(source, dest)
         # thread = threading.Thread(target=run_command, args=[command, source, dest])
@@ -238,18 +238,17 @@ def encode_lossy(path_mappings: list[str], extension: str) -> None:
         task = loop.create_task(run_command_async(command))
         tasks.append(task)
         print(f"add task: {len(tasks)}")
-        logging.info(f"add task: {len(tasks)}")
+        logging.debug(f"add task: {len(tasks)}")
         if len(tasks) > 15:
             run_tasks = tasks.copy()
             loop.run_until_complete(collect_tasks(run_tasks))
             print(f"ran {len(run_tasks)} tasks")
-            logging.info(f"ran {len(run_tasks)} tasks")
+            logging.debug(f"ran {len(run_tasks)} tasks")
             tasks.clear()
     if tasks:
         run_tasks = tasks.copy()
         loop.run_until_complete(collect_tasks(run_tasks))
-        print(f"ran {len(tasks)} tasks")
-        logging.info(f"ran {len(tasks)} tasks")
+        logging.debug(f"ran {len(tasks)} tasks")
         tasks.clear()
         
         
@@ -257,7 +256,7 @@ async def collect_tasks(tasks: list[asyncio.Task]) -> list[asyncio.Future]:
     return await asyncio.gather(*tasks)
 
 async def run_command_async(command: list[str]) -> bool:
-    logging.info(f"run command: {shlex.join(command)}")
+    logging.debug(f"run command: {shlex.join(command)}")
     process = await asyncio.create_subprocess_shell(
         shlex.join(command),
         stdout=asyncio.subprocess.PIPE,
@@ -269,10 +268,10 @@ async def run_command_async(command: list[str]) -> bool:
         message = f"command output:\n"
         if stdout:
             message += stdout.decode()
-            logging.info(message)
+            logging.debug(message)
         elif stderr:
             message += stderr.decode()
-            logging.info(message)
+            logging.debug(message)
         return True
     else:
         logging.error(f"return code '{process.returncode}':\n{stderr.decode()}")

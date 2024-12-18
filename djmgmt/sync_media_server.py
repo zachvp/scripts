@@ -120,11 +120,11 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> No
     options = "--progress -auvziR --exclude '.*'"
     command = shlex.split(f"rsync \"{source_path}\" {dest_address}/{rsync_module} {options}") # todo: use shlex.quote()
     try:
-        logging.info(f'run command: "{shlex.join(command)}"')
+        logging.debug(f'run command: "{shlex.join(command)}"')
         timestamp = time.time()
         process = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
         timestamp = time.time() - timestamp
-        logging.info(f"total time: {format_timing(timestamp)}\n{process.stdout.strip()}")
+        logging.debug(f"total time: {format_timing(timestamp)}\n{process.stdout.strip()}")
     except subprocess.CalledProcessError as error:
         logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
 
@@ -143,18 +143,17 @@ def sync_batch(batch: list[str], date_context: str, source: str, dest: str) -> N
         transfer_files(os.path.dirname(transfer_path), f"{constants.RSYNC_URL}", constants.RSYNC_MODULE_NAVIDROME)
         
         # tell the media server new files are available
-        response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN)
+        response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {'fullScan': 'true'})
         if response.ok:
-            response = subsonic_client.call_endpoint(subsonic_client.API.GET_SCAN_STATUS)
-            content = subsonic_client.handle_response(response, subsonic_client.API.GET_SCAN_STATUS)
-            
             # wait until the server has stopped scanning
-            while content and content['scanning'] == 'true':
-                logging.debug("scan in progress, waiting...")
-                time.sleep(1)
+            while True:
                 response = subsonic_client.call_endpoint(subsonic_client.API.GET_SCAN_STATUS)
                 content = subsonic_client.handle_response(response, subsonic_client.API.GET_SCAN_STATUS)
-                pass
+                if not content or content['scanning'] == 'false':
+                    break
+                logging.debug("scan in progress, waiting...")
+                time.sleep(1)
+
     else:
         logging.error(f"unable to transfer from '{source}' to '{dest}'")
 
@@ -181,18 +180,21 @@ def sync_from_mappings(mappings:list[str]) -> None:
         # collect each mapping in a given date context
         if date_context_previous == date_context:
             batch.append(mapping)
-            logging.info(f"add to batch: {mapping}")
+            logging.debug(f"add to batch: {mapping}")
         else:
+            logging.info(f"processing batch in date context '{date_context_previous}'")
             sync_batch(batch, date_context_previous, source_previous, dest_previous)
             batch.clear()
             batch.append(mapping) # add the first mapping of the new context
-            logging.info(f"add to batch: {mapping}")
+            logging.debug(f"add to batch: {mapping}")
+            logging.info(f"processed batch in date context '{date_context_previous}'")
         source_previous = source
         dest_previous = dest
     
     # process the final batch
     if batch and date_context and source and dest:
         sync_batch(batch, date_context, source, dest)
+        logging.info(f"processed batch in date context '{date_context}'")
 
 def parse_args(valid_modes: set[str]) -> argparse.Namespace:
     ''' Returns the parsed command-line arguments.
@@ -217,7 +219,7 @@ def parse_args(valid_modes: set[str]) -> argparse.Namespace:
 
 if __name__ == '__main__':
     # setup
-    common.configure_log()
+    common.configure_log(level=logging.INFO)
     
     # Script modes
     MODE_COPY = 'copy'

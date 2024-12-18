@@ -3,11 +3,11 @@ import os
 
 import constants
 
-def configure_log() -> None:
+def configure_log(level=logging.DEBUG) -> None:
     '''Standard log configuration.'''
     filename = 'scripts'
     logging.basicConfig(filename=f"logs/{filename}.log",
-                        level=logging.DEBUG,
+                        level=level,
                         format="%(asctime)s [%(levelname)s] %(message)s",
                         datefmt="%D %H:%M:%S",
                         filemode='w')
