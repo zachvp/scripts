@@ -110,7 +110,7 @@ def format_timing(timestamp: float) -> str:
     if timestamp > 60:
         hours, remainder = divmod(timestamp, 3600)
         minutes, seconds = divmod(remainder, 60)
-        return f"{hours}h {minutes}m {seconds}s"
+        return f"{hours}h {minutes}m {seconds:.3}s"
     return f"{timestamp:.3}s"
     
 def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> None:
@@ -132,17 +132,29 @@ def sync_batch(batch: list[str], date_context: str, source: str, dest: str) -> N
     '''Transfers all files in the batch to the given destination, then tells the music server to perform a scan.'''
     import subsonic_client
     import encode_tracks
-            
-    logging.info(f"encoding batch in date context {date_context}:\n{batch}")
+    
+    # encode the current batch to MP3 format
+    logging.debug(f"encoding batch in date context {date_context}:\n{batch}")
     encode_tracks.encode_lossy(batch, '.mp3')
     
     transfer_path = transform_implied_path(dest)
     if transfer_path:        
+        # transfer files to media server
         transfer_files(os.path.dirname(transfer_path), f"{constants.RSYNC_URL}", constants.RSYNC_MODULE_NAVIDROME)
-        subsonic_client.call_endpoint(subsonic_client.API.START_SCAN)
-        # todo: block until scan completes
-        subsonic_client.call_endpoint(subsonic_client.API.GET_SCAN_STATUS)
         
+        # tell the media server new files are available
+        response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN)
+        if response.ok:
+            response = subsonic_client.call_endpoint(subsonic_client.API.GET_SCAN_STATUS)
+            content = subsonic_client.handle_response(response, subsonic_client.API.GET_SCAN_STATUS)
+            
+            # wait until the server has stopped scanning
+            while content and content['scanning'] == 'true':
+                logging.debug("scan in progress, waiting...")
+                time.sleep(1)
+                response = subsonic_client.call_endpoint(subsonic_client.API.GET_SCAN_STATUS)
+                content = subsonic_client.handle_response(response, subsonic_client.API.GET_SCAN_STATUS)
+                pass
     else:
         logging.error(f"unable to transfer from '{source}' to '{dest}'")
 
@@ -152,7 +164,7 @@ def sync_from_mappings(mappings:list[str]) -> None:
     date_context, source, dest = '', '', ''
     
     # process the file mappings
-    logging.info(f"mappings:\n{mappings}")
+    logging.debug(f"mappings:\n{mappings}")
     for mapping in mappings:
         source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
         date_context_previous = common.find_date_context(source_previous)
@@ -220,7 +232,6 @@ if __name__ == '__main__':
     mappings = common.add_output_path(output_path, mappings, input_path)
     mappings.sort()
     
-    # todo: time
     timestamp = time.time()
     sync_from_mappings(mappings)
     timestamp = time.time() - timestamp

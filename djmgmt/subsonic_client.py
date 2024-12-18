@@ -64,7 +64,7 @@ def call_endpoint(endpoint: str, params: dict[str, str] = {}) -> Response:
     query_string = create_query(params)
     base_url = f"http://corevega.local:4533/rest"
     url = f"{base_url}/{endpoint}.view?{query_string}"
-    logging.info(f'send request: {url}')
+    logging.debug(f'send request: {url}')
     return requests.get(url)
 
 def get_response_content(response: Response) -> dict[str, str]:
@@ -74,10 +74,10 @@ def get_response_content(response: Response) -> dict[str, str]:
     else:
         return content.attrib
 
-def handle_response(response: Response, endpoint: str) -> dict[str, str]:
+def handle_response(response: Response, endpoint: str) -> dict[str, str] | None: # todo: determine endpoint from response
     if response.status_code == 200:
         content = get_response_content(response)
-        logging.info(f"successful call to '{endpoint}'\n{json.dumps(content, indent=2)}")
+        logging.debug(f"successful call to '{endpoint}'\n{json.dumps(content, indent=2)}")
         
         return content
     else:
@@ -93,7 +93,7 @@ def handle_response(response: Response, endpoint: str) -> dict[str, str]:
         70 	The requested data was not found.
         '''
         logging.error(f'error: {response.text}')
-        return { 'error': response.text }
+        return None
 
 class API:
     PING = 'ping'
