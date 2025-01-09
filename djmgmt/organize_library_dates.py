@@ -96,7 +96,14 @@ def swap_root(path: str, root: str) -> str:
 
     return root
 
-def get_collection(file_path, xpath) -> ET.Element:
+def get_node(file_path, xpath) -> ET.Element:
+    '''
+    Arguments:
+        file_path -- The XML file path.
+        xpath -- The XPath of the node to find.
+    Returns:
+        The XML node according to the given arguments.
+    '''
     collection = ET.parse(file_path).getroot().find(xpath)
     assert collection, f"unable to find {xpath} for path '{file_path}'"
     return collection
@@ -125,15 +132,15 @@ class Namespace(argparse.Namespace):
 
 # Primary functions
 def generate_date_paths_cli(args: type[Namespace]) -> list[str]:
-    return generate_date_paths(args.xml_collection_path, args.root_path, args.metadata_path)
+    return generate_date_paths(args.xml_collection_path, args.root_path, metadata_path=args.metadata_path)
 
-def generate_date_paths(xml_collection_path: str, root_path: str, metadata_path: bool) -> list[str]:
+def generate_date_paths(xml_collection_path: str, root_path: str, metadata_path: bool = False, swap_input: bool = False) -> list[str]:
     '''Generates a list of path mappings.
     Each item maps from the source path in the collection to the structured directory destination.
     The structure includes the date added and optionally track metadata.
     '''
-    collection = get_collection(xml_collection_path, XPATH_COLLECTION)
-    lines: list[str] = []
+    collection = get_node(xml_collection_path, XPATH_COLLECTION)
+    paths: list[str] = []
 
     for node in collection:
         # check if track file is in expected library folder
@@ -143,7 +150,7 @@ def generate_date_paths(xml_collection_path: str, root_path: str, metadata_path:
         
         # build each entry for the old and new path
         track_path_old = collection_path_to_syspath(node.attrib[ATTR_PATH])
-        if root_path:
+        if root_path and swap_input:
             track_path_old = swap_root(track_path_old, root_path)
 
         track_path_new = full_path(node, REKORDBOX_ROOT, constants.MAPPING_MONTH, include_metadata=metadata_path)
@@ -155,9 +162,9 @@ def generate_date_paths(xml_collection_path: str, root_path: str, metadata_path:
             logging.error(f"delimeter already exists in either {track_path_old} or {track_path_new} exiting")
             sys.exit()
 
-        lines.append(f"{track_path_old}{constants.FILE_OPERATION_DELIMITER}{track_path_new}")
+        paths.append(f"{track_path_old}{constants.FILE_OPERATION_DELIMITER}{track_path_new}")
             
-    return lines
+    return paths
 
 def get_pipe_output(structure: list[str]) -> str:
     output = ''
@@ -199,7 +206,7 @@ def parse_args(valid_functions: set[str]) -> type[Namespace]:
     parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}.")
     parser.add_argument('xml_collection_path', type=str, help='The rekordbox library path containing the DateAdded history.')
     parser.add_argument('--root-path', '-p', type=str, help='The path to use in place of the root path defined in the rekordbox xml.')
-    parser.add_argument('--metadata-path', '-m', action='store_true', help='Include artist and album in path.') # todo: rename to include_metadata
+    parser.add_argument('--metadata-path', '-m', action='store_true', help='Include artist and album in path.')
     parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode.')
     parser.add_argument('--force', action='store_true', help='Skip all interaction safeguards and run the script.')
 
