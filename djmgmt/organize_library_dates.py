@@ -18,7 +18,6 @@ import xml.etree.ElementTree as ET
 from urllib.parse import unquote
 import argparse
 import logging
-import common
 
 import constants
 
@@ -44,7 +43,7 @@ def date_path(date: str, mapping: dict) -> str:
 
     return f"{year}/{month} {mapping[int(month)]}/{day}"
 
-def full_path(node: ET.Element, library_root: str, mapping: dict, metadata_path: bool=False) -> str:
+def full_path(node: ET.Element, library_root: str, mapping: dict, include_metadata: bool=False) -> str:
     '''Returns a formatted directory path based on the node's DateAdded field.
 
     Arguments:
@@ -60,7 +59,7 @@ def full_path(node: ET.Element, library_root: str, mapping: dict, metadata_path:
     
     # construct the path
     path = os.path.join('/', path_components[0], subpath_date)
-    if metadata_path:
+    if include_metadata:
         artist = node.attrib[ATTR_ARTIST]
         album = node.attrib[ATTR_ALBUM]
         if not artist:
@@ -115,13 +114,25 @@ def dev_debug():
     u = full_path(t, '/ZVP-MUSIC/DJing/', constants.MAPPING_MONTH)
     logging.debug(u)
 
+# Classes
+class Namespace(argparse.Namespace):
+    function: str
+    xml_collection_path: str
+    root_path: str
+    metadata_path: bool
+    interactive: bool
+    force: bool
+
 # Primary functions
-def generate_date_paths(args: argparse.Namespace) -> list[str]:
+def generate_date_paths_cli(args: type[Namespace]) -> list[str]:
+    return generate_date_paths(args.xml_collection_path, args.root_path, args.metadata_path)
+
+def generate_date_paths(xml_collection_path: str, root_path: str, metadata_path: bool) -> list[str]:
     '''Generates a list of path mappings.
     Each item maps from the source path in the collection to the structured directory destination.
     The structure includes the date added and optionally track metadata.
     '''
-    collection = get_collection(args.xml_collection_path, XPATH_COLLECTION)
+    collection = get_collection(xml_collection_path, XPATH_COLLECTION)
     lines: list[str] = []
 
     for node in collection:
@@ -132,13 +143,13 @@ def generate_date_paths(args: argparse.Namespace) -> list[str]:
         
         # build each entry for the old and new path
         track_path_old = collection_path_to_syspath(node.attrib[ATTR_PATH])
-        if args.root_path:
-            track_path_old = swap_root(track_path_old, args.root_path)
+        if root_path:
+            track_path_old = swap_root(track_path_old, root_path)
 
-        track_path_new = full_path(node, REKORDBOX_ROOT, constants.MAPPING_MONTH, metadata_path=args.metadata_path)
+        track_path_new = full_path(node, REKORDBOX_ROOT, constants.MAPPING_MONTH, include_metadata=metadata_path)
         track_path_new = collection_path_to_syspath(track_path_new)
-        if args.root_path:
-            track_path_new = swap_root(track_path_new, args.root_path)
+        if root_path:
+            track_path_new = swap_root(track_path_new, root_path)
 
         if constants.FILE_OPERATION_DELIMITER in track_path_old or constants.FILE_OPERATION_DELIMITER in track_path_new:
             logging.error(f"delimeter already exists in either {track_path_old} or {track_path_new} exiting")
@@ -154,8 +165,7 @@ def get_pipe_output(structure: list[str]) -> str:
         output += f"{item.strip()}\n"
     return output.strip()
 
-# todo: replace with call to bulk operations script
-def move_files(args: argparse.Namespace, path_mappings: list[str]) -> None:
+def move_files(args: type[Namespace], path_mappings: list[str]) -> None:
     '''Moves files according to the paths input mapping.'''
     for mapping in path_mappings:
         source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
@@ -184,16 +194,16 @@ def move_files(args: argparse.Namespace, path_mappings: list[str]) -> None:
 
         shutil.move(source, dest)
 
-def parse_args(valid_functions: set[str]) -> argparse.Namespace:
+def parse_args(valid_functions: set[str]) -> type[Namespace]:
     parser = argparse.ArgumentParser()
     parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}.")
     parser.add_argument('xml_collection_path', type=str, help='The rekordbox library path containing the DateAdded history.')
     parser.add_argument('--root-path', '-p', type=str, help='The path to use in place of the root path defined in the rekordbox xml.')
-    parser.add_argument('--metadata-path', '-m', action='store_true', help='Include artist and album in path.')
+    parser.add_argument('--metadata-path', '-m', action='store_true', help='Include artist and album in path.') # todo: rename to include_metadata
     parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode.')
     parser.add_argument('--force', action='store_true', help='Skip all interaction safeguards and run the script.')
 
-    args = parser.parse_args()
+    args = parser.parse_args(namespace=Namespace)
 
     if args.function not in valid_functions:
         parser.error(f"invalid parameter '{args.function}'")
@@ -220,4 +230,4 @@ if __name__ == '__main__':
 
     logging.info(f"running organize('{script_args.xml_collection_path}')")
     if script_args.function == FUNCTION_DATE_PATHS:
-        print(get_pipe_output(generate_date_paths(script_args)))
+        print(get_pipe_output(generate_date_paths_cli(script_args)))
