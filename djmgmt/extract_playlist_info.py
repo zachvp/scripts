@@ -55,11 +55,46 @@ def parse_args() -> argparse.Namespace:
 
     return args
 
+def find_column(path: str, name: str) -> int:
+    # options = ['#', 'Track_Title',	'Genre', 'Artist', 'Key', 'BPM', 'Time', 'Date_Added', 'DJ_Play_Count']
+    options = {
+        '#' : '#',
+        'Track Title' : 'Track_Title',
+        'Genre' : 'Genre',
+        'Artist' : 'Artist',
+        'Key' : 'Key',
+        'BPM' : 'BPM',
+        'Time' : 'Time',
+        'Date Added' : 'Date_Added',
+        'DJ Play Count': 'DJ_Play_Count'
+    }
+    # todo: preprocess columns without whitespace
+    
+    with open(path, 'r', encoding='utf-8') as file:
+        columns = file.readline().split()
+        columns_processed = []
+        multiword = ''
+        for c in columns:
+            if c in options:
+                columns_processed.append(options[c])
+                multiword = ''
+            else: 
+                multiword += f"{c} "
+                if multiword.strip() in options:
+                    columns_processed.append(options[multiword.strip()])
+                    multiword = ''
+            
+        for i, c in enumerate(columns_processed):
+            if c == name.replace(' ', '_'):
+                return i
+    print(f"error: unable to find name: '{name}' in path '{path}'")
+    return -1
+
 def script(args: argparse.Namespace):
-    number = 0
-    title  = 1
-    artist = 2
-    genre  = 3
+    number = find_column(args.input, '#')
+    title  = find_column(args.input, 'Track Title')
+    artist = find_column(args.input, 'Artist')
+    genre  = find_column(args.input, 'Genre')
 
     fields: list[int] = []
     if args.number:

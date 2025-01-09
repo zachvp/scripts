@@ -1,3 +1,8 @@
+# Next steps
+?. Test with portion of real deal file
+?. Select "_pruned" Playlist as config
+?. Deploy Navidrome server on rasp
+
 # Latest and greatest
 Read local file for last scan date
 Find corresponding starting point in music library
@@ -11,12 +16,12 @@ For each day in directory structure
     Block until scan finished, then continue
 Remove all files in localState/temp/
 
-#_ todo: turn into bash/python script
-
-# On the fly plan
-## TODO:
-* combine `sort_hierarchy_from_tags` and `organize_library_dates`
-* combine `populate_media_server` and `aggregate_tracks`
+# Migrate music to server
+1. Clear music files
+2. Perform full scan on music server
+3. Docker compose down
+4. Docker compose up
+5. Run migration
 
 # End to end process
 

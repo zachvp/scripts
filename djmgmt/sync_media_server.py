@@ -44,7 +44,7 @@ def normalize_paths(paths: list[str], parent: str) -> list[str]:
     return normalized
 
 def sync_from_path(args: argparse.Namespace):
-    '''The main script function.
+    '''A primary script function.
 
     Function arguments:
         args -- The parsed command-line arguments.
@@ -153,7 +153,6 @@ def sync_batch(batch: list[str], date_context: str, source: str, dest: str) -> N
                     break
                 logging.debug("scan in progress, waiting...")
                 time.sleep(1)
-
     else:
         logging.error(f"unable to transfer from '{source}' to '{dest}'")
 
@@ -177,6 +176,21 @@ def sync_from_mappings(mappings:list[str]) -> None:
             logging.error(f"no date context in path '{date_context}'")
             break
         
+        # skip if context already processed
+        date_context_processed = ''
+        with open('SyncState.txt', encoding='utf-8', mode='r') as state:
+            saved_state = state.readline()
+            if saved_state:
+                date_context_processed = saved_state.split(':')[1].strip()
+        # if date_context_processed and date_context_processed == date_context:
+        if date_context_processed:
+            if date_context < date_context_processed:
+                logging.info(f"skip processed date context: {date_context}")
+                continue
+            elif date_context_previous < date_context_processed:
+                logging.info(f"skip processed date context: {date_context_previous}")
+                continue
+        
         # collect each mapping in a given date context
         if date_context_previous == date_context:
             batch.append(mapping)
@@ -186,6 +200,10 @@ def sync_from_mappings(mappings:list[str]) -> None:
             sync_batch(batch, date_context_previous, source_previous, dest_previous)
             batch.clear()
             batch.append(mapping) # add the first mapping of the new context
+            
+            # persist the processed date context
+            with open('SyncState.txt', encoding='utf-8', mode='w') as state:
+                state.write(f"sync_date: {date_context_previous}")
             logging.debug(f"add to batch: {mapping}")
             logging.info(f"processed batch in date context '{date_context_previous}'")
         source_previous = source
@@ -194,6 +212,8 @@ def sync_from_mappings(mappings:list[str]) -> None:
     # process the final batch
     if batch and date_context and source and dest:
         sync_batch(batch, date_context, source, dest)
+        with open('SyncState.txt', encoding='utf-8', mode='w') as state:
+            state.write(f"sync_date: {date_context}")
         logging.info(f"processed batch in date context '{date_context}'")
 
 def parse_args(valid_modes: set[str]) -> argparse.Namespace:
@@ -224,22 +244,26 @@ if __name__ == '__main__':
     # Script modes
     MODE_COPY = 'copy'
     MODE_MOVE = 'move'
+    MODE_SYNC = 'sync'
 
-    MODES = {MODE_COPY, MODE_MOVE}
-    # script_args = parse_args(MODES)
+    MODES = {MODE_COPY, MODE_MOVE, MODE_SYNC}
+    script_args = parse_args(MODES)
     
-    input_path = '/Users/zachvp/developer/test-private/data/tracks'
-    output_path = '/Users/zachvp/developer/test-private/data/tracks-output/'
-    mappings = common.collect_paths(input_path)
-    mappings = common.add_output_path(output_path, mappings, input_path)
-    mappings.sort()
+    if script_args.mode in {MODE_COPY, MODE_MOVE}:
+        sync_from_path(script_args)
+    else:        
+        input_path = '/Users/zachvp/developer/test-private/data/tracks'
+        output_path = '/Users/zachvp/developer/test-private/data/tracks-output/'
+        mappings = common.collect_paths(input_path)
+        mappings = common.add_output_path(output_path, mappings, input_path)
+        mappings.sort()
     
-    timestamp = time.time()
-    sync_from_mappings(mappings)
-    timestamp = time.time() - timestamp
-    logging.info(f"sync time: {format_timing(timestamp)}")
+        timestamp = time.time()
+        sync_from_mappings(mappings)
+        timestamp = time.time() - timestamp
+        logging.info(f"sync time: {format_timing(timestamp)}")
     
     # print(transform_implied_path('/Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'))
     # print(date_path_root('/Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'))
     # transfer_files(output_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
-    # sync(script_args)
+    
