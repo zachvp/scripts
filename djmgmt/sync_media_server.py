@@ -27,6 +27,20 @@ import time
 import common
 import constants
 
+# Classes
+class Namespace(argparse.Namespace):
+    # Script Arguments
+    mode: str
+    input: str
+    output: str
+    
+    # Script modes
+    MODE_COPY = 'copy'
+    MODE_MOVE = 'move'
+    MODE_SYNC = 'sync'
+
+    MODES = {MODE_COPY, MODE_MOVE, MODE_SYNC}
+
 # Helper functions
 def normalize_paths(paths: list[str], parent: str) -> list[str]:
     '''Returns a collection with the given paths transformed to be relative to the given parent directory.
@@ -43,7 +57,7 @@ def normalize_paths(paths: list[str], parent: str) -> list[str]:
         normalized.append(os.path.relpath(path, start=parent))
     return normalized
 
-def sync_from_path(args: argparse.Namespace):
+def sync_from_path(args: type[Namespace]):
     '''A primary script function.
 
     Function arguments:
@@ -58,9 +72,9 @@ def sync_from_path(args: argparse.Namespace):
 
     # Assign the action based on the given mode.
     action: Callable[[str, str], None] = lambda x, y : print(f"dummy: {x}, {y}")
-    if args.mode == MODE_COPY:
+    if args.mode == Namespace.MODE_COPY:
         action = shutil.copy
-    elif args.mode == MODE_MOVE:
+    elif args.mode == Namespace.MODE_MOVE:
         action = shutil.move
     else:
         print(f"error: unrecognized mode: {args.mode}. Exiting.")
@@ -216,7 +230,7 @@ def sync_from_mappings(mappings:list[str]) -> None:
             state.write(f"sync_date: {date_context}")
         logging.info(f"processed batch in date context '{date_context}'")
 
-def parse_args(valid_modes: set[str]) -> argparse.Namespace:
+def parse_args(valid_modes: set[str]) -> type[Namespace]:
     ''' Returns the parsed command-line arguments.
 
     Function arguments:
@@ -228,7 +242,7 @@ def parse_args(valid_modes: set[str]) -> argparse.Namespace:
         It's expected to be structured in a year/month/audio.file format.")
     parser.add_argument('output', type=str, help="The output directory to populate.")
 
-    args = parser.parse_args()
+    args = parser.parse_args(namespace=Namespace)
     args.input = os.path.normpath(args.input)
     args.output = os.path.normpath(args.output)
 
@@ -241,23 +255,31 @@ if __name__ == '__main__':
     # setup
     common.configure_log(level=logging.INFO)
     
-    # Script modes
-    MODE_COPY = 'copy'
-    MODE_MOVE = 'move'
-    MODE_SYNC = 'sync'
-
-    MODES = {MODE_COPY, MODE_MOVE, MODE_SYNC}
-    script_args = parse_args(MODES)
+    script_args = parse_args(Namespace.MODES)
     
-    if script_args.mode in {MODE_COPY, MODE_MOVE}:
+    if script_args.mode in {Namespace.MODE_COPY, Namespace.MODE_MOVE}:
         sync_from_path(script_args)
     else:        
-        mappings = common.collect_paths(script_args.input)
-        mappings = common.add_output_path(script_args.output, mappings, script_args.input)
-        mappings.sort()
+        # mappings = common.collect_paths(script_args.input)
+        # mappings = common.add_output_path(script_args.output, mappings, script_args.input)
+        # mappings.sort()
+        import organize_library_dates as library
+        pruned = library.find_node(script_args.input, constants.XPATH_PRUNED)
+        collection = library.find_node(script_args.input, constants.XPATH_COLLECTION)
+        
+        # collect the playlist IDs
+        playlist_ids: set[str] = set()
+        for track in pruned:
+            playlist_ids.add(track.attrib[constants.ATTR_KEY])
+        mappings = library.generate_date_paths(collection,
+                                               script_args.output,
+                                               playlist_ids=playlist_ids,
+                                               metadata_path=True,
+                                               swap_root_path='/Users/zachvp/Music/DJ/')
+        mappings.sort() # todo: this doesn't work, need to sort according to output path
     
         timestamp = time.time()
-        sync_from_mappings(mappings)
+        # sync_from_mappings(mappings)
         timestamp = time.time() - timestamp
         logging.info(f"sync time: {format_timing(timestamp)}")
     

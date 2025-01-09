@@ -21,14 +21,6 @@ import logging
 
 import constants
 
-# Constants
-ATTR_DATE_ADDED = 'DateAdded'
-ATTR_PATH = 'Location'
-ATTR_ARTIST = 'Artist'
-ATTR_ALBUM = 'Album'
-REKORDBOX_ROOT = 'file://localhost'
-XPATH_COLLECTION = './/COLLECTION'
-
 # Helper functions
 def date_path(date: str, mapping: dict) -> str:
     '''Returns a date-formatted directory path string. e.g:
@@ -53,15 +45,15 @@ def full_path(node: ET.Element, library_root: str, mapping: dict, include_metada
         include_metadata -- Whether the path should include album and artist metadata
     '''
     # path components
-    date = node.attrib[ATTR_DATE_ADDED]
-    path_components = os.path.split(node.attrib[ATTR_PATH].lstrip(library_root))
+    date = node.attrib[constants.ATTR_DATE_ADDED]
+    path_components = os.path.split(node.attrib[constants.ATTR_PATH].lstrip(library_root))
     subpath_date = date_path(date, mapping)
     
     # construct the path
     path = os.path.join('/', path_components[0], subpath_date)
     if include_metadata:
-        artist = node.attrib[ATTR_ARTIST]
-        album = node.attrib[ATTR_ALBUM]
+        artist = node.attrib[constants.ATTR_ARTIST]
+        album = node.attrib[constants.ATTR_ALBUM]
         if not artist:
             artist = constants.UNKNOWN_ARTIST
         if not album:
@@ -77,12 +69,12 @@ def collection_path_to_syspath(path: str) -> str:
     Arguments:
         path -- The URL-like collection path
     '''
-    syspath = unquote(path).lstrip(REKORDBOX_ROOT)
+    syspath = unquote(path).lstrip(constants.REKORDBOX_ROOT)
     if not syspath.startswith('/'):
         syspath = '/' + syspath
     return syspath # todo: fix
 
-def swap_root(path: str, root: str) -> str:
+def swap_root(path: str, old_root: str, root: str) -> str:
     '''Returns the given path with its root replaced.
 
     Arguments:
@@ -92,13 +84,12 @@ def swap_root(path: str, root: str) -> str:
     if not root.endswith('/'):
         root += '/'
 
-    root = path.replace('/Users/zachvp/', root)
+    root = path.replace(old_root, root)
 
     return root
 
-def get_node(file_path, xpath) -> ET.Element:
-    '''
-    Arguments:
+def find_node(file_path, xpath) -> ET.Element:
+    '''Arguments:
         file_path -- The XML file path.
         xpath -- The XPath of the node to find.
     Returns:
@@ -123,40 +114,55 @@ def dev_debug():
 
 # Classes
 class Namespace(argparse.Namespace):
+    # Script args
     function: str
     xml_collection_path: str
     root_path: str
     metadata_path: bool
     interactive: bool
     force: bool
+    
+    # Script functions
+    FUNCTION_DATE_PATHS = 'date-paths'
+    FUNCTIONS = {FUNCTION_DATE_PATHS}
 
 # Primary functions
 def generate_date_paths_cli(args: type[Namespace]) -> list[str]:
-    return generate_date_paths(args.xml_collection_path, args.root_path, metadata_path=args.metadata_path)
+    collection = find_node(args.xml_collection_path, constants.XPATH_COLLECTION)
+    return generate_date_paths(collection, args.root_path, metadata_path=args.metadata_path)
 
-def generate_date_paths(xml_collection_path: str, root_path: str, metadata_path: bool = False, swap_input: bool = False) -> list[str]:
+def generate_date_paths(collection: ET.Element,
+                        root_path: str,
+                        playlist_ids: set[str] = set(),
+                        metadata_path: bool = False,
+                        swap_root_path: str = '/Users/zachvp/',
+                        swap_input_root: bool = False) -> list[str]:
     '''Generates a list of path mappings.
     Each item maps from the source path in the collection to the structured directory destination.
     The structure includes the date added and optionally track metadata.
     '''
-    collection = get_node(xml_collection_path, XPATH_COLLECTION)
     paths: list[str] = []
 
     for node in collection:
         # check if track file is in expected library folder
-        if REKORDBOX_ROOT not in node.attrib[ATTR_PATH]:
-            logging.warning(f"unexpected path {collection_path_to_syspath(node.attrib[ATTR_PATH])}, will skip")
+        if constants.REKORDBOX_ROOT not in node.attrib[constants.ATTR_PATH]:
+            logging.warning(f"unexpected path {collection_path_to_syspath(node.attrib[constants.ATTR_PATH])}, will skip")
+            continue
+        
+        # check if a playlist is provided
+        if playlist_ids and node.attrib[constants.ATTR_TRACK_ID] not in playlist_ids:
+            logging.info(f"skip non-playlist track: '{node.attrib[constants.ATTR_PATH]}'")
             continue
         
         # build each entry for the old and new path
-        track_path_old = collection_path_to_syspath(node.attrib[ATTR_PATH])
-        if root_path and swap_input:
-            track_path_old = swap_root(track_path_old, root_path)
+        track_path_old = collection_path_to_syspath(node.attrib[constants.ATTR_PATH])
+        if root_path and swap_input_root:
+            track_path_old = swap_root(track_path_old, swap_root_path, root_path)
 
-        track_path_new = full_path(node, REKORDBOX_ROOT, constants.MAPPING_MONTH, include_metadata=metadata_path)
+        track_path_new = full_path(node, constants.REKORDBOX_ROOT, constants.MAPPING_MONTH, include_metadata=metadata_path)
         track_path_new = collection_path_to_syspath(track_path_new)
         if root_path:
-            track_path_new = swap_root(track_path_new, root_path)
+            track_path_new = swap_root(track_path_new, swap_root_path, root_path)
 
         if constants.FILE_OPERATION_DELIMITER in track_path_old or constants.FILE_OPERATION_DELIMITER in track_path_new:
             logging.error(f"delimeter already exists in either {track_path_old} or {track_path_new} exiting")
@@ -219,11 +225,8 @@ def parse_args(valid_functions: set[str]) -> type[Namespace]:
 
 # MAIN
 if __name__ == '__main__':
-    FUNCTION_DATE_PATHS = 'date-paths'
-    script_functions = {FUNCTION_DATE_PATHS}
-    
     # parse arguments
-    script_args = parse_args(script_functions)
+    script_args = parse_args(Namespace.FUNCTIONS)
 
     if script_args.root_path:
         logging.info(f"args output root dir: '{script_args.root_path}'")
@@ -236,5 +239,5 @@ if __name__ == '__main__':
             sys.exit()
 
     logging.info(f"running organize('{script_args.xml_collection_path}')")
-    if script_args.function == FUNCTION_DATE_PATHS:
+    if script_args.function == Namespace.FUNCTION_DATE_PATHS:
         print(get_pipe_output(generate_date_paths_cli(script_args)))

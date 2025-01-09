@@ -7,14 +7,16 @@ import argparse
 from collections import defaultdict
 import xml.etree.ElementTree as ET
 import organize_library_dates as ORG
+import constants
 
 # print the tracks present in collection, but not the given playlist
 def output_missing_tracks(playlist_ids: set[str], collection: ET.Element) -> list[str]:
     readout = []
 
     for track in collection:
-        if track.attrib['TrackID'] not in playlist_ids:
-            item = f"{track.attrib['Name']}\t{track.attrib['Artist']}\t{track.attrib['Genre']}\t{track.attrib['DateAdded']}"
+        if track.attrib[constants.ATTR_TRACK_ID] not in playlist_ids:
+            item = f"{track.attrib[constants.ATTR_NAME]}\t{track.attrib[constants.ATTR_ARTIST]}"
+            item = f"{item}\t{track.attrib[constants.ATTR_GENRE]}\t{track.attrib[constants.ATTR_DATE_ADDED]}"
             readout.append(item)
 
     for item in readout:
@@ -29,8 +31,8 @@ def output_genres_verbose(playlist_ids: set[str], collection: ET.Element) -> lis
     # search collection for the file tracks,
     # and gather the relevant data
     for track in collection:
-        if track.attrib['TrackID'] in playlist_ids:
-            key = track.attrib['Genre']
+        if track.attrib[constants.ATTR_TRACK_ID] in playlist_ids:
+            key = track.attrib[constants.ATTR_GENRE]
             readout[key] += 1
 
     for genre, count in readout.items():
@@ -46,8 +48,8 @@ def output_genres_short(playlist_ids: set[str], collection: ET.Element) -> list[
     # search collection for the file tracks,
     # and gather the relevant data
     for track in collection:
-        if track.attrib['TrackID'] in playlist_ids:
-            shortened = track.attrib['Genre'].split('/')
+        if track.attrib[constants.ATTR_TRACK_ID] in playlist_ids:
+            shortened = track.attrib[constants.ATTR_GENRE].split('/')
 
             # for longer genres, remove the last 2 subgenres
             if len(shortened) > 2:
@@ -68,8 +70,8 @@ def output_genre_category(playlist_ids: set[str], collection: ET.Element) -> set
     categories: set[str] = set()
 
     for track in collection:
-        if track.attrib['TrackID'] in playlist_ids:
-            genre_elements = track.attrib['Genre'].split('/')
+        if track.attrib[constants.ATTR_TRACK_ID] in playlist_ids:
+            genre_elements = track.attrib[constants.ATTR_GENRE].split('/')
             for e in genre_elements:
                 categories.add(e)
 
@@ -82,8 +84,8 @@ def output_renamed_genres(playlist_ids: set[str], collection) -> set[str]:
     genres: set[str] = set()
 
     for track in collection:
-        if track.attrib['TrackID'] in playlist_ids:
-            genre_elements = track.attrib['Genre'].split('/')
+        if track.attrib[constants.ATTR_TRACK_ID] in playlist_ids:
+            genre_elements = track.attrib[constants.ATTR_GENRE].split('/')
             if '' in genre_elements:
                 genre_elements.remove('')
             renamed : list[str] = ['' for _ in range(len(genre_elements))]
@@ -118,8 +120,8 @@ def create_genre_map(path: str) -> dict[str, str]:
 def output_collection_filter(root: ET.Element) -> list[str]:
     output : list[str] = []
     for track in root:
-        path = ORG.collection_path_to_syspath(track.attrib['Location'])
-        output.append(f"{track.attrib['Genre']}\t{path}")
+        path = ORG.collection_path_to_syspath(track.attrib[constants.ATTR_PATH])
+        output.append(f"{track.attrib[constants.ATTR_GENRE]}\t{path}")
     for line in output:
         print(line)
     return output
@@ -141,18 +143,18 @@ def script(args: argparse.Namespace) -> None:
     # data: input document
     tree = ET.parse(args.input).getroot()
 
-    collection = tree.find('.//COLLECTION')
-    assert collection, "invalid node search for 'COLLECTION'"
+    collection = tree.find(constants.XPATH_COLLECTION)
+    assert collection, f"invalid node search for '{constants.XPATH_COLLECTION}'"
 
-    pruned = tree.find('.//NODE[@Name="_pruned"]')
-    assert pruned, "invalid node search for '_pruned'"
+    pruned = tree.find(constants.XPATH_PRUNED)
+    assert pruned, f"invalid node search for '{constants.XPATH_PRUNED}'"
 
     # data: script
     playlist_ids : set[str] = set()
 
     # collect the playlist IDs
     for track in pruned:
-        playlist_ids.add(track.attrib['Key'])
+        playlist_ids.add(track.attrib[constants.ATTR_KEY])
 
     # call requested script mode
     if args.mode == MODE_SHORT:

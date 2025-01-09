@@ -29,3 +29,17 @@ RSYNC_PORT = '12000'
 RSYNC_PROTOCOL = 'rsync://'
 RSYNC_MODULE_NAVIDROME = 'navidrome'
 RSYNC_URL = f"{RSYNC_PROTOCOL}{COREVEGA_USER}@{COREVEGA_HOST}:{RSYNC_PORT}"
+
+# Rekordbox
+ATTR_DATE_ADDED = 'DateAdded'
+ATTR_PATH = 'Location'
+ATTR_NAME = 'Name'
+ATTR_ARTIST = 'Artist'
+ATTR_ALBUM = 'Album'
+ATTR_GENRE = 'Genre'
+ATTR_KEY = 'Key'
+ATTR_TRACK_ID = 'TrackID'
+
+REKORDBOX_ROOT = 'file://localhost'
+XPATH_COLLECTION = './/COLLECTION'
+XPATH_PRUNED = './/NODE[@Name="_pruned"]'
