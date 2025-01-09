@@ -252,10 +252,8 @@ if __name__ == '__main__':
     if script_args.mode in {MODE_COPY, MODE_MOVE}:
         sync_from_path(script_args)
     else:        
-        input_path = '/Users/zachvp/developer/test-private/data/tracks'
-        output_path = '/Users/zachvp/developer/test-private/data/tracks-output/'
-        mappings = common.collect_paths(input_path)
-        mappings = common.add_output_path(output_path, mappings, input_path)
+        mappings = common.collect_paths(script_args.input)
+        mappings = common.add_output_path(script_args.output, mappings, script_args.input)
         mappings.sort()
     
         timestamp = time.time()
