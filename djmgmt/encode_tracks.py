@@ -10,12 +10,12 @@ import shlex
 import logging
 import sys
 import asyncio
+from typing import Any
 
 import common
-import constants
 
 def ffmpeg_base(input_path: str, output_path: str, options: str) -> list[str]:
-    all_options = f"-ar 44100 -map 0 -write_id3v2 1 {options}"
+    all_options = f"-ar 44100 -write_id3v2 1 {options}"
     return ['ffmpeg', '-i', input_path] + shlex.split(all_options) + [output_path]
 
 def ffmpeg_standardize(input_path: str, output_path: str) -> list[str]:
@@ -28,22 +28,22 @@ def ffmpeg_standardize(input_path: str, output_path: str) -> list[str]:
 
     return ffmpeg_base(input_path, output_path, options)
 
-def ffmpeg_mp3(input_path: str, output_path: str) -> list[str]: # todo: use shlex.quote()
-    options = '-b:a 320k'
+def ffmpeg_mp3(input_path: str, output_path: str, map_options: str='-map 0') -> list[str]: # todo: use shlex.quote()
+    options = f"-b:a 320k {map_options}"
     return ffmpeg_base(input_path, output_path, options)
 
-def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream: str) -> str:
+def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream_key: str) -> str:
     '''Uses ffprobe command line tool. Reads the ffprobe value for a particular stream entry.
 
     Args:
     `args`        : The script's arguments.
     `input_path`  : Path to the file to probe.
-    `stream`      : The stream label according to 'ffprobe' documentation.
+    `stream_key`  : The stream label according to 'ffprobe' documentation.
 
     Returns:
     Stripped stdout of the ffprobe command or empty string.
     '''
-    command = shlex.split(f"ffprobe -v error -show_entries stream={stream} -of default=noprint_wrappers=1:nokey=1")
+    command = shlex.split(f"ffprobe -v error -show_entries stream={stream_key} -of default=noprint_wrappers=1:nokey=1")
     command.append(input_path)
 
     try:
@@ -58,15 +58,41 @@ def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream: str) -
         logging.debug(f"command: {shlex.join(command)}")
         sys.exit()
 
+def read_ffprobe_json(path: str) -> list[dict[str, Any]]:
+    '''Reads the ffprobe video streams of the given file.'''
+    import json
+    command_str = f"ffprobe -v error -select_streams v"
+    command_str += f" -show_entries stream=index,codec_name,codec_type,width,height -of json {shlex.quote(path)}"
+    command = shlex.split(command_str)
+    code, output = run_command(command)
+    
+    if code == 0:
+        streams = json.loads(output)['streams']
+        logging.debug(f"read streams for '{path}':\n{streams}")
+        return streams
+    return []
+
+def guess_cover_stream_specifier(streams: list[dict[str, Any]]) -> int:
+    '''Inspects the width and height of the video stream JSON to try to find a square cover image.'''
+    min_index, min_diff = -1, float('inf')
+    for stream in streams:
+        index = stream['index']
+        width, height = stream['width'], stream['height']
+        
+        diff = abs(width - height)
+        threshold = 1500 / 250
+        if diff < min_diff and width / height <  threshold and height / width < threshold:
+            min_diff = diff
+            min_index = index
+    return min_index
+
 def check_skip_sample_rate(args: argparse.Namespace, input_path: str) -> bool:
-    '''Returns `True` if sample rate for `input_path` is at or below the standardized value.
-    '''
+    '''Returns `True` if sample rate for `input_path` is at or below the standardized value.'''
     result = read_ffprobe_value(args, input_path, 'sample_rate')
     return False if len(result) < 1 else int(result) <= 44100
 
 def check_skip_bit_depth(args: argparse.Namespace, input_path: str) -> bool:
-    '''Returns `True` if bit depth (aka 'sample format') is at or below the standardized value.
-    '''
+    '''Returns `True` if bit depth (aka 'sample format') is at or below the standardized value.'''
     result = read_ffprobe_value(args, input_path, 'sample_fmt').lstrip('s')
     return False if len(result) < 1 else int(result) <= 16
 
@@ -207,21 +233,22 @@ def encode_lossy_cli(args: argparse.Namespace) -> None:
     path_mappings = common.add_output_path(args.output, path_mappings, args.input)
     return encode_lossy(path_mappings, args.extension)
 
-def run_command(command: list[str]) -> None:
+def run_command(command: list[str]) -> tuple[int, str]:
     try:
         logging.debug(f"run command: {shlex.join(command)}")
-        subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-        logging.debug(f"command success")
+        result = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
+        logging.debug(f"command success:\n{result.stdout.strip()}")
+        return (result.returncode, result.stdout.strip())
     except subprocess.CalledProcessError as error:
         logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
+        return (error.returncode, error.stderr.strip())
 
-# todo: extend to encode multiple files at a time
-def encode_lossy(path_mappings: list[str], extension: str) -> None:
+def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4) -> None:
     tasks = []
     loop = asyncio.get_event_loop()
     
     for mapping in path_mappings:
-        source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
+        source, dest = mapping[0], mapping[1]
         dest = os.path.splitext(dest)[0] + extension
         
         dest_dir = os.path.dirname(dest)
@@ -232,17 +259,26 @@ def encode_lossy(path_mappings: list[str], extension: str) -> None:
         if os.path.exists(dest):
             logging.debug(f"path exists, skipping: '{dest}'")
             continue
-        command = ffmpeg_mp3(source, dest)
-        # thread = threading.Thread(target=run_command, args=[command, source, dest])
+        # command = ffmpeg_mp3(source, dest)
         # run_command(command)
+        
+        ffprobe_data = read_ffprobe_json(source)
+        cover_stream = guess_cover_stream_specifier(ffprobe_data)
+        map_options = f"-map 0:0"
+        if cover_stream > -1:
+            logging.debug(f"guessed cover image in stream: {cover_stream}")
+            map_options += f" -map 0:{cover_stream}"
+        else:
+            logging.debug(f"no cover image found for '{source}'")
+            
+        command = ffmpeg_mp3(source, dest, map_options=map_options)
+        
         task = loop.create_task(run_command_async(command))
         tasks.append(task)
-        print(f"add task: {len(tasks)}")
         logging.debug(f"add task: {len(tasks)}")
-        if len(tasks) > 15:
+        if len(tasks) > threads - 1:
             run_tasks = tasks.copy()
             loop.run_until_complete(collect_tasks(run_tasks))
-            print(f"ran {len(run_tasks)} tasks")
             logging.debug(f"ran {len(run_tasks)} tasks")
             tasks.clear()
     if tasks:
@@ -250,7 +286,6 @@ def encode_lossy(path_mappings: list[str], extension: str) -> None:
         loop.run_until_complete(collect_tasks(run_tasks))
         logging.debug(f"ran {len(tasks)} tasks")
         tasks.clear()
-        
         
 async def collect_tasks(tasks: list[asyncio.Task]) -> list[asyncio.Future]:
     return await asyncio.gather(*tasks)
@@ -307,43 +342,15 @@ if __name__ == '__main__':
     FUNCTIONS = {FUNCTION_LOSSLESS, FUNCTION_LOSSY}
     
     # testing
-    async def wrapper():
-        source = "/Users/zachvp/developer/test-private/data/tracks/2020/03 march/21/album/artist/2pole - Atom (Original Mix).aiff"
-        dest = "/Users/zachvp/developer/test-private/data/tracks-output/2020/03 march/21/album/artist/2pole - Atom (Original Mix).mp3"
-        command = ffmpeg_mp3(source, dest)
-        if not os.path.exists(os.path.dirname(dest)):
-            os.makedirs(os.path.dirname(dest))
-        # process_0 = asyncio.run(run_command_async(command))
-        loop = asyncio.get_event_loop()
-        task_command_0 = loop.create_task(run_command_async(command))
-        
-        source = '/Users/zachvp/developer/test-private/data/tracks/2021/03 march/07/01 Crystal.aiff'
-        dest = '/Users/zachvp/developer/test-private/data/tracks-output/2021/03 march/07/01 Crystal.mp3'
-        if not os.path.exists(os.path.dirname(dest)):
-            os.makedirs(os.path.dirname(dest))
-        command = ffmpeg_mp3(source, dest)
-        task_command_1 = loop.create_task(run_command_async(command))
-        
-        await asyncio.gather(task_command_0, task_command_1)
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(wrapper())
-    # asyncio.run(handle_process(process_0))
-    
+    path = '/Users/zachvp/Music/DJ/David K - Mayann (Original Mix).aiff'
+    output = read_ffprobe_json(path)
+    cover_stream = guess_cover_stream_specifier(output)
+    command = ffmpeg_mp3('/Users/zachvp/Music/DJ/David K - Mayann (Original Mix).aiff',
+                         '/Users/zachvp/developer/test-private/data/tracks-output/2020/02 february/08/David K/Mayann/David K - Mayann (Original Mix).mp3',
+                         map_options=f"-map 0:0 -map 0:{cover_stream}")
+    run_command(command)
     exit()
     
-
-    process_1 = asyncio.run(run_command_async(command))
-    # print(process.returncode)
-    
-    
-    
-    processes = [process_0, process_1]
-    # if processes:
-    #     result = asyncio.run(handle_process(processes[0]))
-    #     print(f"result: {result}")
-    
-    exit()
     args = process_args(FUNCTIONS)
     
     if args.function == FUNCTION_LOSSLESS:

@@ -127,7 +127,7 @@ class Namespace(argparse.Namespace):
     FUNCTIONS = {FUNCTION_DATE_PATHS}
 
 # Primary functions
-def generate_date_paths_cli(args: type[Namespace]) -> list[str]:
+def generate_date_paths_cli(args: type[Namespace]) -> list[tuple[str, str]]:
     collection = find_node(args.xml_collection_path, constants.XPATH_COLLECTION)
     return generate_date_paths(collection, args.root_path, metadata_path=args.metadata_path)
 
@@ -136,12 +136,12 @@ def generate_date_paths(collection: ET.Element,
                         playlist_ids: set[str] = set(),
                         metadata_path: bool = False,
                         swap_root_path: str = '/Users/zachvp/',
-                        swap_input_root: bool = False) -> list[str]:
+                        swap_input_root: bool = False) -> list[tuple[str, str]]:
     '''Generates a list of path mappings.
     Each item maps from the source path in the collection to the structured directory destination.
     The structure includes the date added and optionally track metadata.
     '''
-    paths: list[str] = []
+    paths: list[tuple[str, str]] = []
 
     for node in collection:
         # check if track file is in expected library folder
@@ -151,7 +151,7 @@ def generate_date_paths(collection: ET.Element,
         
         # check if a playlist is provided
         if playlist_ids and node.attrib[constants.ATTR_TRACK_ID] not in playlist_ids:
-            logging.info(f"skip non-playlist track: '{node.attrib[constants.ATTR_PATH]}'")
+            logging.debug(f"skip non-playlist track: '{node.attrib[constants.ATTR_PATH]}'")
             continue
         
         # build each entry for the old and new path
@@ -164,18 +164,14 @@ def generate_date_paths(collection: ET.Element,
         if root_path:
             track_path_new = swap_root(track_path_new, swap_root_path, root_path)
 
-        if constants.FILE_OPERATION_DELIMITER in track_path_old or constants.FILE_OPERATION_DELIMITER in track_path_new:
-            logging.error(f"delimeter already exists in either {track_path_old} or {track_path_new} exiting")
-            sys.exit()
-
-        paths.append(f"{track_path_old}{constants.FILE_OPERATION_DELIMITER}{track_path_new}")
+        paths.append((track_path_old, track_path_new))
             
     return paths
 
-def get_pipe_output(structure: list[str]) -> str:
+def get_pipe_output(structure: list[tuple[str, str]]) -> str:
     output = ''
     for item in structure:
-        output += f"{item.strip()}\n"
+        output += f"{item[0].strip()}{constants.FILE_OPERATION_DELIMITER}{item[1].strip()}\n"
     return output.strip()
 
 def move_files(args: type[Namespace], path_mappings: list[str]) -> None:

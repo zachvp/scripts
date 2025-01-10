@@ -110,6 +110,10 @@ def transform_implied_path(path: str) -> str | None:
     '''Rsync-specific. Transforms the given path into a format that will include the required subdirectories.'''
     # input : /Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3
     # output: /Users/zachvp/developer/test-private/data/tracks-output/./2022/04 april/24/
+    
+    # '/Users/zachvp/developer/test-private/data/tracks-output/./2020/02 february/03/Tucci/Safe Miami 2017 (Mixed By The Deepshakerz)'
+    # 01/09/25 16:11:25 [DEBUG] run command: "rsync '/Users/zachvp/developer/test-private/data/tracks-output/./2020/02 february' rsync://zachvp@corevega.local:12000/navidrome --progress -auvziR --exclude '.*'"
+
     components = path.split(os.sep)[1:]
     if not common.find_date_context(path):
         return None
@@ -118,6 +122,8 @@ def transform_implied_path(path: str) -> str | None:
         if len(c) == 4 and c.isdecimal() and components[i+1].split()[1] in constants.MAPPING_MONTH.values():
             transformed += f"{os.sep}."
         transformed += f"{os.sep}{c}"
+        if common.find_date_context(transformed):
+            break
     return transformed
 
 def format_timing(timestamp: float) -> str:
@@ -131,6 +137,8 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> No
     import subprocess
     import shlex
     
+    logging.info(f"transfer from {source_path} to {dest_address}")
+    
     options = "--progress -auvziR --exclude '.*'"
     command = shlex.split(f"rsync \"{source_path}\" {dest_address}/{rsync_module} {options}") # todo: use shlex.quote()
     try:
@@ -142,18 +150,19 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> No
     except subprocess.CalledProcessError as error:
         logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
 
-def sync_batch(batch: list[str], date_context: str, source: str, dest: str) -> None:
+def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, dest: str) -> None:
     '''Transfers all files in the batch to the given destination, then tells the music server to perform a scan.'''
     import subsonic_client
     import encode_tracks
     
     # encode the current batch to MP3 format
     logging.debug(f"encoding batch in date context {date_context}:\n{batch}")
-    encode_tracks.encode_lossy(batch, '.mp3')
+    encode_tracks.encode_lossy(batch, '.mp3', threads=28)
+    return None
     
+    # transfer batch to the media server
     transfer_path = transform_implied_path(dest)
-    if transfer_path:        
-        # transfer files to media server
+    if transfer_path: 
         transfer_files(os.path.dirname(transfer_path), f"{constants.RSYNC_URL}", constants.RSYNC_MODULE_NAVIDROME)
         
         # tell the media server new files are available
@@ -168,19 +177,19 @@ def sync_batch(batch: list[str], date_context: str, source: str, dest: str) -> N
                 logging.debug("scan in progress, waiting...")
                 time.sleep(1)
     else:
-        logging.error(f"unable to transfer from '{source}' to '{dest}'")
+        logging.error(f"empty transfer path: unable to transfer from '{source}' to '{dest}'")
 
-def sync_from_mappings(mappings:list[str]) -> None:
-    batch: list[str] = []
-    source_previous, dest_previous = mappings[0].split(constants.FILE_OPERATION_DELIMITER)
+def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
+    batch: list[tuple[str, str]] = []
+    source_previous, dest_previous = mappings[0][0], mappings[0][1]
     date_context, source, dest = '', '', ''
     
     # process the file mappings
     logging.debug(f"mappings:\n{mappings}")
     for mapping in mappings:
-        source, dest = mapping.split(constants.FILE_OPERATION_DELIMITER)
-        date_context_previous = common.find_date_context(source_previous)
-        date_context = common.find_date_context(source)
+        source, dest = mapping[0], mapping[1]
+        date_context_previous = common.find_date_context(dest_previous)
+        date_context = common.find_date_context(dest)
         
         # validate date contexts
         if not date_context_previous:
@@ -190,22 +199,24 @@ def sync_from_mappings(mappings:list[str]) -> None:
             logging.error(f"no date context in path '{date_context}'")
             break
         
+        # TODO: move to separate function
         # skip if context already processed
-        date_context_processed = ''
-        with open('SyncState.txt', encoding='utf-8', mode='r') as state:
-            saved_state = state.readline()
-            if saved_state:
-                date_context_processed = saved_state.split(':')[1].strip()
-        # if date_context_processed and date_context_processed == date_context:
-        if date_context_processed:
-            if date_context < date_context_processed:
-                logging.info(f"skip processed date context: {date_context}")
-                continue
-            elif date_context_previous < date_context_processed:
-                logging.info(f"skip processed date context: {date_context_previous}")
-                continue
+        # date_context_processed = ''
+        # with open('SyncState.txt', encoding='utf-8', mode='r') as state:
+        #     saved_state = state.readline()
+        #     if saved_state:
+        #         date_context_processed = saved_state.split(':')[1].strip()
+        # # if date_context_processed and date_context_processed == date_context:
+        # if date_context_processed:
+        #     if date_context < date_context_processed:
+        #         logging.info(f"skip processed date context: {date_context}")
+        #         continue
+        #     elif date_context_previous < date_context_processed:
+        #         logging.info(f"skip processed date context: {date_context_previous}")
+        #         continue
         
         # collect each mapping in a given date context
+        # TODO: add progress logging
         if date_context_previous == date_context:
             batch.append(mapping)
             logging.debug(f"add to batch: {mapping}")
@@ -220,15 +231,18 @@ def sync_from_mappings(mappings:list[str]) -> None:
                 state.write(f"sync_date: {date_context_previous}")
             logging.debug(f"add to batch: {mapping}")
             logging.info(f"processed batch in date context '{date_context_previous}'")
+            if date_context_previous == '2020/11 november/11':
+                break
         source_previous = source
         dest_previous = dest
     
-    # process the final batch
-    if batch and date_context and source and dest:
-        sync_batch(batch, date_context, source, dest)
-        with open('SyncState.txt', encoding='utf-8', mode='w') as state:
-            state.write(f"sync_date: {date_context}")
-        logging.info(f"processed batch in date context '{date_context}'")
+    # process the final batch TODO: UNCOMMENT
+    # if batch and date_context and source and dest:
+    #     logging.info(f"processing batch in date context '{date_context}'")
+    #     sync_batch(batch, date_context, source, dest)
+    #     with open('SyncState.txt', encoding='utf-8', mode='w') as state:
+    #         state.write(f"sync_date: {date_context}")
+    #     logging.info(f"processed batch in date context '{date_context}'")
 
 def parse_args(valid_modes: set[str]) -> type[Namespace]:
     ''' Returns the parsed command-line arguments.
@@ -251,18 +265,18 @@ def parse_args(valid_modes: set[str]) -> type[Namespace]:
 
     return args
 
+def key_date_context(mapping: tuple[str, str]) -> str:
+    date_context = common.find_date_context(mapping[1])
+    return date_context if date_context else ''
+
 if __name__ == '__main__':
     # setup
-    common.configure_log(level=logging.INFO)
-    
+    common.configure_log(level=logging.DEBUG)
     script_args = parse_args(Namespace.MODES)
     
     if script_args.mode in {Namespace.MODE_COPY, Namespace.MODE_MOVE}:
         sync_from_path(script_args)
-    else:        
-        # mappings = common.collect_paths(script_args.input)
-        # mappings = common.add_output_path(script_args.output, mappings, script_args.input)
-        # mappings.sort()
+    else:
         import organize_library_dates as library
         pruned = library.find_node(script_args.input, constants.XPATH_PRUNED)
         collection = library.find_node(script_args.input, constants.XPATH_COLLECTION)
@@ -276,10 +290,10 @@ if __name__ == '__main__':
                                                playlist_ids=playlist_ids,
                                                metadata_path=True,
                                                swap_root_path='/Users/zachvp/Music/DJ/')
-        mappings.sort() # todo: this doesn't work, need to sort according to output path
+        mappings.sort(key=lambda m: key_date_context(m))
     
         timestamp = time.time()
-        # sync_from_mappings(mappings)
+        sync_from_mappings(mappings)
         timestamp = time.time() - timestamp
         logging.info(f"sync time: {format_timing(timestamp)}")
     
