@@ -259,8 +259,6 @@ def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: 
         if os.path.exists(dest):
             logging.debug(f"path exists, skipping: '{dest}'")
             continue
-        # command = ffmpeg_mp3(source, dest)
-        # run_command(command)
         
         ffprobe_data = read_ffprobe_json(source)
         cover_stream = guess_cover_stream_specifier(ffprobe_data)
@@ -272,6 +270,9 @@ def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: 
             logging.debug(f"no cover image found for '{source}'")
             
         command = ffmpeg_mp3(source, dest, map_options=map_options)
+        
+        # run synchronous 
+        # run_command(command)
         
         task = loop.create_task(run_command_async(command))
         tasks.append(task)
@@ -340,16 +341,6 @@ if __name__ == '__main__':
     FUNCTION_LOSSLESS = 'lossless'
     FUNCTION_LOSSY = 'lossy'
     FUNCTIONS = {FUNCTION_LOSSLESS, FUNCTION_LOSSY}
-    
-    # testing
-    path = '/Users/zachvp/Music/DJ/David K - Mayann (Original Mix).aiff'
-    output = read_ffprobe_json(path)
-    cover_stream = guess_cover_stream_specifier(output)
-    command = ffmpeg_mp3('/Users/zachvp/Music/DJ/David K - Mayann (Original Mix).aiff',
-                         '/Users/zachvp/developer/test-private/data/tracks-output/2020/02 february/08/David K/Mayann/David K - Mayann (Original Mix).mp3',
-                         map_options=f"-map 0:0 -map 0:{cover_stream}")
-    run_command(command)
-    exit()
     
     args = process_args(FUNCTIONS)
     

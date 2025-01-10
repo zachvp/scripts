@@ -133,22 +133,24 @@ def format_timing(timestamp: float) -> str:
         return f"{hours}h {minutes}m {seconds:.3}s"
     return f"{timestamp:.3}s"
     
-def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> None:
+def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tuple[int, str]:
     import subprocess
     import shlex
     
-    logging.info(f"transfer from {source_path} to {dest_address}")
+    logging.info(f"transfer from '{source_path}' to '{dest_address}'")
     
     options = "--progress -auvziR --exclude '.*'"
-    command = shlex.split(f"rsync \"{source_path}\" {dest_address}/{rsync_module} {options}") # todo: use shlex.quote()
+    command = shlex.split(f"rsync {shlex.quote(source_path)} {dest_address}/{rsync_module} {options}")
     try:
         logging.debug(f'run command: "{shlex.join(command)}"')
         timestamp = time.time()
         process = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
         timestamp = time.time() - timestamp
-        logging.debug(f"total time: {format_timing(timestamp)}\n{process.stdout.strip()}")
+        logging.debug(f"time: {format_timing(timestamp)}\n{process.stdout.strip()}")
+        return (process.returncode, process.stdout)
     except subprocess.CalledProcessError as error:
         logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
+        return (error.returncode, error.stderr)
 
 def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, dest: str) -> None:
     '''Transfers all files in the batch to the given destination, then tells the music server to perform a scan.'''
@@ -158,12 +160,12 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
     # encode the current batch to MP3 format
     logging.debug(f"encoding batch in date context {date_context}:\n{batch}")
     encode_tracks.encode_lossy(batch, '.mp3', threads=28)
-    return None
     
     # transfer batch to the media server
     transfer_path = transform_implied_path(dest)
     if transfer_path: 
-        transfer_files(os.path.dirname(transfer_path), f"{constants.RSYNC_URL}", constants.RSYNC_MODULE_NAVIDROME)
+        transfer_files(transfer_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
+        # TODO: handle transfer error
         
         # tell the media server new files are available
         response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {'fullScan': 'true'})
@@ -231,18 +233,18 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
                 state.write(f"sync_date: {date_context_previous}")
             logging.debug(f"add to batch: {mapping}")
             logging.info(f"processed batch in date context '{date_context_previous}'")
-            if date_context_previous == '2020/11 november/11':
+            if date_context_previous == '2020/04 april/04':
                 break
         source_previous = source
         dest_previous = dest
     
     # process the final batch TODO: UNCOMMENT
-    # if batch and date_context and source and dest:
-    #     logging.info(f"processing batch in date context '{date_context}'")
-    #     sync_batch(batch, date_context, source, dest)
-    #     with open('SyncState.txt', encoding='utf-8', mode='w') as state:
-    #         state.write(f"sync_date: {date_context}")
-    #     logging.info(f"processed batch in date context '{date_context}'")
+    if batch and date_context and source and dest:
+        logging.info(f"processing batch in date context '{date_context}'")
+        sync_batch(batch, date_context, source, dest)
+        with open('SyncState.txt', encoding='utf-8', mode='w') as state:
+            state.write(f"sync_date: {date_context}")
+        logging.info(f"processed batch in date context '{date_context}'")
 
 def parse_args(valid_modes: set[str]) -> type[Namespace]:
     ''' Returns the parsed command-line arguments.
