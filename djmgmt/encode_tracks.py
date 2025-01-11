@@ -10,10 +10,13 @@ import shlex
 import logging
 import sys
 import asyncio
-from asyncio import Task, Future
+from asyncio import Task, Future, AbstractEventLoop
 from typing import Any
 
+
 import common
+import constants
+
 
 class Namespace(argparse.Namespace):
     # arguments
@@ -101,8 +104,11 @@ def read_ffprobe_value(args: type[Namespace], input_path: str, stream_key: str) 
         sys.exit()
 
 def command_ffprobe_json(path: str) -> list[str]:
+    # todo: read the tag data to try to determine if only 'Publisher Logotype' is expected.
+    # ffprobe -v error -select_streams v -show_entries stream=index,codec_name,codec_type,width,height,:tags=comment -of json '/Users/zachvp/Music/DJ/Bernard Badie - Train feat Dajae (Original .aiff'
+    
     command_str = f"ffprobe -v error -select_streams v"
-    command_str += f" -show_entries stream=index,codec_name,codec_type,width,height -of json {shlex.quote(path)}"
+    command_str += f" -show_entries stream=index,width,height,:tags=comment -of json {shlex.quote(path)}"
     command = shlex.split(command_str)
     return command    
 
@@ -127,7 +133,14 @@ def guess_cover_stream_specifier(streams: list[dict[str, Any]]) -> int:
         
         diff = abs(width - height)
         threshold = 3 # based on common placeholder image dimensions 250x1500
-        if diff < min_diff and width / height <  threshold and height / width < threshold:
+        
+        if width / height >  threshold or height / width > threshold:
+            logging.debug(f"found non-square video content at index {index}")
+            continue
+        if 'comment' in stream['tags'] and 'logotype' in stream['tags']['comment'].lower():
+            logging.debug(f"found non-cover video content at index {index}: '{stream['tags']['comment']}")
+            continue
+        if diff < min_diff:
             min_diff = diff
             min_index = index
     return min_index
@@ -273,12 +286,6 @@ def encode_lossless(args: type[Namespace]) -> None:
             store_file.writelines(skipped_files)
             logging.info(f"wrote skipped files to '{store_path_skipped}'")
 
-def encode_lossy_cli(args: type[Namespace]) -> None:
-    '''Parse each path mapping entry into an encoding operation.'''
-    path_mappings = common.collect_paths(args.input)
-    path_mappings = common.add_output_path(args.output, path_mappings, args.input)
-    return encode_lossy(path_mappings, args.extension)
-
 def run_command(command: list[str]) -> tuple[int, str]:
     try:
         logging.debug(f"run command: {shlex.join(command)}")
@@ -288,54 +295,6 @@ def run_command(command: list[str]) -> tuple[int, str]:
     except subprocess.CalledProcessError as error:
         logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
         return (error.returncode, error.stderr.strip())
-
-def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4) -> None:
-    tasks: list[Task[tuple[int, str]]] = []
-    loop = asyncio.get_event_loop()
-    
-    for mapping in path_mappings:
-        source, dest = mapping[0], mapping[1]
-        dest = os.path.splitext(dest)[0] + extension
-        
-        dest_dir = os.path.dirname(dest)
-        if not os.path.exists(dest_dir):
-            logging.debug(f"create path: '{dest_dir}'")
-            os.makedirs(dest_dir)
-        
-        if os.path.exists(dest):
-            logging.debug(f"path exists, skipping: '{dest}'")
-            continue
-        
-        ffprobe_data = read_ffprobe_json(source)
-        cover_stream = guess_cover_stream_specifier(ffprobe_data)
-        map_options = f"-map 0:0"
-        if cover_stream > 0:
-            logging.debug(f"guessed cover image in stream: {cover_stream}")
-            map_options += f" -map 0:{cover_stream}"
-        else:
-            logging.info(f"no cover image found for '{source}'")
-            
-        command = ffmpeg_mp3(source, dest, map_options=map_options)
-        
-        # run synchronous 
-        # run_command(command)
-        
-        task = loop.create_task(run_command_async(command))
-        tasks.append(task)
-        logging.debug(f"add task: {len(tasks)}")
-        if len(tasks) > threads - 1:
-            run_tasks = tasks.copy()
-            loop.run_until_complete(collect_tasks(run_tasks))
-            logging.debug(f"ran {len(run_tasks)} tasks")
-            tasks.clear()
-    if tasks:
-        run_tasks = tasks.copy()
-        loop.run_until_complete(collect_tasks(run_tasks))
-        logging.debug(f"ran {len(tasks)} tasks")
-        tasks.clear()
-        
-async def collect_tasks(tasks: list[Task]) -> list[Future]:
-    return await asyncio.gather(*tasks)
 
 async def run_command_async(command: list[str]) -> tuple[int, str]:
     logging.debug(f"run command: {shlex.join(command)}")
@@ -364,6 +323,123 @@ async def run_command_async(command: list[str]) -> tuple[int, str]:
         logging.error(f"return code '{process.returncode}':\n{stderr}")
         return (process.returncode, stderr)
 
+async def collect_tasks(tasks: list[Task]) -> list[Future]:
+    return await asyncio.gather(*tasks)
+
+def encode_lossy_cli(args: type[Namespace]) -> None:
+    '''Parse each path mapping entry into an encoding operation.'''
+    path_mappings = common.collect_paths(args.input)
+    path_mappings = common.add_output_path(args.output, path_mappings, args.input)
+    return encode_lossy(path_mappings, args.extension)
+
+def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4) -> None:
+    tasks: list[Task[tuple[int, str]]] = []
+    loop = asyncio.get_event_loop()
+    
+    for mapping in path_mappings:
+        source, dest = mapping[0], mapping[1]
+        dest = os.path.splitext(dest)[0] + extension
+        
+        dest_dir = os.path.dirname(dest)
+        if not os.path.exists(dest_dir):
+            logging.debug(f"create path: '{dest_dir}'")
+            os.makedirs(dest_dir)
+        
+        if os.path.exists(dest):
+            logging.debug(f"path exists, skipping: '{dest}'")
+            continue
+        
+        ffprobe_data = read_ffprobe_json(source)
+        cover_stream = guess_cover_stream_specifier(ffprobe_data)
+        map_options = f"-map 0:0"
+        if cover_stream > -1:
+            logging.debug(f"guessed cover image in stream: {cover_stream}")
+            map_options += f" -map 0:{cover_stream}"
+        else:
+            logging.info(f"no cover image found for '{source}'")
+            
+        command = ffmpeg_mp3(source, dest, map_options=map_options)
+        
+        # run synchronous 
+        # run_command(command)
+        
+        task = loop.create_task(run_command_async(command))
+        tasks.append(task)
+        logging.debug(f"add task: {len(tasks)}")
+        if len(tasks) > threads - 1:
+            run_tasks = tasks.copy()
+            loop.run_until_complete(collect_tasks(run_tasks))
+            logging.debug(f"ran {len(run_tasks)} tasks")
+            tasks.clear()
+    if tasks:
+        run_tasks = tasks.copy()
+        loop.run_until_complete(collect_tasks(run_tasks))
+        logging.debug(f"ran {len(tasks)} tasks")
+        tasks.clear()
+
+class CommandOutput:
+    def __init__(self, task: Task, return_code: int, output: str) -> None:
+        self.task = task
+        self.return_code = return_code
+        self.output = output
+
+class CommandTask:
+    def __init__(self, command: str, output: CommandOutput) -> None:
+        self.command = command
+        self.output = output
+
+# TODO: change complex type into a class
+def run_missing_art_tasks(loop: AbstractEventLoop, tasks: list[tuple[str, Task[tuple[int, str]]]], output_path: str):
+    import json
+    
+    run_tasks = [task[1] for task in tasks]
+    loop.run_until_complete(collect_tasks(run_tasks))
+    logging.debug(f"ran {len(run_tasks)} tasks")
+    
+    for i, task in enumerate(run_tasks):
+        source = tasks[i][0]
+        output = json.loads(task.result()[1])['streams']    
+        cover_stream = guess_cover_stream_specifier(output)
+    
+        if cover_stream > -1:
+            logging.info(f"guessed cover image in stream: {cover_stream}")
+        else:
+            logging.info(f"no cover image found for '{source}'")
+            with open(output_path, 'a', encoding='utf-8') as file:
+                file.write(f"{os.path.basename(source)}\n")
+    tasks.clear()
+
+def find_missing_art(collection_file_path: str, output_path: str, collection_xpath: str, playlist_xpath: str, threads=24):
+    import organize_library_dates as library
+    
+    # clear the output file
+    with open(output_path, 'w', encoding='utf-8'):
+        pass
+    
+    collection = library.find_node(collection_file_path, collection_xpath)
+    playlist = library.find_node(collection_file_path, playlist_xpath)
+    
+    # collect the playlist IDs
+    tasks: list[tuple[str, Task[tuple[int, str]]]] = []
+    playlist_ids: set[str] = set(track.attrib[constants.ATTR_KEY] for track in playlist)
+    
+    loop = asyncio.get_event_loop()
+    for node in collection:
+        # check if node is in playlist
+        source = library.collection_path_to_syspath(node.attrib[constants.ATTR_PATH])
+        if playlist_ids and node.attrib[constants.ATTR_TRACK_ID] not in playlist_ids:
+            logging.info(f"skip non-playlist track: '{source}'")
+            continue
+        
+        task = loop.create_task(run_command_async(command_ffprobe_json(source)))
+        tasks.append((source, task))
+        logging.debug(f"add task: {len(tasks)}")
+        if len(tasks) > threads - 1:
+            run_missing_art_tasks(loop, tasks, output_path)
+    
+    # run remaining tasks
+    run_missing_art_tasks(loop, tasks, output_path)
+
 # Main
 if __name__ == '__main__':
     common.configure_log(level=logging.DEBUG)
@@ -374,51 +450,7 @@ if __name__ == '__main__':
     elif script_args.function == Namespace.FUNCTION_LOSSY:
         encode_lossy_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_MISSING_ART:
-        import organize_library_dates as library
-        import constants
-        import json
-        
-        with open(script_args.output, 'w', encoding='utf-8') as file:
-            pass
-        
-        pruned = library.find_node(script_args.input, constants.XPATH_PRUNED)
-        collection = library.find_node(script_args.input, constants.XPATH_COLLECTION)
-        
-        # collect the playlist IDs
-        tasks: list[tuple[str, Task[tuple[int, str]]]] = []
-        playlist_ids: set[str] = set()
-        threads = 64
-        loop = asyncio.get_event_loop()
-        for track in pruned:
-            playlist_ids.add(track.attrib[constants.ATTR_KEY])
+        # TODO: add timing
+        find_missing_art(script_args.input, script_args.output, constants.XPATH_COLLECTION, constants.XPATH_PRUNED, threads=72)
             
-        for node in collection:
-            # check if a playlist is provided
-            source = library.collection_path_to_syspath(node.attrib[constants.ATTR_PATH])
-            if playlist_ids and node.attrib[constants.ATTR_TRACK_ID] not in playlist_ids:
-                logging.info(f"skip non-playlist track: '{source}'")
-                continue
             
-            # ffprobe_data = read_ffprobe_json(source)
-            task = loop.create_task(run_command_async(command_ffprobe_json(source)))
-            tasks.append((source, task))
-            logging.debug(f"add task: {len(tasks)}")
-            # TODO: add timing
-            if len(tasks) > threads - 1:
-                run_tasks = [task[1] for task in tasks]
-                loop.run_until_complete(collect_tasks(run_tasks))
-                logging.debug(f"ran {len(run_tasks)} tasks")
-                
-                file = open(script_args.output, 'a', encoding='utf-8')
-                for i, task in enumerate(run_tasks):
-                    source = tasks[i][0]
-                    output = json.loads(task.result()[1])['streams']    
-                    cover_stream = guess_cover_stream_specifier(output)
-                
-                    if cover_stream > -1:
-                        logging.info(f"guessed cover image in stream: {cover_stream}")
-                    else:
-                        logging.info(f"no cover image found for '{source}'")
-                        file.write(f"{os.path.basename(source)}\n")
-                file.close()
-                tasks.clear()
