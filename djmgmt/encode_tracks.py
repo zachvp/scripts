@@ -10,9 +10,51 @@ import shlex
 import logging
 import sys
 import asyncio
+from asyncio import Task, Future
 from typing import Any
 
 import common
+
+class Namespace(argparse.Namespace):
+    # arguments
+    function: str
+    input: str
+    output: str
+    extension: str
+    
+    store_path: str
+    store_skipped: bool
+    interactive: bool
+    verbose: bool
+    
+    # functions
+    FUNCTION_LOSSLESS = 'lossless'
+    FUNCTION_LOSSY = 'lossy'
+    FUNCTION_MISSING_ART = 'missing_art'
+    FUNCTIONS = {FUNCTION_LOSSLESS, FUNCTION_LOSSY, FUNCTION_MISSING_ART}
+
+def parse_args(functions: set[str]) -> type[Namespace]:
+    '''Process the script's command line aruments.'''
+    parser = argparse.ArgumentParser()
+    parser.add_argument('function', type=str, help=f"the function to run; one of: '{functions}'")
+    parser.add_argument('input', type=str, help='the input path')
+    parser.add_argument('output', type=str, help='the output path')
+    
+    parser.add_argument('--extension', '-e', type=str, help='the output extension for each file')
+    parser.add_argument('--store-path', type=str, help='the script storage path to write to')
+    parser.add_argument('--store-skipped', action='store_true', help='store the skipped files in store path')
+    parser.add_argument('--interactive', '-i', action='store_true', help='run the script in interactive mode')
+    parser.add_argument('--verbose', '-v', action='store_true', help='run the script with verbose output')
+
+    args = parser.parse_args(namespace=Namespace)
+    
+    if args.function not in functions:
+        parser.error(f"invalid function '{args.function}', expect one of: '{functions}'")
+
+    if args.store_skipped and not args.store_path:
+        parser.error("if option '--store-skipped' is set, option '--store-path' is required")
+
+    return args
 
 def ffmpeg_base(input_path: str, output_path: str, options: str) -> list[str]:
     all_options = f"-ar 44100 -write_id3v2 1 {options}"
@@ -32,7 +74,7 @@ def ffmpeg_mp3(input_path: str, output_path: str, map_options: str='-map 0') -> 
     options = f"-b:a 320k {map_options}"
     return ffmpeg_base(input_path, output_path, options)
 
-def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream_key: str) -> str:
+def read_ffprobe_value(args: type[Namespace], input_path: str, stream_key: str) -> str:
     '''Uses ffprobe command line tool. Reads the ffprobe value for a particular stream entry.
 
     Args:
@@ -58,12 +100,16 @@ def read_ffprobe_value(args: argparse.Namespace, input_path: str, stream_key: st
         logging.debug(f"command: {shlex.join(command)}")
         sys.exit()
 
-def read_ffprobe_json(path: str) -> list[dict[str, Any]]:
-    '''Reads the ffprobe video streams of the given file.'''
-    import json
+def command_ffprobe_json(path: str) -> list[str]:
     command_str = f"ffprobe -v error -select_streams v"
     command_str += f" -show_entries stream=index,codec_name,codec_type,width,height -of json {shlex.quote(path)}"
     command = shlex.split(command_str)
+    return command    
+
+def read_ffprobe_json(path: str) -> list[dict[str, Any]]:
+    '''Reads the ffprobe video streams of the given file.'''
+    import json
+    command = command_ffprobe_json(path)
     code, output = run_command(command)
     
     if code == 0:
@@ -73,30 +119,30 @@ def read_ffprobe_json(path: str) -> list[dict[str, Any]]:
     return []
 
 def guess_cover_stream_specifier(streams: list[dict[str, Any]]) -> int:
-    '''Inspects the width and height of the video stream JSON to try to find a square cover image.'''
+    '''Inspects the width and height of the video stream JSON to try to find a likely cover image.'''
     min_index, min_diff = -1, float('inf')
     for stream in streams:
         index = stream['index']
         width, height = stream['width'], stream['height']
         
         diff = abs(width - height)
-        threshold = 1500 / 250
+        threshold = 3 # based on common placeholder image dimensions 250x1500
         if diff < min_diff and width / height <  threshold and height / width < threshold:
             min_diff = diff
             min_index = index
     return min_index
 
-def check_skip_sample_rate(args: argparse.Namespace, input_path: str) -> bool:
+def check_skip_sample_rate(args: type[Namespace], input_path: str) -> bool:
     '''Returns `True` if sample rate for `input_path` is at or below the standardized value.'''
     result = read_ffprobe_value(args, input_path, 'sample_rate')
     return False if len(result) < 1 else int(result) <= 44100
 
-def check_skip_bit_depth(args: argparse.Namespace, input_path: str) -> bool:
+def check_skip_bit_depth(args: type[Namespace], input_path: str) -> bool:
     '''Returns `True` if bit depth (aka 'sample format') is at or below the standardized value.'''
     result = read_ffprobe_value(args, input_path, 'sample_fmt').lstrip('s')
     return False if len(result) < 1 else int(result) <= 16
 
-def setup_storage(args: argparse.Namespace, filename: str) -> str:
+def setup_storage(args: type[Namespace], filename: str) -> str:
     '''Create or clear a storage file called `filename` at the path specified in `args`.
 
     Returns:
@@ -115,7 +161,7 @@ def setup_storage(args: argparse.Namespace, filename: str) -> str:
 
     return store_path
 
-def encode_lossless(args: argparse.Namespace) -> None:
+def encode_lossless(args: type[Namespace]) -> None:
     '''Primary script function. Recursively walks the input path specified in `args` to re-encode each eligible file.
     A file is eligible if:
         1) It is an uncompressed `aiff` or `wav` type.
@@ -227,7 +273,7 @@ def encode_lossless(args: argparse.Namespace) -> None:
             store_file.writelines(skipped_files)
             logging.info(f"wrote skipped files to '{store_path_skipped}'")
 
-def encode_lossy_cli(args: argparse.Namespace) -> None:
+def encode_lossy_cli(args: type[Namespace]) -> None:
     '''Parse each path mapping entry into an encoding operation.'''
     path_mappings = common.collect_paths(args.input)
     path_mappings = common.add_output_path(args.output, path_mappings, args.input)
@@ -244,7 +290,7 @@ def run_command(command: list[str]) -> tuple[int, str]:
         return (error.returncode, error.stderr.strip())
 
 def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4) -> None:
-    tasks = []
+    tasks: list[Task[tuple[int, str]]] = []
     loop = asyncio.get_event_loop()
     
     for mapping in path_mappings:
@@ -263,11 +309,11 @@ def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: 
         ffprobe_data = read_ffprobe_json(source)
         cover_stream = guess_cover_stream_specifier(ffprobe_data)
         map_options = f"-map 0:0"
-        if cover_stream > -1:
+        if cover_stream > 0:
             logging.debug(f"guessed cover image in stream: {cover_stream}")
             map_options += f" -map 0:{cover_stream}"
         else:
-            logging.debug(f"no cover image found for '{source}'")
+            logging.info(f"no cover image found for '{source}'")
             
         command = ffmpeg_mp3(source, dest, map_options=map_options)
         
@@ -288,10 +334,10 @@ def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: 
         logging.debug(f"ran {len(tasks)} tasks")
         tasks.clear()
         
-async def collect_tasks(tasks: list[asyncio.Task]) -> list[asyncio.Future]:
+async def collect_tasks(tasks: list[Task]) -> list[Future]:
     return await asyncio.gather(*tasks)
 
-async def run_command_async(command: list[str]) -> bool:
+async def run_command_async(command: list[str]) -> tuple[int, str]:
     logging.debug(f"run command: {shlex.join(command)}")
     process = await asyncio.create_subprocess_shell(
         shlex.join(command),
@@ -300,51 +346,79 @@ async def run_command_async(command: list[str]) -> bool:
     
     # wait for process to finish
     stdout, stderr = await process.communicate()
+    if process.returncode is None:
+        raise RuntimeError(f"process has return code 'None'.")
     if process.returncode == 0:
         message = f"command output:\n"
+        output = ''
         if stdout:
-            message += stdout.decode()
-            logging.debug(message)
+            output = stdout.decode()
         elif stderr:
-            message += stderr.decode()
-            logging.debug(message)
-        return True
+            output = stderr.decode()
+        
+        message += output
+        logging.debug(message)
+        return (process.returncode, output)
     else:
-        logging.error(f"return code '{process.returncode}':\n{stderr.decode()}")
-    return False                
-
-def process_args(functions: set[str]) -> argparse.Namespace:
-    '''Process the script's command line aruments.'''
-    parser = argparse.ArgumentParser()
-    parser.add_argument('function', type=str, help=f"the function to run; one of: '{functions}'")
-    parser.add_argument('input', type=str, help='the input directory to recursively process')
-    parser.add_argument('output', type=str, help='the output directory to contain all the files in a flat structure')
-    parser.add_argument('extension', type=str, help='the output extension for each file')
-
-    parser.add_argument('--store-path', type=str, help='the script storage path to write to')
-    parser.add_argument('--store-skipped', action='store_true', help='store the skipped files in store path')
-    parser.add_argument('--interactive', '-i', action='store_true', help='run the script in interactive mode')
-    parser.add_argument('--verbose', '-v', action='store_true', help='run the script with verbose output')
-
-    args = parser.parse_args()
-    
-    if args.function not in functions:
-        parser.error(f"invalid function '{args.function}', expect one of: '{functions}'")
-
-    if args.store_skipped and not args.store_path:
-        parser.error("if option '--store-skipped' is set, option '--store-path' is required")
-
-    return args
+        stderr = stderr.decode()
+        logging.error(f"return code '{process.returncode}':\n{stderr}")
+        return (process.returncode, stderr)
 
 # Main
 if __name__ == '__main__':
-    FUNCTION_LOSSLESS = 'lossless'
-    FUNCTION_LOSSY = 'lossy'
-    FUNCTIONS = {FUNCTION_LOSSLESS, FUNCTION_LOSSY}
+    common.configure_log(level=logging.DEBUG)
+    script_args = parse_args(Namespace.FUNCTIONS)
     
-    args = process_args(FUNCTIONS)
-    
-    if args.function == FUNCTION_LOSSLESS:
-        encode_lossless(args)
-    elif args.function == FUNCTION_LOSSY:
-        encode_lossy_cli(args)
+    if script_args.function == Namespace.FUNCTION_LOSSLESS:
+        encode_lossless(script_args)
+    elif script_args.function == Namespace.FUNCTION_LOSSY:
+        encode_lossy_cli(script_args)
+    elif script_args.function == Namespace.FUNCTION_MISSING_ART:
+        import organize_library_dates as library
+        import constants
+        import json
+        
+        with open(script_args.output, 'w', encoding='utf-8') as file:
+            pass
+        
+        pruned = library.find_node(script_args.input, constants.XPATH_PRUNED)
+        collection = library.find_node(script_args.input, constants.XPATH_COLLECTION)
+        
+        # collect the playlist IDs
+        tasks: list[tuple[str, Task[tuple[int, str]]]] = []
+        playlist_ids: set[str] = set()
+        threads = 64
+        loop = asyncio.get_event_loop()
+        for track in pruned:
+            playlist_ids.add(track.attrib[constants.ATTR_KEY])
+            
+        for node in collection:
+            # check if a playlist is provided
+            source = library.collection_path_to_syspath(node.attrib[constants.ATTR_PATH])
+            if playlist_ids and node.attrib[constants.ATTR_TRACK_ID] not in playlist_ids:
+                logging.info(f"skip non-playlist track: '{source}'")
+                continue
+            
+            # ffprobe_data = read_ffprobe_json(source)
+            task = loop.create_task(run_command_async(command_ffprobe_json(source)))
+            tasks.append((source, task))
+            logging.debug(f"add task: {len(tasks)}")
+            # TODO: add timing
+            if len(tasks) > threads - 1:
+                run_tasks = [task[1] for task in tasks]
+                loop.run_until_complete(collect_tasks(run_tasks))
+                logging.debug(f"ran {len(run_tasks)} tasks")
+                
+                file = open(script_args.output, 'a', encoding='utf-8')
+                for i, task in enumerate(run_tasks):
+                    source = tasks[i][0]
+                    output = json.loads(task.result()[1])['streams']    
+                    cover_stream = guess_cover_stream_specifier(output)
+                
+                    if cover_stream > -1:
+                        logging.info(f"guessed cover image in stream: {cover_stream}")
+                    else:
+                        logging.info(f"no cover image found for '{source}'")
+                        file.write(f"{os.path.basename(source)}\n")
+                file.close()
+                tasks.clear()
