@@ -27,6 +27,10 @@ import time
 import common
 import constants
 
+# Constants
+FILE_SYNC = 'SyncState.txt'
+FILE_SYNC_KEY = 'sync_date'
+
 # Classes
 class Namespace(argparse.Namespace):
     # Script Arguments
@@ -111,9 +115,6 @@ def transform_implied_path(path: str) -> str | None:
     # input : /Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3
     # output: /Users/zachvp/developer/test-private/data/tracks-output/./2022/04 april/24/
     
-    # '/Users/zachvp/developer/test-private/data/tracks-output/./2020/02 february/03/Tucci/Safe Miami 2017 (Mixed By The Deepshakerz)'
-    # 01/09/25 16:11:25 [DEBUG] run command: "rsync '/Users/zachvp/developer/test-private/data/tracks-output/./2020/02 february' rsync://zachvp@corevega.local:12000/navidrome --progress -auvziR --exclude '.*'"
-
     components = path.split(os.sep)[1:]
     if not common.find_date_context(path):
         return None
@@ -130,10 +131,11 @@ def format_timing(timestamp: float) -> str:
     if timestamp > 60:
         hours, remainder = divmod(timestamp, 3600)
         minutes, seconds = divmod(remainder, 60)
-        return f"{hours}h {minutes}m {seconds:.3}s"
-    return f"{timestamp:.3}s"
+        return f"{hours}h {minutes}m {seconds:.3f}s"
+    return f"{timestamp:.3f}s"
     
 def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tuple[int, str]:
+    '''Uses rsync to transfer files using remote daemon.'''
     import subprocess
     import shlex
     
@@ -165,7 +167,6 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
     transfer_path = transform_implied_path(dest)
     if transfer_path: 
         transfer_files(transfer_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
-        # TODO: handle transfer error
         
         # tell the media server new files are available
         response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {'fullScan': 'true'})
@@ -181,14 +182,36 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
     else:
         logging.error(f"empty transfer path: unable to transfer from '{source}' to '{dest}'")
 
+def is_processed(date_context: str, date_context_previous: str) -> bool:
+    date_context_processed = ''
+    with open(FILE_SYNC, encoding='utf-8', mode='r') as state:
+        saved_state = state.readline()
+        if saved_state:
+            date_context_processed = saved_state.split(':')[1].strip()
+    if date_context_processed and date_context_processed == date_context:
+        if date_context_processed:
+            if date_context < date_context_processed:
+                logging.info(f"already processed date context: {date_context}")
+                return True
+            elif date_context_previous < date_context_processed:
+                logging.info(f"already processed date context: {date_context_previous}")
+                return True
+    return False
+
 def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
+    # core data
     batch: list[tuple[str, str]] = []
     source_previous, dest_previous = mappings[0][0], mappings[0][1]
     date_context, source, dest = '', '', ''
+    index = 0
+    
+    # helper
+    progressFormat: Callable[[int], str] = lambda i: f"{(i / len(mappings) * 100):.2f}%"
+    logging.info(f"sync progress: {progressFormat(index)}")
     
     # process the file mappings
     logging.debug(f"mappings:\n{mappings}")
-    for mapping in mappings:
+    for index, mapping in enumerate(mappings):
         source, dest = mapping[0], mapping[1]
         date_context_previous = common.find_date_context(dest_previous)
         date_context = common.find_date_context(dest)
@@ -201,24 +224,11 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
             logging.error(f"no date context in path '{date_context}'")
             break
         
-        # TODO: move to separate function
-        # skip if context already processed
-        # date_context_processed = ''
-        # with open('SyncState.txt', encoding='utf-8', mode='r') as state:
-        #     saved_state = state.readline()
-        #     if saved_state:
-        #         date_context_processed = saved_state.split(':')[1].strip()
-        # # if date_context_processed and date_context_processed == date_context:
-        # if date_context_processed:
-        #     if date_context < date_context_processed:
-        #         logging.info(f"skip processed date context: {date_context}")
-        #         continue
-        #     elif date_context_previous < date_context_processed:
-        #         logging.info(f"skip processed date context: {date_context_previous}")
-        #         continue
+        # skip processed dates
+        if is_processed(date_context, date_context_previous):
+            continue
         
         # collect each mapping in a given date context
-        # TODO: add progress logging
         if date_context_previous == date_context:
             batch.append(mapping)
             logging.debug(f"add to batch: {mapping}")
@@ -229,22 +239,24 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
             batch.append(mapping) # add the first mapping of the new context
             
             # persist the processed date context
-            with open('SyncState.txt', encoding='utf-8', mode='w') as state:
-                state.write(f"sync_date: {date_context_previous}")
+            with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
+                state.write(f"{FILE_SYNC_KEY}: {date_context_previous}")
             logging.debug(f"add to batch: {mapping}")
             logging.info(f"processed batch in date context '{date_context_previous}'")
-            if date_context_previous == '2020/04 april/04':
+            logging.info(f"sync progress: {progressFormat(index)}")
+            if date_context_previous == '2020/06 june/11':
                 break
         source_previous = source
         dest_previous = dest
     
-    # process the final batch TODO: UNCOMMENT
+    # process the final batch
     if batch and date_context and source and dest:
         logging.info(f"processing batch in date context '{date_context}'")
         sync_batch(batch, date_context, source, dest)
-        with open('SyncState.txt', encoding='utf-8', mode='w') as state:
-            state.write(f"sync_date: {date_context}")
+        with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
+            state.write(f"{FILE_SYNC_KEY}: {date_context}")
         logging.info(f"processed batch in date context '{date_context}'")
+        logging.info(f"sync progress: {progressFormat(index)}")
 
 def parse_args(valid_modes: set[str]) -> type[Namespace]:
     ''' Returns the parsed command-line arguments.
