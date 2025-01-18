@@ -28,15 +28,19 @@ import common
 import constants
 
 # Constants
-FILE_SYNC = 'SyncState.txt'
+FILE_SYNC = 'state/sync_state.txt'
 FILE_SYNC_KEY = 'sync_date'
 
 # Classes
 class Namespace(argparse.Namespace):
     # Script Arguments
+    ## Required
     mode: str
     input: str
     output: str
+    
+    ## Optional
+    path_0: str
     
     # Script modes
     MODE_COPY = 'copy'
@@ -44,6 +48,28 @@ class Namespace(argparse.Namespace):
     MODE_SYNC = 'sync'
 
     MODES = {MODE_COPY, MODE_MOVE, MODE_SYNC}
+
+def parse_args(valid_modes: set[str]) -> type[Namespace]:
+    ''' Returns the parsed command-line arguments.
+
+    Function arguments:
+        valid_modes -- defines the supported script modes
+    '''
+    parser = argparse.ArgumentParser()
+    parser.add_argument('mode', type=str, help=f"The mode to apply for the function. One of '{valid_modes}'.")
+    parser.add_argument('input', type=str, help="The top level directory to search.\
+        It's expected to be structured in a year/month/audio.file format.")
+    parser.add_argument('output', type=str, help="The output directory to populate.")
+    parser.add_argument('--path-0', '-p0', type=str, help="An optional path. Sync uses this as the music root.")
+
+    args = parser.parse_args(namespace=Namespace)
+    args.input = os.path.normpath(args.input)
+    args.output = os.path.normpath(args.output)
+
+    if args.mode not in valid_modes:
+        parser.error(f"Invalid mode: '{args.mode}'")
+
+    return args
 
 # Helper functions
 def normalize_paths(paths: list[str], parent: str) -> list[str]:
@@ -184,7 +210,7 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
 
 def is_processed(date_context: str, date_context_previous: str) -> bool:
     date_context_processed = ''
-    with open(FILE_SYNC, encoding='utf-8', mode='r') as state:
+    with open(FILE_SYNC, encoding='utf-8', mode='r') as state: # todo: optimize to only open if recent change
         saved_state = state.readline()
         if saved_state:
             date_context_processed = saved_state.split(':')[1].strip()
@@ -210,7 +236,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
     logging.info(f"sync progress: {progressFormat(index)}")
     
     # process the file mappings
-    logging.debug(f"mappings:\n{mappings}")
+    logging.debug(f"sync '{len(mappings)}' mappings:\n{mappings}")
     for index, mapping in enumerate(mappings):
         source, dest = mapping[0], mapping[1]
         date_context_previous = common.find_date_context(dest_previous)
@@ -244,8 +270,6 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
             logging.debug(f"add to batch: {mapping}")
             logging.info(f"processed batch in date context '{date_context_previous}'")
             logging.info(f"sync progress: {progressFormat(index)}")
-            if date_context_previous == '2020/06 june/11':
-                break
         source_previous = source
         dest_previous = dest
     
@@ -257,27 +281,6 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
             state.write(f"{FILE_SYNC_KEY}: {date_context}")
         logging.info(f"processed batch in date context '{date_context}'")
         logging.info(f"sync progress: {progressFormat(index)}")
-
-def parse_args(valid_modes: set[str]) -> type[Namespace]:
-    ''' Returns the parsed command-line arguments.
-
-    Function arguments:
-        valid_modes -- defines the supported script modes
-    '''
-    parser = argparse.ArgumentParser()
-    parser.add_argument('mode', type=str, help=f"The mode to apply for the function. One of '{valid_modes}'.")
-    parser.add_argument('input', type=str, help="The top level directory to search.\
-        It's expected to be structured in a year/month/audio.file format.")
-    parser.add_argument('output', type=str, help="The output directory to populate.")
-
-    args = parser.parse_args(namespace=Namespace)
-    args.input = os.path.normpath(args.input)
-    args.output = os.path.normpath(args.output)
-
-    if args.mode not in valid_modes:
-        parser.error(f"Invalid mode: '{args.mode}'")
-
-    return args
 
 def key_date_context(mapping: tuple[str, str]) -> str:
     date_context = common.find_date_context(mapping[1])
@@ -303,7 +306,7 @@ if __name__ == '__main__':
                                                script_args.output,
                                                playlist_ids=playlist_ids,
                                                metadata_path=True,
-                                               swap_root_path='/Users/zachvp/Music/DJ/')
+                                               swap_root_path=script_args.path_0)
         mappings.sort(key=lambda m: key_date_context(m))
     
         timestamp = time.time()

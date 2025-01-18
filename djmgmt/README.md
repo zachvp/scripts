@@ -1,20 +1,7 @@
 # Next steps
-?. Test with portion of real deal file
-?. Select "_pruned" Playlist as config
-?. Deploy Navidrome server on rasp
-
-# Latest and greatest
-Read local file for last scan date
-Find corresponding starting point in music library
-Copy all files from starting point to Now into localState/temp/
-Transcode all localState/ files to MP3 (localState/temp/transcoded)
-Restructure localState/temp/transcoded to follow directory structure hierarchy
-For each day in directory structure
-    Move localState/temp/transcoded/ into upload/ directory one day at a time
-    Transfer files from upload/ to server
-    Call server.scan
-    Block until scan finished, then continue
-Remove all files in localState/temp/
+? figure out which tracks are missing and why
+    navidrome < local sync folder < than rekordbox _pruned < mappings
+        2297            2327            2343                    2345
 
 # Migrate music to server
 1. Clear music files
@@ -44,16 +31,8 @@ python djmgmt/organize_library_dates.py generate /media/zachvp/SOL/data/mac-coll
     4. python djmgmt/populate_media_server.py /media/zachvp/SOL/music/DJing/ /media/zachvp/SOL/media-server/ -i
 
 ## Copy to server
-**TODO: likely use rsync daemon
-**TODO: check if 'use chroot' is needed in ~/.config/rsync/
 * copy ~/Music/downloads -> remote@host:/media/zachvp/SOL/media-server/staging
 * copy /path/to/latest/collection.xml -> remote@host/home/{USER}/backup/transfer
-
-
-# Ongoing process loops
-## Update files on server from DJing source
-    TODO: script to determine changes
-
 
 # Developer help
 

@@ -68,7 +68,7 @@ def read_tags(path: str) -> Optional[Tags]:
     try:
         track = mutagen.File(path)
     except mutagen.MutagenError as e:
-        print(f"mutagen.MutagenError: {e}\npath: '{path}'")
+        print(f"mutagen.MutagenError:\n{e}\npath: '{path}'")
         return None
 
     if track is None or track.tags is None:
@@ -104,8 +104,7 @@ def read_tags(path: str) -> Optional[Tags]:
 
     return Tags(str(artist), str(album), str(title))
 
-# script input
-def script(root: str) -> None:
+def print_duplicates(root: str) -> None:
     # script state
     file_set: set[str] = set()
 
@@ -142,7 +141,7 @@ if __name__ == '__main__':
     script_args = parser.parse_args()
     script_args.input = os.path.normpath(script_args.input)
 
-    script(script_args.input)
+    print_duplicates(script_args.input)
 
     # DEV investigation:
     # printed = dev_print_relevant_values(track, relevant_keys)

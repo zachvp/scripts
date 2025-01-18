@@ -377,18 +377,6 @@ def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: 
         logging.debug(f"ran {len(tasks)} tasks")
         tasks.clear()
 
-class CommandOutput:
-    def __init__(self, task: Task, return_code: int, output: str) -> None:
-        self.task = task
-        self.return_code = return_code
-        self.output = output
-
-class CommandTask:
-    def __init__(self, command: str, output: CommandOutput) -> None:
-        self.command = command
-        self.output = output
-
-# TODO: change complex type into a class
 def run_missing_art_tasks(loop: AbstractEventLoop, tasks: list[tuple[str, Task[tuple[int, str]]]], output_path: str):
     import json
     

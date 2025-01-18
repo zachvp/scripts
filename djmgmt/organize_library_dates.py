@@ -145,17 +145,18 @@ def generate_date_paths(collection: ET.Element,
 
     for node in collection:
         # check if track file is in expected library folder
+        node_syspath = collection_path_to_syspath(node.attrib[constants.ATTR_PATH])
         if constants.REKORDBOX_ROOT not in node.attrib[constants.ATTR_PATH]:
-            logging.warning(f"unexpected path {collection_path_to_syspath(node.attrib[constants.ATTR_PATH])}, will skip")
+            logging.warning(f"unexpected path {node_syspath}, will skip")
             continue
         
         # check if a playlist is provided
         if playlist_ids and node.attrib[constants.ATTR_TRACK_ID] not in playlist_ids:
-            logging.debug(f"skip non-playlist track: '{node.attrib[constants.ATTR_PATH]}'")
+            logging.debug(f"skip non-playlist track: '{node_syspath}'")
             continue
         
         # build each entry for the old and new path
-        track_path_old = collection_path_to_syspath(node.attrib[constants.ATTR_PATH])
+        track_path_old = node_syspath
         if root_path and swap_input_root:
             track_path_old = swap_root(track_path_old, swap_root_path, root_path)
 

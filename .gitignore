@@ -14,3 +14,7 @@ data/write/
 logs/
 fallout/input.txt
 copypasta
+
+djmgmt/SyncState.txt
+
+djmgmt/state/
