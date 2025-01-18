@@ -29,8 +29,8 @@ def generate_id(node: ET.Element) -> str:
     len_0 = min(8, len(node.attrib[ATTR_NAME]))
     len_1 = min(8, len(node.attrib[ATTR_ARTIST]))
     shard_0 = f"{node.attrib[ATTR_NAME][:len_0]}{node.attrib[ATTR_NAME][-len_0:]}"
-    shard_1 = f"{node.attrib[ATTR_ARTIST][:len_1]}\
-        {node.attrib[ATTR_TOTAL_TIME]}{node.attrib[ATTR_AVG_BPM]}"
+    shard_1 = f"{node.attrib[ATTR_ARTIST][:len_1]}"
+    shard_1 += f"{node.attrib[ATTR_TOTAL_TIME]}{node.attrib[ATTR_AVG_BPM]}"
 
     # print(f"generated id: {id_str}")
     return f"{shard_0}{shard_1}"
