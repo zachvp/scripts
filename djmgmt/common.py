@@ -5,9 +5,12 @@ import constants
 
 def configure_log(level=logging.DEBUG, filename='scripts') -> None:
     '''Standard log configuration.'''
-    split = os.path.splitext(filename)
-    if len(split) > 1:
-        filename = split[0]
+    print(f"dbg: name: {filename}")
+    if filename != 'scripts':
+        split = os.path.basename(filename)
+        split = os.path.splitext(split)
+        if len(split) > 1:
+            filename = split[0]
     
     logging.basicConfig(filename=f"logs/{filename}.log",
                         level=level,
