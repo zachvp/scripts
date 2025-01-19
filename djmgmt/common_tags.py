@@ -1,11 +1,15 @@
 from typing import Optional
 import mutagen
+import logging
 
 class Tags:
     def __init__(self, artist: Optional[str]=None, album: Optional[str]=None, title: Optional[str]=None):
         self.artist = artist
         self.album = album
         self.title = title
+    
+    def __str__(self) -> str:
+        return f"artist/album/title = {self.artist}/{self.album}/{self.title}"
 
 # DEV - Investigation
 # relevant_keys = {'genre', 'beatgrid', 'TENC', 'TOAL', 'TCOM', 'TDRC', 'USLT::eng', 'initialkey', 'TIT1', 'TCOP', 'TBPM', 'TOPE', 'cuepoints', 'TDRL', 'TSSE', 'TDEN', 'TPOS', 'WPUB', 'TSRC', 'artist', 'energy', 'TPE1', 'album', 'WOAF', 'TFLT', 'TDTG', 'key', 'metadata_block_picture', 'TCMP', 'TCON', 'PCNT', 'TALB', 'TDOR', 'comment', 'title', 'TPE2', 'TPE4', 'energylevel', 'TPUB', 'tracknumber', 'TLEN', 'TIT2'}
@@ -48,7 +52,7 @@ def get_track_key(track: mutagen.FileType, options: set[str]) -> Optional[str]:
             if o in track:
                 return o
     except ValueError as error:
-        print(f"error: unable to find key for track: {error}")
+        logging.error(f"unable to find key for track: {error}")
         return None
 
     return None
@@ -62,11 +66,11 @@ def read_tags(path: str) -> Optional[Tags]:
     try:
         track = mutagen.File(path)
     except mutagen.MutagenError as e:
-        print(f"mutagen.MutagenError:\n{e}\npath: '{path}'")
+        logging.error(f"mutagen.MutagenError:\n{e}\npath: '{path}'")
         return None
 
     if track is None or track.tags is None:
-        print(f"error: unable to read '{path}'")
+        logging.error(f"unable to read '{path}'")
         return None
 
     # pull keys based on what's present in each track
@@ -75,12 +79,12 @@ def read_tags(path: str) -> Optional[Tags]:
     album_key = get_track_key(track, album_keys)
 
     if title_key is None and artist_key is None and album_key is None:
-        print(f"error: unable to find any valid tags for '{path}'")
+        logging.error(f"unable to find any valid tags for '{path}'")
         return None
 
     # skip 'tracks' that don't contain both an artist and title
     if title_key not in track and artist_key not in track and album_key not in track:
-        print(f"error: unable to read any valid tags for '{path}'")
+        logging.error(f"unable to read any valid tags for '{path}'")
         return None
 
     # pull base tag info
@@ -97,3 +101,11 @@ def read_tags(path: str) -> Optional[Tags]:
         album = album[0]
 
     return Tags(str(artist), str(album), str(title))
+
+def basic_identifier(title: str, artist: str) -> str:
+    if not title:
+        title = 'none'
+    if not artist:
+        artist = 'none'
+    
+    return f"{artist} - {title}".strip().lower()

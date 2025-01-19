@@ -21,7 +21,44 @@ import logging
 
 import constants
 
-# Helper functions
+# command support
+class Namespace(argparse.Namespace):
+    # required
+    function: str
+    xml_collection_path: str
+    
+    # optional
+    output_path: str
+    root_path: str
+    metadata_path: bool
+    interactive: bool
+    force: bool
+    
+    # Script functions
+    FUNCTION_DATE_PATHS = 'date_paths'
+    FUNCTION_IDENTIFIERS = 'identifiers'
+    FUNCTION_FILENAMES = 'filenames'
+    FUNCTIONS = {FUNCTION_DATE_PATHS, FUNCTION_IDENTIFIERS, FUNCTION_FILENAMES}
+
+def parse_args(valid_functions: set[str]) -> type[Namespace]:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}.")
+    parser.add_argument('xml_collection_path', type=str, help='The rekordbox library path containing the DateAdded history.')
+    
+    parser.add_argument('--output-path', '-o', type=str, help='Write to this file path.')
+    parser.add_argument('--root-path', '-p', type=str, help='The path to use in place of the root path defined in the rekordbox xml.')
+    parser.add_argument('--metadata-path', '-m', action='store_true', help='Include artist and album in path.')
+    parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode.')
+    parser.add_argument('--force', action='store_true', help='Skip all interaction safeguards and run the script.')
+
+    args = parser.parse_args(namespace=Namespace)
+
+    if args.function not in valid_functions:
+        parser.error(f"invalid parameter '{args.function}'")
+
+    return args
+
+# helper functions
 def date_path(date: str, mapping: dict) -> str:
     '''Returns a date-formatted directory path string. e.g:
         YYYY/MM MONTH_NAME / DD
@@ -112,20 +149,6 @@ def dev_debug():
     u = full_path(t, '/ZVP-MUSIC/DJing/', constants.MAPPING_MONTH)
     logging.debug(u)
 
-# Classes
-class Namespace(argparse.Namespace):
-    # Script args
-    function: str
-    xml_collection_path: str
-    root_path: str
-    metadata_path: bool
-    interactive: bool
-    force: bool
-    
-    # Script functions
-    FUNCTION_DATE_PATHS = 'date-paths'
-    FUNCTIONS = {FUNCTION_DATE_PATHS}
-
 # Primary functions
 def generate_date_paths_cli(args: type[Namespace]) -> list[tuple[str, str]]:
     collection = find_node(args.xml_collection_path, constants.XPATH_COLLECTION)
@@ -204,37 +227,67 @@ def move_files(args: type[Namespace], path_mappings: list[str]) -> None:
 
         shutil.move(source, dest)
 
-def parse_args(valid_functions: set[str]) -> type[Namespace]:
-    parser = argparse.ArgumentParser()
-    parser.add_argument('function', type=str, help=f"The script function to run. One of: {valid_functions}.")
-    parser.add_argument('xml_collection_path', type=str, help='The rekordbox library path containing the DateAdded history.')
-    parser.add_argument('--root-path', '-p', type=str, help='The path to use in place of the root path defined in the rekordbox xml.')
-    parser.add_argument('--metadata-path', '-m', action='store_true', help='Include artist and album in path.')
-    parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode.')
-    parser.add_argument('--force', action='store_true', help='Skip all interaction safeguards and run the script.')
+def collect_identifiers(collection: ET.Element, playlist_ids: set[str] = set()) -> list[str]:
+    import common_tags
+    
+    identifiers: list[str] = []
+    
+    for node in collection:
+        node_syspath = collection_path_to_syspath(node.attrib[constants.ATTR_PATH])
+        # check if a playlist is provided
+        if playlist_ids and node.attrib[constants.ATTR_TRACK_ID] not in playlist_ids:
+            logging.debug(f"skip non-playlist track: '{node_syspath}'")
+            continue
+                    # load track tags, check for errors
+        tags = common_tags.read_tags(node_syspath)
+        if not tags or not tags.artist or not tags.title:
+            logging.error(f"incomplete tags: {tags}")
+            continue
+        
+        identifiers.append(common_tags.basic_identifier(tags.title, tags.artist))
+    
+    return identifiers
 
-    args = parser.parse_args(namespace=Namespace)
-
-    if args.function not in valid_functions:
-        parser.error(f"invalid parameter '{args.function}'")
-
-    return args
+def collect_filenames(collection: ET.Element, playlist_ids: set[str] = set()) -> list[str]:
+    names: list[str] = []
+    for node in collection:
+        node_syspath = collection_path_to_syspath(node.attrib[constants.ATTR_PATH])
+        # check if a playlist is provided
+        if playlist_ids and node.attrib[constants.ATTR_TRACK_ID] not in playlist_ids:
+            logging.debug(f"skip non-playlist track: '{node_syspath}'")
+            continue
+        name = os.path.basename(node_syspath)
+        name = os.path.splitext(name)[0]
+        names.append(name)
+    return names
 
 # MAIN
 if __name__ == '__main__':
-    # parse arguments
+    import common
+    
+    # setup
+    common.configure_log(level=logging.DEBUG, filename=__file__)
     script_args = parse_args(Namespace.FUNCTIONS)
 
     if script_args.root_path:
-        logging.info(f"args output root dir: '{script_args.root_path}'")
+        logging.info(f"args root path: '{script_args.root_path}'")
 
-    # check argument switches
-    if not script_args.interactive and not script_args.force:
-        main_choice = input("this is a destructive action, and interactive mode is disabled, continue? [y/N]")
-        if main_choice != 'y':
-            logging.info("exit: user quit")
-            sys.exit()
-
-    logging.info(f"running organize('{script_args.xml_collection_path}')")
     if script_args.function == Namespace.FUNCTION_DATE_PATHS:
         print(get_pipe_output(generate_date_paths_cli(script_args)))
+    elif script_args.function == Namespace.FUNCTION_IDENTIFIERS or script_args.function == Namespace.FUNCTION_FILENAMES:
+        pruned = find_node(script_args.xml_collection_path, constants.XPATH_PRUNED)
+        collection = find_node(script_args.xml_collection_path, constants.XPATH_COLLECTION)
+        
+        # collect the playlist IDs
+        playlist_ids: set[str] = set()
+        for track in pruned:
+            playlist_ids.add(track.attrib[constants.ATTR_KEY])
+        if script_args.function == Namespace.FUNCTION_IDENTIFIERS:
+            items = collect_identifiers(collection, playlist_ids)
+        else:
+            items = collect_filenames(collection, playlist_ids)
+        
+        items.sort()
+        lines = [f"{id}\n" for id in items]
+        with open(script_args.output_path, 'w', encoding='utf-8') as file:
+            file.writelines(lines)

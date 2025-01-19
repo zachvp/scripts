@@ -15,7 +15,7 @@ def output_missing_tracks(playlist_ids: set[str], collection: ET.Element) -> lis
 
     for track in collection:
         if track.attrib[constants.ATTR_TRACK_ID] not in playlist_ids:
-            item = f"{track.attrib[constants.ATTR_NAME]}\t{track.attrib[constants.ATTR_ARTIST]}"
+            item = f"{track.attrib[constants.ATTR_TITLE]}\t{track.attrib[constants.ATTR_ARTIST]}"
             item = f"{item}\t{track.attrib[constants.ATTR_GENRE]}\t{track.attrib[constants.ATTR_DATE_ADDED]}"
             readout.append(item)
 

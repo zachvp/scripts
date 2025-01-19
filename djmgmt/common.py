@@ -3,9 +3,12 @@ import os
 
 import constants
 
-def configure_log(level=logging.DEBUG) -> None:
+def configure_log(level=logging.DEBUG, filename='scripts') -> None:
     '''Standard log configuration.'''
-    filename = 'scripts'
+    split = os.path.splitext(filename)
+    if len(split) > 1:
+        filename = split[0]
+    
     logging.basicConfig(filename=f"logs/{filename}.log",
                         level=level,
                         format="%(asctime)s [%(levelname)s] %(message)s",

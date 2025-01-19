@@ -33,7 +33,7 @@ RSYNC_URL = f"{RSYNC_PROTOCOL}{COREVEGA_USER}@{COREVEGA_HOST}:{RSYNC_PORT}"
 # Rekordbox
 ATTR_DATE_ADDED = 'DateAdded'
 ATTR_PATH = 'Location'
-ATTR_NAME = 'Name'
+ATTR_TITLE = 'Name'
 ATTR_ARTIST = 'Artist'
 ATTR_ALBUM = 'Album'
 ATTR_GENRE = 'Genre'

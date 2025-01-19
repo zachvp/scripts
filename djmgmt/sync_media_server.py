@@ -288,7 +288,7 @@ def key_date_context(mapping: tuple[str, str]) -> str:
 
 if __name__ == '__main__':
     # setup
-    common.configure_log(level=logging.DEBUG)
+    common.configure_log(level=logging.DEBUG, filename=__file__)
     script_args = parse_args(Namespace.MODES)
     
     if script_args.mode in {Namespace.MODE_COPY, Namespace.MODE_MOVE}:

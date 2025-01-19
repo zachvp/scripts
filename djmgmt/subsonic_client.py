@@ -107,7 +107,7 @@ class API:
 
 if __name__ == '__main__':
     # setup
-    common.configure_log()
+    common.configure_log(logging.DEBUG)
     
     # DEV testing
     endpoint = API.PING
