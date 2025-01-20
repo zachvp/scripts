@@ -35,7 +35,7 @@ FILE_SYNC_KEY = 'sync_date'
 class Namespace(argparse.Namespace):
     # Script Arguments
     ## Required
-    mode: str
+    function: str
     input: str
     output: str
     
@@ -43,11 +43,11 @@ class Namespace(argparse.Namespace):
     path_0: str
     
     # Script modes
-    MODE_COPY = 'copy'
-    MODE_MOVE = 'move'
-    MODE_SYNC = 'sync'
+    FUNCTION_COPY = 'copy'
+    FUNCTION_MOVE = 'move'
+    FUNCTION_SYNC = 'sync'
 
-    MODES = {MODE_COPY, MODE_MOVE, MODE_SYNC}
+    FUNCTIONS = {FUNCTION_COPY, FUNCTION_MOVE, FUNCTION_SYNC}
 
 def parse_args(valid_modes: set[str]) -> type[Namespace]:
     ''' Returns the parsed command-line arguments.
@@ -56,7 +56,7 @@ def parse_args(valid_modes: set[str]) -> type[Namespace]:
         valid_modes -- defines the supported script modes
     '''
     parser = argparse.ArgumentParser()
-    parser.add_argument('mode', type=str, help=f"The mode to apply for the function. One of '{valid_modes}'.")
+    parser.add_argument('function', type=str, help=f"The mode to apply for the function. One of '{valid_modes}'.")
     parser.add_argument('input', type=str, help="The top level directory to search.\
         It's expected to be structured in a year/month/audio.file format.")
     parser.add_argument('output', type=str, help="The output directory to populate.")
@@ -66,8 +66,8 @@ def parse_args(valid_modes: set[str]) -> type[Namespace]:
     args.input = os.path.normpath(args.input)
     args.output = os.path.normpath(args.output)
 
-    if args.mode not in valid_modes:
-        parser.error(f"Invalid mode: '{args.mode}'")
+    if args.function not in valid_modes:
+        parser.error(f"Invalid mode: '{args.function}'")
 
     return args
 
@@ -102,12 +102,12 @@ def sync_from_path(args: type[Namespace]):
 
     # Assign the action based on the given mode.
     action: Callable[[str, str], None] = lambda x, y : print(f"dummy: {x}, {y}")
-    if args.mode == Namespace.MODE_COPY:
+    if args.function == Namespace.FUNCTION_COPY:
         action = shutil.copy
-    elif args.mode == Namespace.MODE_MOVE:
+    elif args.function == Namespace.FUNCTION_MOVE:
         action = shutil.move
     else:
-        print(f"error: unrecognized mode: {args.mode}. Exiting.")
+        print(f"error: unrecognized mode: {args.function}. Exiting.")
         return
 
     # Performs the configured action for each input and output path
@@ -119,7 +119,7 @@ def sync_from_path(args: type[Namespace]):
             print(f"info: skip: output path exists: '{output_path_full}'")
             continue
         input_path_full = os.path.join(args.input, path)
-        print(f"info: {args.mode}: '{input_path_full}' -> {output_path_full}")
+        print(f"info: {args.function}: '{input_path_full}' -> {output_path_full}")
 
         # Notify the user if the current date context is different from the previous date context,
         date_context = '/'.join(os.path.split(path)[:3]) # format: 'year/month/day'
@@ -195,7 +195,7 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
         transfer_files(transfer_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
         
         # tell the media server new files are available
-        response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {'fullScan': 'true'})
+        response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {'fullScan': 'false'})
         if response.ok:
             # wait until the server has stopped scanning
             while True:
@@ -227,7 +227,7 @@ def is_processed(date_context: str, date_context_previous: str) -> bool:
 def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
     # core data
     batch: list[tuple[str, str]] = []
-    source_previous, dest_previous = mappings[0][0], mappings[0][1]
+    source_previous, dest_previous = mappings[0]
     date_context, source, dest = '', '', ''
     index = 0
     
@@ -237,17 +237,22 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
     
     # process the file mappings
     logging.debug(f"sync '{len(mappings)}' mappings:\n{mappings}")
+    
     for index, mapping in enumerate(mappings):
-        source, dest = mapping[0], mapping[1]
+        source, dest = mapping
         date_context_previous = common.find_date_context(dest_previous)
         date_context = common.find_date_context(dest)
         
-        # validate date contexts
-        if not date_context_previous:
-            logging.error(f"no previous date context in path '{date_context_previous}'")
+        # validate date contexts        
+        if date_context_previous:
+            date_context_previous = date_context_previous[0]
+        else:
+            logging.error(f"no previous date context in path '{dest_previous}'")
             break
-        if not date_context:
-            logging.error(f"no date context in path '{date_context}'")
+        if date_context:
+            date_context = date_context[0]
+        else:
+            logging.error(f"no date context in path '{dest}'")
             break
         
         # skip processed dates
@@ -275,6 +280,8 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
     
     # process the final batch
     if batch and date_context and source and dest:
+        if isinstance(date_context, tuple):
+            date_context = date_context[0]
         logging.info(f"processing batch in date context '{date_context}'")
         sync_batch(batch, date_context, source, dest)
         with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
@@ -284,14 +291,15 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
 
 def key_date_context(mapping: tuple[str, str]) -> str:
     date_context = common.find_date_context(mapping[1])
-    return date_context if date_context else ''
+    return date_context[0] if date_context else ''
 
 if __name__ == '__main__':
     # setup
     common.configure_log(level=logging.DEBUG, filename=__file__)
-    script_args = parse_args(Namespace.MODES)
+    script_args = parse_args(Namespace.FUNCTIONS)
     
-    if script_args.mode in {Namespace.MODE_COPY, Namespace.MODE_MOVE}:
+    logging.info(f"running function '{script_args.function}'")
+    if script_args.function in {Namespace.FUNCTION_COPY, Namespace.FUNCTION_MOVE}:
         sync_from_path(script_args)
     else:
         import organize_library_dates as library

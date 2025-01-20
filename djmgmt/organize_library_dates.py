@@ -20,6 +20,7 @@ import argparse
 import logging
 
 import constants
+import common
 
 # command support
 class Namespace(argparse.Namespace):
@@ -185,9 +186,16 @@ def generate_date_paths(collection: ET.Element,
 
         track_path_new = full_path(node, constants.REKORDBOX_ROOT, constants.MAPPING_MONTH, include_metadata=metadata_path)
         track_path_new = collection_path_to_syspath(track_path_new)
+        
+        # transform the new path to use the given root path
         if root_path:
             track_path_new = swap_root(track_path_new, swap_root_path, root_path)
-
+            context = common.find_date_context(track_path_new)
+            
+            # remove any intermediary subdirectories
+            if context:
+                track_path_new = common.remove_subpath(track_path_new, root_path, context[1])
+            
         paths.append((track_path_old, track_path_new))
             
     return paths
@@ -263,8 +271,6 @@ def collect_filenames(collection: ET.Element, playlist_ids: set[str] = set()) ->
 
 # MAIN
 if __name__ == '__main__':
-    import common
-    
     # setup
     common.configure_log(level=logging.DEBUG, filename=__file__)
     script_args = parse_args(Namespace.FUNCTIONS)

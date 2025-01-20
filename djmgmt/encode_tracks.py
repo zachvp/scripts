@@ -137,9 +137,11 @@ def guess_cover_stream_specifier(streams: list[dict[str, Any]]) -> int:
         if width / height >  threshold or height / width > threshold:
             logging.debug(f"found non-square video content at index {index}")
             continue
-        if 'comment' in stream['tags'] and 'logotype' in stream['tags']['comment'].lower():
+        if 'tags' in stream and 'comment' in stream['tags'] and 'logotype' in stream['tags']['comment'].lower():
             logging.debug(f"found non-cover video content at index {index}: '{stream['tags']['comment']}")
             continue
+        if width == height and width == 849:
+            return -2
         if diff < min_diff:
             min_diff = diff
             min_index = index
@@ -377,9 +379,10 @@ def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: 
         logging.debug(f"ran {len(tasks)} tasks")
         tasks.clear()
 
-def run_missing_art_tasks(loop: AbstractEventLoop, tasks: list[tuple[str, Task[tuple[int, str]]]], output_path: str):
+def run_missing_art_tasks(loop: AbstractEventLoop, tasks: list[tuple[str, Task[tuple[int, str]]]]) -> list[str]:
     import json
     
+    results: list[str] = []
     run_tasks = [task[1] for task in tasks]
     loop.run_until_complete(collect_tasks(run_tasks))
     logging.debug(f"ran {len(run_tasks)} tasks")
@@ -391,21 +394,19 @@ def run_missing_art_tasks(loop: AbstractEventLoop, tasks: list[tuple[str, Task[t
     
         if cover_stream > -1:
             logging.info(f"guessed cover image in stream: {cover_stream}")
+        elif cover_stream == -2:
+            logging.info(f"found potential placeholder cover for '{source}'")
         else:
             logging.info(f"no cover image found for '{source}'")
-            with open(output_path, 'a', encoding='utf-8') as file:
-                file.write(f"{os.path.basename(source)}\n")
-    tasks.clear()
+            results.append(source)
+    return results
 
-def find_missing_art(collection_file_path: str, output_path: str, collection_xpath: str, playlist_xpath: str, threads=24):
+def find_missing_art(collection_file_path: str, collection_xpath: str, playlist_xpath: str, threads=24) -> list[str]:
     import organize_library_dates as library
-    
-    # clear the output file
-    with open(output_path, 'w', encoding='utf-8'):
-        pass
     
     collection = library.find_node(collection_file_path, collection_xpath)
     playlist = library.find_node(collection_file_path, playlist_xpath)
+    missing: list[str] = []
     
     # collect the playlist IDs
     tasks: list[tuple[str, Task[tuple[int, str]]]] = []
@@ -423,14 +424,16 @@ def find_missing_art(collection_file_path: str, output_path: str, collection_xpa
         tasks.append((source, task))
         logging.debug(f"add task: {len(tasks)}")
         if len(tasks) > threads - 1:
-            run_missing_art_tasks(loop, tasks, output_path)
+            missing += run_missing_art_tasks(loop, tasks)
+            tasks.clear()
     
     # run remaining tasks
-    run_missing_art_tasks(loop, tasks, output_path)
+    missing += run_missing_art_tasks(loop, tasks)
+    return missing
 
 # Main
 if __name__ == '__main__':
-    common.configure_log(level=logging.DEBUG)
+    common.configure_log(level=logging.DEBUG, filename=__file__)
     script_args = parse_args(Namespace.FUNCTIONS)
     
     if script_args.function == Namespace.FUNCTION_LOSSLESS:
@@ -439,6 +442,11 @@ if __name__ == '__main__':
         encode_lossy_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_MISSING_ART:
         # TODO: add timing
-        find_missing_art(script_args.input, script_args.output, constants.XPATH_COLLECTION, constants.XPATH_PRUNED, threads=72)
-            
+        # clear the output file
+        missing = find_missing_art(script_args.input, constants.XPATH_COLLECTION, constants.XPATH_PRUNED, threads=72)
+        missing = [f"{os.path.splitext(os.path.basename(m))[0]}\n" for m in missing]
+        missing.sort()
+        with open(script_args.output, 'w', encoding='utf-8') as file:
+            file.writelines(missing)
+        
             

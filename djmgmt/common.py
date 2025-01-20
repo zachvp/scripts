@@ -5,7 +5,6 @@ import constants
 
 def configure_log(level=logging.DEBUG, filename='scripts') -> None:
     '''Standard log configuration.'''
-    print(f"dbg: name: {filename}")
     if filename != 'scripts':
         split = os.path.basename(filename)
         split = os.path.splitext(split)
@@ -46,10 +45,10 @@ def raise_exception(error: Exception):
     logging.exception(error)
     raise error
 
-def find_date_context(path: str) -> str | None:
-    '''Extracts the date subpath from the input path.
+def find_date_context(path: str) -> tuple[str, int] | None:
+    '''Extracts the date subpath and start path component index from the input path.
     Example path: '/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'
-    Example output: '2022/04 april/24'
+    Example output: '2022/04 april/24', 3
     '''
     # Edge case: '/Users/zachvp/developer/test-private/data/tracks-output/2024/08 august/18/Paolo Mojo/1983/159678_1983_(Eric_Prydz_Remix).aiff'
     components = path.split(os.sep)
@@ -75,11 +74,28 @@ def find_date_context(path: str) -> str | None:
     if len(context) != 3:
         return None
     
-    return '/'.join(context)
+    return (os.sep.join(context), found['y'])
+
+def remove_subpath(path: str, preserve_root: str, preserve_index: int) -> str:
+    '''Given a path, removes the intermediary path components after the root and before the preserve index.'''
+    transformed = path.split(os.sep)
+    removals = [i for i in range(preserve_index)]
+    for _ in removals:
+        del transformed[0]
+    return f"{os.path.join(preserve_root, os.sep.join(transformed))}"
+
+def remove_substring(source: str, start_inclusive: int, end_exclusive: int) -> str:
+    assert start_inclusive < end_exclusive, f"invalid start, end: '{start_inclusive}', '{end_exclusive}'"
+    return f"{source[:start_inclusive]}{source[end_exclusive:]}"
 
 # Development
 def dev_testing():
-    pass
+    # print(remove_substring('0123456789', 2, 8))
+    source = '/Users/zachvp/developer/test-private/data/tracks-output/_parental jams/blah/foo/2023/05 may/27/Carlos Santana/Supernatural/01 (Da Le) Yaleo.mp3'
+    # print(find_date_context(source))
+    date_context = find_date_context(source)
+    if date_context:
+        print(remove_subpath(source, '/Users/zachvp/developer/test-private/data/tracks-output', date_context[1]))
     # print(find_date_context('/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3', ''))
 
 # dev_testing()
