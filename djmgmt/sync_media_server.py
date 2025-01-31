@@ -167,7 +167,7 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tu
     
     logging.info(f"transfer from '{source_path}' to '{dest_address}'")
     
-    options = "--progress -auvziR --exclude '.*'"
+    options = "--progress -auvzitR --exclude '.*'"
     command = shlex.split(f"rsync {shlex.quote(source_path)} {dest_address}/{rsync_module} {options}")
     try:
         logging.debug(f'run command: "{shlex.join(command)}"')
@@ -191,11 +191,11 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
     
     # transfer batch to the media server
     transfer_path = transform_implied_path(dest)
-    if transfer_path: 
+    if transfer_path:
         transfer_files(transfer_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
         
         # tell the media server new files are available
-        response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {'fullScan': 'false'})
+        response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {'fullScan': 'true'})
         if response.ok:
             # wait until the server has stopped scanning
             while True:
@@ -274,7 +274,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
                 state.write(f"{FILE_SYNC_KEY}: {date_context_previous}")
             logging.debug(f"add to batch: {mapping}")
             logging.info(f"processed batch in date context '{date_context_previous}'")
-            logging.info(f"sync progress: {progressFormat(index)}")
+            logging.info(f"sync progress: {progressFormat(index + 1)}")
         source_previous = source
         dest_previous = dest
     
@@ -287,7 +287,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
         with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
             state.write(f"{FILE_SYNC_KEY}: {date_context}")
         logging.info(f"processed batch in date context '{date_context}'")
-        logging.info(f"sync progress: {progressFormat(index)}")
+        logging.info(f"sync progress: {progressFormat(index + 1)}")
 
 def key_date_context(mapping: tuple[str, str]) -> str:
     date_context = common.find_date_context(mapping[1])
