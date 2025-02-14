@@ -13,7 +13,50 @@ import os
 import shutil
 import zipfile
 
+# classes
+class Namespace(argparse.Namespace):
+    # arguments
+    function : str
+    input: str
+    output: str
+    interactive: bool
+    
+    # functions
+    FUNCTION_SWEEP = 'sweep'
+    FUNCTION_FLATTEN = 'flatten'
+    FUNCTION_EXTRACT = 'extract'
+    FUNCTION_COMPRESS = 'compress'
+    FUNCTION_PRUNE = 'prune'
+    FUNCTION_PROCESS = 'process'
+    
+    FUNCTIONS_SINGLE_ARG = {FUNCTION_COMPRESS, FUNCTION_FLATTEN, FUNCTION_PRUNE}
+    FUNCTIONS = {FUNCTION_SWEEP, FUNCTION_EXTRACT, FUNCTION_PROCESS}.union(FUNCTIONS_SINGLE_ARG)
+
 # Helper functions
+def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> type[Namespace]:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('function', type=str, help=f"Which script function to run. One of '{valid_functions}'.\
+        The following functions only require a single argument: '{single_arg_functions}'.")
+    parser.add_argument('input', type=str, help='The input directory to sweep.')
+    parser.add_argument('output', nargs='?', type=str, help='The output directory to place the swept tracks.')
+    parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode')
+
+    args = parser.parse_args(namespace=Namespace)
+
+    if args.function not in valid_functions:
+        parser.error(f"invalid function '{args.function}'")
+    if not args.output and args.function not in single_arg_functions:
+        parser.error(f"the 'output' parameter is required for function '{args.function}'")
+
+    args.input = os.path.normpath(args.input)
+
+    if args.output:
+        args.output = os.path.normpath(args.output)
+    else:
+        args.output = os.path.normpath(args.input)
+
+    return args
+
 def compress_dir(input_path: str, output_path: str):
     with zipfile.ZipFile(output_path + '.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
         for working_dir, _, names in os.walk(input_path):
@@ -68,7 +111,7 @@ def is_empty_dir(top: str) -> bool:
         if path.startswith('.') or os.path.isdir(os.path.join(top, path)):
             files += 1
 
-    print(f"{files} == {len(paths)}")
+    print(f"{files} == {len(paths)}?")
     return files == len(paths)
 
 def get_dirs(top: str) -> list[str]:
@@ -84,13 +127,13 @@ def get_dirs(top: str) -> list[str]:
     return dirs
 
 # Primary functions
-def sweep(args: argparse.Namespace, valid_extensions: set[str], prefix_hints: set[str]) -> None:
-    for working_dir, directories, filenames in os.walk(args.input):
+def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> None:
+    for working_dir, directories, filenames in os.walk(source):
         prune(working_dir, directories, filenames)
 
         for name in filenames:
             input_path = os.path.join(working_dir, name)
-            output_path = os.path.join(args.output, name)
+            output_path = os.path.join(output, name)
             name_split = os.path.splitext(name)
 
             if os.path.exists(output_path):
@@ -124,7 +167,7 @@ def sweep(args: argparse.Namespace, valid_extensions: set[str], prefix_hints: se
 
             if name_split[1] in valid_extensions or is_valid_archive:
                 print(f"info: filter matched file '{input_path}'")
-                if args.interactive:
+                if interactive:
                     print(f"info: move from '{input_path}' to '{output_path}'")
                     choice = input('Continue? [y/N/q]')
                     if choice == 'q':
@@ -135,18 +178,22 @@ def sweep(args: argparse.Namespace, valid_extensions: set[str], prefix_hints: se
                         continue
                 shutil.move(input_path, output_path)
     print("swept all files")
+    
 
-def flatten_hierarchy(args: argparse.Namespace) -> None:
-    for working_dir, directories, filenames in os.walk(args.input):
+def sweep_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
+    sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
+
+def flatten_hierarchy(source: str, output: str, interactive: bool) -> None:
+    for working_dir, directories, filenames in os.walk(source):
         prune(working_dir, directories, filenames)
 
         for name in filenames:
             input_path = os.path.join(working_dir, name)
-            output_path = os.path.join(args.output, name)
+            output_path = os.path.join(output, name)
 
             if not os.path.exists(output_path):
                 print(f"move '{input_path}' to '{output_path}'")
-                if args.interactive:
+                if interactive:
                     choice = input('Continue? [y/N/q]')
                     if choice == 'q':
                         print('info: user quit')
@@ -164,8 +211,11 @@ def flatten_hierarchy(args: argparse.Namespace) -> None:
             else:
                 print(f"info: skip: {input_path}")
 
-def extract(args: argparse.Namespace) -> None:
-    for working_dir, directories, filenames in os.walk(args.input):
+def flatten_hierarchy_cli(args: type[Namespace]) -> None:
+    flatten_hierarchy(args.input, args.output, args.interactive)
+
+def extract(source: str, output: str, interactive: bool) -> None:
+    for working_dir, directories, filenames in os.walk(source):
         prune(working_dir, directories, filenames)
 
         for name in filenames:
@@ -173,14 +223,14 @@ def extract(args: argparse.Namespace) -> None:
             name_split = os.path.splitext(name)
             if name_split[1] == '.zip':
                 zip_input_path = os.path.join(working_dir, name)
-                zip_output_path = os.path.join(args.output, name_split[0])
+                zip_output_path = os.path.join(output, name_split[0])
 
                 if os.path.exists(zip_output_path) and os.path.isdir(zip_output_path):
                     print(f"info: skip: existing ouput path '{zip_output_path}'")
                     continue
 
-                print(f"info: extract {zip_input_path} to {args.output}")
-                if args.interactive:
+                print(f"info: extract {zip_input_path} to {output}")
+                if interactive:
                     choice = input('Continue? [y/N/q]')
                     if choice == 'q':
                         print('info: user quit')
@@ -189,17 +239,20 @@ def extract(args: argparse.Namespace) -> None:
                         print(f"info: skip: {input_path}")
                         continue
                 with zipfile.ZipFile(zip_input_path, 'r') as file:
-                    file.extractall(os.path.normpath(args.output))
+                    file.extractall(os.path.normpath(output))
             else:
                 print(f"info: skip: non-zip file '{input_path}'")
 
-def compress_all(args: argparse.Namespace) -> None:
+def extract_cli(args: type[Namespace]) -> None:
+    extract(args.input, args.output, args.interactive)
+
+def compress_all(args: type[Namespace]) -> None:
     for working_dir, directories, _ in os.walk(args.input):
         for directory in directories:
             # print(f"dbg: {os.path.join(working_dir, directory), os.path.join(args.output, directory)}")
             compress_dir(os.path.join(working_dir, directory), os.path.join(args.output, directory))
 
-def prune_empty(args: argparse.Namespace) -> None:
+def prune_empty(args: type[Namespace]) -> None:
     search_dirs : list[str] = []
     pruned : set[str] = set()
 
@@ -234,53 +287,29 @@ def prune_empty(args: argparse.Namespace) -> None:
 
     print(f"search_dirs, end: {search_dirs}")
 
-def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument('function', type=str, help=f"Which script function to run. One of '{valid_functions}'.\
-        The following functions only require a single argument: '{single_arg_functions}'.")
-    parser.add_argument('input', type=str, help='The input directory to sweep.')
-    parser.add_argument('output', nargs='?', type=str, help='The output directory to place the swept tracks.')
-    parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode')
-
-    args = parser.parse_args()
-
-    if args.function not in valid_functions:
-        parser.error(f"invalid function '{args.function}'")
-    if not args.output and args.function not in single_arg_functions:
-        parser.error(f"the 'output' parameter is required for function '{args.function}'")
-
-    args.input = os.path.normpath(args.input)
-
-    if args.output:
-        args.output = os.path.normpath(args.output)
-    else:
-        args.output = os.path.normpath(args.input)
-
-    return args
+def process(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
+    sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
+    extract(args.output, args.output, args.interactive)
+    flatten_hierarchy(args.output, args.output, args.interactive)
 
 if __name__ == '__main__':
     # CONSTANTS
-    FUNCTION_SWEEP = 'sweep'
-    FUNCTION_FLATTEN = 'flatten'
-    FUNCTION_EXTRACT = 'extract'
-    FUNCTION_COMPRESS = 'compress'
-    FUNCTION_PRUNE = 'prune'
-    FUNCTIONS_SINGLE_ARG = {FUNCTION_COMPRESS, FUNCTION_FLATTEN, FUNCTION_PRUNE}
-    FUNCTIONS = {FUNCTION_FLATTEN, FUNCTION_SWEEP, FUNCTION_EXTRACT}.union(FUNCTIONS_SINGLE_ARG)
     EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', 'flac'}
     PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
 
     # parse arguments
-    script_args = parse_args(FUNCTIONS, FUNCTIONS_SINGLE_ARG)
+    script_args = parse_args(Namespace.FUNCTIONS, Namespace.FUNCTIONS_SINGLE_ARG)
     print(f"will execute: '{script_args.function}'")
 
-    if script_args.function == FUNCTION_SWEEP:
-        sweep(script_args, EXTENSIONS, PREFIX_HINTS)
-    elif script_args.function == FUNCTION_FLATTEN:
-        flatten_hierarchy(script_args)
-    elif script_args.function == FUNCTION_EXTRACT:
-        extract(script_args)
-    elif script_args.function == FUNCTION_COMPRESS:
+    if script_args.function == Namespace.FUNCTION_SWEEP:
+        sweep_cli(script_args, EXTENSIONS, PREFIX_HINTS)
+    elif script_args.function == Namespace.FUNCTION_FLATTEN:
+        flatten_hierarchy_cli(script_args)
+    elif script_args.function == Namespace.FUNCTION_EXTRACT:
+        extract_cli(script_args)
+    elif script_args.function == Namespace.FUNCTION_COMPRESS:
         compress_all(script_args)
-    elif script_args.function == FUNCTION_PRUNE:
+    elif script_args.function == Namespace.FUNCTION_PRUNE:
         prune_empty(script_args)
+    elif script_args.function == Namespace.FUNCTION_PROCESS:
+        process(script_args, EXTENSIONS, PREFIX_HINTS)
