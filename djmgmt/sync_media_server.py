@@ -214,14 +214,13 @@ def is_processed(date_context: str, date_context_previous: str) -> bool:
         saved_state = state.readline()
         if saved_state:
             date_context_processed = saved_state.split(':')[1].strip()
-    if date_context_processed and date_context_processed == date_context:
-        if date_context_processed:
-            if date_context < date_context_processed:
-                logging.info(f"already processed date context: {date_context}")
-                return True
-            elif date_context_previous < date_context_processed:
-                logging.info(f"already processed date context: {date_context_previous}")
-                return True
+    if date_context_processed:
+        if date_context <= date_context_processed and date_context_previous <= date_context_processed:
+            logging.info(f"already processed date contexts: {date_context_previous}, {date_context}")
+            return True
+        # elif :
+        #     logging.info(f"already processed date context: {date_context_previous}")
+        #     return True
     return False
 
 def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
@@ -256,25 +255,25 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
             break
         
         # skip processed dates
-        if is_processed(date_context, date_context_previous):
-            continue
-        
-        # collect each mapping in a given date context
-        if date_context_previous == date_context:
-            batch.append(mapping)
-            logging.debug(f"add to batch: {mapping}")
-        else:
-            logging.info(f"processing batch in date context '{date_context_previous}'")
-            sync_batch(batch, date_context_previous, source_previous, dest_previous)
-            batch.clear()
-            batch.append(mapping) # add the first mapping of the new context
-            
-            # persist the processed date context
-            with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
-                state.write(f"{FILE_SYNC_KEY}: {date_context_previous}")
-            logging.debug(f"add to batch: {mapping}")
-            logging.info(f"processed batch in date context '{date_context_previous}'")
-            logging.info(f"sync progress: {progressFormat(index + 1)}")
+        if not is_processed(date_context, date_context_previous):
+            # collect each mapping in a given date context
+            if date_context_previous == date_context:
+                batch.append(mapping)
+                logging.debug(f"add to batch: {mapping}")
+            elif batch:
+                logging.info(f"processing batch in date context '{date_context_previous}'")
+                sync_batch(batch, date_context_previous, source_previous, dest_previous)
+                batch.clear()
+                batch.append(mapping) # add the first mapping of the new context
+                
+                # persist the processed date context
+                with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
+                    state.write(f"{FILE_SYNC_KEY}: {date_context_previous}")
+                logging.debug(f"add to batch: {mapping}")
+                logging.info(f"processed batch in date context '{date_context_previous}'")
+                logging.info(f"sync progress: {progressFormat(index + 1)}")
+            else:
+                logging.info(f"skip empty batch: {date_context_previous}")
         source_previous = source
         dest_previous = dest
     
