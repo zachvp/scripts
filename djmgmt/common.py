@@ -82,7 +82,7 @@ def remove_subpath(path: str, preserve_root: str, preserve_index: int) -> str:
     removals = [i for i in range(preserve_index)]
     for _ in removals:
         del transformed[0]
-    return f"{os.path.join(preserve_root, os.sep.join(transformed))}"
+    return os.path.join(preserve_root, os.sep.join(transformed))
 
 def remove_substring(source: str, start_inclusive: int, end_exclusive: int) -> str:
     assert start_inclusive < end_exclusive, f"invalid start, end: '{start_inclusive}', '{end_exclusive}'"

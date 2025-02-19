@@ -218,9 +218,6 @@ def is_processed(date_context: str, date_context_previous: str) -> bool:
         if date_context <= date_context_processed and date_context_previous <= date_context_processed:
             logging.info(f"already processed date contexts: {date_context_previous}, {date_context}")
             return True
-        # elif :
-        #     logging.info(f"already processed date context: {date_context_previous}")
-        #     return True
     return False
 
 def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:

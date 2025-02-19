@@ -179,7 +179,6 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
                 shutil.move(input_path, output_path)
     print("swept all files")
     
-
 def sweep_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
     sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
 
