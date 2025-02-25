@@ -6,6 +6,7 @@ import os
 import argparse
 from collections import defaultdict
 import xml.etree.ElementTree as ET
+from collections.abc import Collection
 import organize_library_dates as ORG
 import constants
 
@@ -24,7 +25,7 @@ def output_missing_tracks(playlist_ids: set[str], collection: ET.Element) -> lis
     return readout
 
 # print the genre and count for all tracks in the given file
-def output_genres_verbose(playlist_ids: set[str], collection: ET.Element) -> list[str]:
+def output_genres_long(playlist_ids: set[str], collection: ET.Element) -> list[str]:
     readout: dict[str, int] = defaultdict(int)
     lines: list[str] = []
 
@@ -66,15 +67,18 @@ def output_genres_short(playlist_ids: set[str], collection: ET.Element) -> list[
         print(line)
     return lines
 
-def output_genre_category(playlist_ids: set[str], collection: ET.Element) -> set[str]:
-    categories: set[str] = set()
+def output_genre_category(playlist_ids: set[str], collection: ET.Element) -> list[str]:
+    categories: Collection[str] = set()
 
     for track in collection:
         if track.attrib[constants.ATTR_TRACK_ID] in playlist_ids:
             genre_elements = track.attrib[constants.ATTR_GENRE].split('/')
             for e in genre_elements:
+                if len(e) == 0:
+                    continue
                 categories.add(e)
 
+    categories = sorted(categories)
     for c in categories:
         print(c)
     return categories
@@ -159,8 +163,8 @@ def script(args: argparse.Namespace) -> None:
     # call requested script mode
     if args.mode == MODE_SHORT:
         output_genres_short(playlist_ids, collection)
-    elif args.mode == MODE_VERBOSE:
-        output_genres_verbose(playlist_ids, collection)
+    elif args.mode == MODE_LONG:
+        output_genres_long(playlist_ids, collection)
     elif args.mode == MODE_MISSING:
         output_missing_tracks(playlist_ids, collection)
     elif args.mode == MODE_CATEGORY:
@@ -172,7 +176,7 @@ def script(args: argparse.Namespace) -> None:
 
 # constants
 MODE_SHORT = 'short'
-MODE_VERBOSE = 'verbose'
+MODE_LONG = 'long'
 MODE_MISSING = 'missing'
 MODE_CATEGORY = 'category'
 MODE_RENAMED = 'renamed'
@@ -181,7 +185,7 @@ MODE_PATHS = 'paths'
 if __name__ == '__main__':
     MODES: set[str] = {
         MODE_SHORT,
-        MODE_VERBOSE,
+        MODE_LONG,
         MODE_MISSING,
         MODE_CATEGORY,
         MODE_RENAMED,
