@@ -137,6 +137,7 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
     for working_dir, _, filenames in os.walk(source):
 
         for name in filenames:
+            # loop state
             input_path = os.path.join(working_dir, name)
             output_path = os.path.join(output, name)
             name_split = os.path.splitext(name)
@@ -145,16 +146,21 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
                 logging.info(f"skip: path '{output_path}' exists in destination")
                 continue
 
+            # handle zip archive
             is_valid_archive = False
             if name_split[1] == '.zip':                
                 is_valid_archive = True
-                music_files = 0
+                valid_files = 0
+                
+                # inspect zip archive to determine if this is likely a music container
                 if not is_prefix_match(name, prefix_hints):
                     with zipfile.ZipFile(input_path) as archive:
                         for archive_file in archive.namelist():
                             if not is_valid_archive:
+                                logging.debug(f"invalid archive: '{input_path}''")
                                 break
 
+                            # ignore archive that contains an app
                             filepath_split = os.path.split(archive_file)
                             for f in filepath_split:
                                 if '.app' in os.path.splitext(f)[1]:
@@ -162,13 +168,16 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
                                     is_valid_archive = False
                                     break
                             
+                            # only the given valid extensions and images are allowed
                             file_ext = os.path.splitext(archive_file)[1]
                             if file_ext in valid_extensions:
-                                music_files += 1
+                                valid_files += 1
                             else:
                                 is_valid_archive &= file_ext in {'.jpg', '.png', 'jpeg'}
-                    is_valid_archive &= music_files > 0
+                    is_valid_archive &= valid_files > 0
+                    logging.debug(f"archive '{input_path}' valid = '{is_valid_archive}'")
 
+            # move input file if it has a supported extension or is a valid archive
             if name_split[1] in valid_extensions or is_valid_archive:
                 logging.info(f"filter matched file '{input_path}'")
                 if interactive:
@@ -208,7 +217,6 @@ def flatten_hierarchy(source: str, output: str, interactive: bool) -> None:
                     if error.filename == input_path:
                         logging.info(f"skip: encountered ghost file: '{input_path}'")
                         continue
-
             else:
                 logging.info(f"skip: {input_path}")
 
