@@ -1,7 +1,11 @@
 '''
-# Summary
 Functions to scan and manipulate a batch of music files.
-See `FUNCTIONS` definition.
+    sweep:    Moves all music files and archives to another directory.
+    flatten:  Flattens all files in a given directory, including subdirectories.
+    extract:  Extract files from all archives.
+    compress: Zips the contents of a given directory.
+    prune:    Removes all empty folders and non-music files from a directory.
+    process:  Convenience function to run sweep, extract, flatten in sequence for a directory.
 '''
 
 # todo: properly document
@@ -34,7 +38,7 @@ class Namespace(argparse.Namespace):
 
 # Helper functions
 def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> type[Namespace]:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('function', type=str, help=f"Which script function to run. One of '{valid_functions}'.\
         The following functions only require a single argument: '{single_arg_functions}'.")
     parser.add_argument('input', type=str, help='The input directory to sweep.')
@@ -128,8 +132,7 @@ def get_dirs(top: str) -> list[str]:
 
 # Primary functions
 def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> None:
-    for working_dir, directories, filenames in os.walk(source):
-        prune(working_dir, directories, filenames)
+    for working_dir, _, filenames in os.walk(source):
 
         for name in filenames:
             input_path = os.path.join(working_dir, name)
@@ -183,9 +186,7 @@ def sweep_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: s
     sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
 
 def flatten_hierarchy(source: str, output: str, interactive: bool) -> None:
-    for working_dir, directories, filenames in os.walk(source):
-        prune(working_dir, directories, filenames)
-
+    for working_dir, _, filenames in os.walk(source):
         for name in filenames:
             input_path = os.path.join(working_dir, name)
             output_path = os.path.join(output, name)
@@ -214,9 +215,7 @@ def flatten_hierarchy_cli(args: type[Namespace]) -> None:
     flatten_hierarchy(args.input, args.output, args.interactive)
 
 def extract(source: str, output: str, interactive: bool) -> None:
-    for working_dir, directories, filenames in os.walk(source):
-        prune(working_dir, directories, filenames)
-
+    for working_dir, _, filenames in os.walk(source):
         for name in filenames:
             input_path = os.path.join(working_dir, name)
             name_split = os.path.splitext(name)
@@ -245,18 +244,18 @@ def extract(source: str, output: str, interactive: bool) -> None:
 def extract_cli(args: type[Namespace]) -> None:
     extract(args.input, args.output, args.interactive)
 
-def compress_all(args: type[Namespace]) -> None:
+def compress_all_cli(args: type[Namespace]) -> None:
     for working_dir, directories, _ in os.walk(args.input):
         for directory in directories:
             # print(f"dbg: {os.path.join(working_dir, directory), os.path.join(args.output, directory)}")
             compress_dir(os.path.join(working_dir, directory), os.path.join(args.output, directory))
 
-def prune_empty(args: type[Namespace]) -> None:
+def prune_empty(source: str, interactive: bool) -> None:
     search_dirs : list[str] = []
     pruned : set[str] = set()
 
-    dir_list = get_dirs(args.input)
-    search_dirs.append(args.input)
+    dir_list = get_dirs(source)
+    search_dirs.append(source)
 
     print(f"search_dirs, start: {search_dirs}")
 
@@ -273,7 +272,7 @@ def prune_empty(args: type[Namespace]) -> None:
 
     for path in pruned:
         print(f"info: will remove: '{path}'")
-        if args.interactive:
+        if interactive:
             choice = input("continue? [y/N]")
             if choice != 'y':
                 print('info: skip: user skipped')
@@ -286,10 +285,14 @@ def prune_empty(args: type[Namespace]) -> None:
 
     print(f"search_dirs, end: {search_dirs}")
 
-def process(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
+def prune_empty_cli(args: type[Namespace]) -> None:
+    prune_empty(args.input, args.interactive)
+    
+def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
     sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
     extract(args.output, args.output, args.interactive)
     flatten_hierarchy(args.output, args.output, args.interactive)
+    prune_empty(args.output, args.interactive)
 
 if __name__ == '__main__':
     # CONSTANTS
@@ -307,8 +310,8 @@ if __name__ == '__main__':
     elif script_args.function == Namespace.FUNCTION_EXTRACT:
         extract_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_COMPRESS:
-        compress_all(script_args)
+        compress_all_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_PRUNE:
-        prune_empty(script_args)
+        prune_empty_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_PROCESS:
-        process(script_args, EXTENSIONS, PREFIX_HINTS)
+        process_cli(script_args, EXTENSIONS, PREFIX_HINTS)
