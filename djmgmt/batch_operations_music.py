@@ -9,13 +9,14 @@ Functions to scan and manipulate a batch of music files.
 '''
 
 # todo: properly document
-# todo: store processed files in DB
-# todo: record each function's processing list (e.g. list of files extracted or swept)
 
 import argparse
 import os
 import shutil
 import zipfile
+import logging
+
+import common
 
 # classes
 class Namespace(argparse.Namespace):
@@ -74,27 +75,27 @@ def is_prefix_match(value: str, prefixes: set[str]) -> bool:
     return False
 
 def flatten_zip(zip_path: str, extract_path: str) -> None:
-    print(f"output dir: {os.path.join(extract_path, os.path.splitext(os.path.basename(zip_path))[0])}")
+    logging.debug(f"output dir: {os.path.join(extract_path, os.path.splitext(os.path.basename(zip_path))[0])}")
     with zipfile.ZipFile(zip_path, 'r') as file:
         file.extractall(os.path.normpath(extract_path))
 
     unzipped_path = os.path.join(extract_path, os.path.splitext(os.path.basename(zip_path))[0])
     for working_dir, _, filenames in os.walk(unzipped_path):
         for name in filenames:
-            print(f"move from {os.path.join(working_dir, name)} to {extract_path}")
+            logging.debug(f"move from {os.path.join(working_dir, name)} to {extract_path}")
             shutil.move(os.path.join(working_dir, name), extract_path)
     if os.path.exists(unzipped_path) and len(os.listdir(unzipped_path)) < 1:
-        print(f"info: remove empty unzipped path {unzipped_path}")
+        logging.info(f"remove empty unzipped path {unzipped_path}")
         shutil.rmtree(unzipped_path)
 
 def prune(working_dir: str, directories: list[str], filenames: list[str]) -> None:
     for index, directory in enumerate(directories):
         if is_prefix_match(directory, {'.', '_'}) or '.app' in directory:
-            print(f"info: prune: hidden directory or '.app' archive '{os.path.join(working_dir, directory)}'")
+            logging.info(f"prune: hidden directory or '.app' archive '{os.path.join(working_dir, directory)}'")
             del directories[index]
     for index, name in enumerate(filenames):
         if name.startswith('.'):
-            print(f"info: prune: hidden file '{name}'")
+            logging.info(f"prune: hidden file '{name}'")
             del filenames[index]
 
 def find_root_year(path: str) -> str:
@@ -111,11 +112,12 @@ def is_empty_dir(top: str) -> bool:
     paths = os.listdir(top)
     files = 0
     for path in paths:
-        print(f"listed path: {path}")
-        if path.startswith('.') or os.path.isdir(os.path.join(top, path)):
+        check_path = os.path.join(top, path)
+        logging.debug(f"check path: {check_path}")
+        if path.startswith('.') or os.path.isdir(check_path):
             files += 1
 
-    print(f"{files} == {len(paths)}?")
+    logging.debug(f"{files} == {len(paths)}?")
     return files == len(paths)
 
 def get_dirs(top: str) -> list[str]:
@@ -140,7 +142,7 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
             name_split = os.path.splitext(name)
 
             if os.path.exists(output_path):
-                print(f"info: skip: path '{output_path}' exists in destination")
+                logging.info(f"skip: path '{output_path}' exists in destination")
                 continue
 
             is_valid_archive = False
@@ -156,7 +158,7 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
                             filepath_split = os.path.split(archive_file)
                             for f in filepath_split:
                                 if '.app' in os.path.splitext(f)[1]:
-                                    print(f"app {archive_file} detected, skipping")
+                                    logging.info(f"app {archive_file} detected, skipping")
                                     is_valid_archive = False
                                     break
                             
@@ -168,18 +170,18 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
                     is_valid_archive &= music_files > 0
 
             if name_split[1] in valid_extensions or is_valid_archive:
-                print(f"info: filter matched file '{input_path}'")
+                logging.info(f"filter matched file '{input_path}'")
                 if interactive:
-                    print(f"info: move from '{input_path}' to '{output_path}'")
+                    logging.info(f"move from '{input_path}' to '{output_path}'")
                     choice = input('Continue? [y/N/q]')
                     if choice == 'q':
-                        print('info: user quit')
+                        logging.info('user quit')
                         return
                     if choice != 'y' or choice in 'nN':
-                        print('info: skip: user skipped file')
+                        logging.info('skip: user skipped file')
                         continue
                 shutil.move(input_path, output_path)
-    print("swept all files")
+    logging.info("swept all files")
     
 def sweep_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
     sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
@@ -191,24 +193,24 @@ def flatten_hierarchy(source: str, output: str, interactive: bool) -> None:
             output_path = os.path.join(output, name)
 
             if not os.path.exists(output_path):
-                print(f"move '{input_path}' to '{output_path}'")
+                logging.info(f"move '{input_path}' to '{output_path}'")
                 if interactive:
                     choice = input('Continue? [y/N/q]')
                     if choice == 'q':
-                        print('info: user quit')
+                        logging.info('info: user quit')
                         return
                     if choice != 'y' or choice in 'nN':
-                        print(f"info: skip: {input_path}")
+                        logging.info(f"skip: {input_path}")
                         continue
                 try:
                     shutil.move(input_path, output_path)
                 except FileNotFoundError as error:
                     if error.filename == input_path:
-                        print(f"info: skip: encountered ghost file: '{input_path}'")
+                        logging.info(f"skip: encountered ghost file: '{input_path}'")
                         continue
 
             else:
-                print(f"info: skip: {input_path}")
+                logging.info(f"skip: {input_path}")
 
 def flatten_hierarchy_cli(args: type[Namespace]) -> None:
     flatten_hierarchy(args.input, args.output, args.interactive)
@@ -223,22 +225,22 @@ def extract(source: str, output: str, interactive: bool) -> None:
                 zip_output_path = os.path.join(output, name_split[0])
 
                 if os.path.exists(zip_output_path) and os.path.isdir(zip_output_path):
-                    print(f"info: skip: existing ouput path '{zip_output_path}'")
+                    logging.info(f"skip: existing ouput path '{zip_output_path}'")
                     continue
 
-                print(f"info: extract {zip_input_path} to {output}")
+                logging.info(f"extract {zip_input_path} to {output}")
                 if interactive:
                     choice = input('Continue? [y/N/q]')
                     if choice == 'q':
-                        print('info: user quit')
+                        logging.info('user quit')
                         return
                     if choice != 'y' or choice in 'nN':
-                        print(f"info: skip: {input_path}")
+                        logging.info(f"skip: {input_path}")
                         continue
                 with zipfile.ZipFile(zip_input_path, 'r') as file:
                     file.extractall(os.path.normpath(output))
             else:
-                print(f"info: skip: non-zip file '{input_path}'")
+                logging.info(f"skip: non-zip file '{input_path}'")
 
 def extract_cli(args: type[Namespace]) -> None:
     extract(args.input, args.output, args.interactive)
@@ -246,7 +248,6 @@ def extract_cli(args: type[Namespace]) -> None:
 def compress_all_cli(args: type[Namespace]) -> None:
     for working_dir, directories, _ in os.walk(args.input):
         for directory in directories:
-            # print(f"dbg: {os.path.join(working_dir, directory), os.path.join(args.output, directory)}")
             compress_dir(os.path.join(working_dir, directory), os.path.join(args.output, directory))
 
 def prune_empty(source: str, interactive: bool) -> None:
@@ -256,33 +257,33 @@ def prune_empty(source: str, interactive: bool) -> None:
     dir_list = get_dirs(source)
     search_dirs.append(source)
 
-    print(f"prune search_dirs source: '{search_dirs}'")
+    logging.debug(f"prune search_dirs source: '{search_dirs}'")
 
     while len(search_dirs) > 0:
         search_dir = search_dirs.pop(0)
         if is_empty_dir(search_dir) and search_dir != source:
             pruned.add(search_dir)
         else:
-            print(f"search_dir: {search_dir}")
+            logging.info(f"search_dir: {search_dir}")
 
             dir_list = get_dirs(search_dir)
             for d in dir_list:
                 search_dirs.append(os.path.join(search_dir, d))
 
     for path in pruned:
-        print(f"info: will remove: '{path}'")
+        logging.info(f"will remove: '{path}'")
         if interactive:
             choice = input("continue? [y/N]")
             if choice != 'y':
-                print('info: skip: user skipped')
+                logging.info('skip: user skipped')
                 continue
         try:
             shutil.rmtree(path)
         except OSError as e:
             if e.errno == 39: # directory not empty
-                print(f"info: skip: non-empty dir {path}")
+                logging.info(f"skip: non-empty dir {path}")
 
-    print(f"search_dirs, end: {search_dirs}")
+    logging.info(f"search_dirs, end: {search_dirs}")
 
 def prune_empty_cli(args: type[Namespace]) -> None:
     prune_empty(args.input, args.interactive)
@@ -294,13 +295,15 @@ def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints:
     prune_empty(args.output, args.interactive)
 
 if __name__ == '__main__':
+    common.configure_log(filename=__file__)
+    
     # CONSTANTS
     EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', 'flac'}
     PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
 
     # parse arguments
     script_args = parse_args(Namespace.FUNCTIONS, Namespace.FUNCTIONS_SINGLE_ARG)
-    print(f"will execute: '{script_args.function}'")
+    logging.info(f"will execute: '{script_args.function}'")
 
     if script_args.function == Namespace.FUNCTION_SWEEP:
         sweep_cli(script_args, EXTENSIONS, PREFIX_HINTS)
