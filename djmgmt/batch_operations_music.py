@@ -144,9 +144,9 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
                 continue
 
             is_valid_archive = False
-            music_files = 0
-            if name_split[1] == '.zip':
+            if name_split[1] == '.zip':                
                 is_valid_archive = True
+                music_files = 0
                 if not is_prefix_match(name, prefix_hints):
                     with zipfile.ZipFile(input_path) as archive:
                         for archive_file in archive.namelist():
@@ -165,8 +165,7 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
                                 music_files += 1
                             else:
                                 is_valid_archive &= file_ext in {'.jpg', '.png', 'jpeg'}
-
-            is_valid_archive &= music_files > 0
+                    is_valid_archive &= music_files > 0
 
             if name_split[1] in valid_extensions or is_valid_archive:
                 print(f"info: filter matched file '{input_path}'")
@@ -257,18 +256,18 @@ def prune_empty(source: str, interactive: bool) -> None:
     dir_list = get_dirs(source)
     search_dirs.append(source)
 
-    print(f"search_dirs, start: {search_dirs}")
+    print(f"prune search_dirs source: '{search_dirs}'")
 
     while len(search_dirs) > 0:
         search_dir = search_dirs.pop(0)
-        if is_empty_dir(search_dir):
+        if is_empty_dir(search_dir) and search_dir != source:
             pruned.add(search_dir)
         else:
             print(f"search_dir: {search_dir}")
 
             dir_list = get_dirs(search_dir)
-            for filename in dir_list:
-                search_dirs.append(os.path.join(search_dir, filename))
+            for d in dir_list:
+                search_dirs.append(os.path.join(search_dir, d))
 
     for path in pruned:
         print(f"info: will remove: '{path}'")
