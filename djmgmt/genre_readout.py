@@ -1,5 +1,5 @@
 '''
-Outputs genres according to the given rekordbox XML collection file.
+Outputs genres and track counts according to the given rekordbox XML collection file.
 '''
 
 import os
@@ -130,12 +130,53 @@ def output_collection_filter(root: ET.Element) -> list[str]:
         print(line)
     return output
 
-def parse_args(valid_modes: set[str]) -> argparse.Namespace:
+class Namespace(argparse.Namespace):
+    # required arguments
+    input: str
+    mode: str
+    source: str
+    
+    # optional arguments
+    genres: bool
+    counts: bool
+    
+    # constants
+    ## modes
+    MODE_SHORT = 'short'
+    MODE_LONG = 'long'
+    MODE_MISSING = 'missing'
+    MODE_CATEGORY = 'category'
+    MODE_RENAMED = 'renamed'
+    MODE_PATHS = 'paths'
+
+    MODES: set[str] = {
+            MODE_SHORT,
+            MODE_LONG,
+            MODE_MISSING,
+            MODE_CATEGORY,
+            MODE_RENAMED,
+            MODE_PATHS
+        }
+    
+    ## sources
+    SOURCE_COLLECTION = 'collection'
+    SOURCE_PRUNED = 'pruned'
+    
+    SOURCES: set[str] = {
+        SOURCE_COLLECTION,
+        SOURCE_PRUNED
+    }    
+
+def parse_args(valid_modes: set[str], valid_sources: set[str]) -> type[Namespace]:
     parser = argparse.ArgumentParser(description=__doc__)
+    
+    # required
     parser.add_argument('input', type=str, help="The input path to the XML collection.")
     parser.add_argument('mode', type=str, help=f"The script output mode. One of '{valid_modes}'.")
+    parser.add_argument('source', type=str, help=f"The Rekordbox source. One of '{valid_sources}'")
+    
 
-    args = parser.parse_args()
+    args = parser.parse_args(namespace=Namespace)
     args.input = os.path.normpath(args.input)
 
     if args.mode not in valid_modes:
@@ -143,52 +184,40 @@ def parse_args(valid_modes: set[str]) -> argparse.Namespace:
 
     return args
 
-def script(args: argparse.Namespace) -> None:
-    # data: input document
+def script(args: type[Namespace]) -> None:
+    # read data from the collection and determine source
     tree = ET.parse(args.input).getroot()
-
     collection = tree.find(constants.XPATH_COLLECTION)
     assert collection, f"invalid node search for '{constants.XPATH_COLLECTION}'"
-
-    pruned = tree.find(constants.XPATH_PRUNED)
-    assert pruned, f"invalid node search for '{constants.XPATH_PRUNED}'"
-
-    # data: script
-    playlist_ids : set[str] = set()
+    source = collection
+    
+    if args.source == Namespace.SOURCE_PRUNED:
+        pruned = tree.find(constants.XPATH_PRUNED)
+        assert pruned, f"invalid node search for '{constants.XPATH_PRUNED}'"
+        source = pruned
 
     # collect the playlist IDs
-    for track in pruned:
-        playlist_ids.add(track.attrib[constants.ATTR_KEY])
+    playlist_ids : set[str] = set()
+    for track in source:
+        if constants.ATTR_TRACK_ID in track.attrib:
+            playlist_ids.add(track.attrib[constants.ATTR_TRACK_ID])
+        elif constants.ATTR_KEY in track.attrib:
+            playlist_ids.add(track.attrib[constants.ATTR_KEY])
+        
 
     # call requested script mode
-    if args.mode == MODE_SHORT:
+    if args.mode == Namespace.MODE_SHORT:
         output_genres_short(playlist_ids, collection)
-    elif args.mode == MODE_LONG:
+    elif args.mode == Namespace.MODE_LONG:
         output_genres_long(playlist_ids, collection)
-    elif args.mode == MODE_MISSING:
+    elif args.mode == Namespace.MODE_MISSING:
         output_missing_tracks(playlist_ids, collection)
-    elif args.mode == MODE_CATEGORY:
+    elif args.mode == Namespace.MODE_CATEGORY:
         output_genre_category(playlist_ids, collection)
-    elif args.mode == MODE_RENAMED:
+    elif args.mode == Namespace.MODE_RENAMED:
         output_renamed_genres(playlist_ids, collection)
-    elif args.mode == MODE_PATHS:
+    elif args.mode == Namespace.MODE_PATHS:
         output_collection_filter(collection)
 
-# constants
-MODE_SHORT = 'short'
-MODE_LONG = 'long'
-MODE_MISSING = 'missing'
-MODE_CATEGORY = 'category'
-MODE_RENAMED = 'renamed'
-MODE_PATHS = 'paths'
-
 if __name__ == '__main__':
-    MODES: set[str] = {
-        MODE_SHORT,
-        MODE_LONG,
-        MODE_MISSING,
-        MODE_CATEGORY,
-        MODE_RENAMED,
-        MODE_PATHS
-    }
-    script(parse_args(MODES))
+    script(parse_args(Namespace.MODES, Namespace.SOURCES))
