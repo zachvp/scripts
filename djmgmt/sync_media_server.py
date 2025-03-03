@@ -38,36 +38,46 @@ class Namespace(argparse.Namespace):
     function: str
     input: str
     output: str
+    scan_mode: str
     
     ## Optional
     path_0: str
     
-    # Script modes
+    # Functions
     FUNCTION_COPY = 'copy'
     FUNCTION_MOVE = 'move'
     FUNCTION_SYNC = 'sync'
 
     FUNCTIONS = {FUNCTION_COPY, FUNCTION_MOVE, FUNCTION_SYNC}
+    
+    # Scan modes
+    SCAN_QUICK = 'quick'
+    SCAN_FULL = 'full'
+    
+    SCAN_MODES = {SCAN_QUICK, SCAN_FULL}
 
-def parse_args(valid_modes: set[str]) -> type[Namespace]:
+def parse_args(valid_functions: set[str], valid_scan_modes: set[str]) -> type[Namespace]:
     ''' Returns the parsed command-line arguments.
 
     Function arguments:
         valid_modes -- defines the supported script modes
     '''
     parser = argparse.ArgumentParser()
-    parser.add_argument('function', type=str, help=f"The mode to apply for the function. One of '{valid_modes}'.")
+    parser.add_argument('function', type=str, help=f"The mode to apply for the function. One of '{valid_functions}'.")
     parser.add_argument('input', type=str, help="The top level directory to search.\
         It's expected to be structured in a year/month/audio.file format.")
     parser.add_argument('output', type=str, help="The output directory to populate.")
+    parser.add_argument('scan-mode', type=str, help=f"The scan mode for the server. One of: '{valid_scan_modes}'.")
     parser.add_argument('--path-0', '-p0', type=str, help="An optional path. Sync uses this as the music root.")
 
     args = parser.parse_args(namespace=Namespace)
     args.input = os.path.normpath(args.input)
     args.output = os.path.normpath(args.output)
 
-    if args.function not in valid_modes:
-        parser.error(f"Invalid mode: '{args.function}'")
+    if args.function not in valid_functions:
+        parser.error(f"Invalid function: '{args.function}'")
+    if args.scan_mode not in valid_scan_modes:
+        parser.error(f"Invalid scan mode: '{args.scan_mode}'")
 
     return args
 
@@ -180,7 +190,7 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tu
         logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
         return (error.returncode, error.stderr)
 
-def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, dest: str) -> None:
+def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, dest: str, full_scan: bool) -> None:
     '''Transfers all files in the batch to the given destination, then tells the music server to perform a scan.'''
     import subsonic_client
     import encode_tracks
@@ -195,7 +205,10 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
         transfer_files(transfer_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
         
         # tell the media server new files are available
-        response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {'fullScan': 'true'})
+        scan_param = 'false'
+        if full_scan:
+            scan_param = 'true'
+        response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {'fullScan': scan_param})
         if response.ok:
             # wait until the server has stopped scanning
             while True:
@@ -218,9 +231,10 @@ def is_processed(date_context: str, date_context_previous: str) -> bool:
         if date_context <= date_context_processed and date_context_previous <= date_context_processed:
             logging.info(f"already processed date contexts: {date_context_previous}, {date_context}")
             return True
+    logging.info(f"one date context is unprocessed: {date_context_previous}, {date_context}")
     return False
 
-def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
+def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
     # core data
     batch: list[tuple[str, str]] = []
     source_previous, dest_previous = mappings[0]
@@ -259,9 +273,10 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
                 logging.debug(f"add to batch: {mapping}")
             elif batch:
                 logging.info(f"processing batch in date context '{date_context_previous}'")
-                sync_batch(batch, date_context_previous, source_previous, dest_previous)
+                sync_batch(batch, date_context_previous, source_previous, dest_previous, full_scan)
                 batch.clear()
                 batch.append(mapping) # add the first mapping of the new context
+                logging.debug(f"add new context mapping: {mapping}")
                 
                 # persist the processed date context
                 with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
@@ -270,6 +285,8 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
                 logging.info(f"processed batch in date context '{date_context_previous}'")
                 logging.info(f"sync progress: {progressFormat(index + 1)}")
             else:
+                batch.append(mapping) # add the first mapping of the new context
+                logging.debug(f"add new context mapping: {mapping}")
                 logging.info(f"skip empty batch: {date_context_previous}")
         source_previous = source
         dest_previous = dest
@@ -279,7 +296,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]]) -> None:
         if isinstance(date_context, tuple):
             date_context = date_context[0]
         logging.info(f"processing batch in date context '{date_context}'")
-        sync_batch(batch, date_context, source, dest)
+        sync_batch(batch, date_context, source, dest, full_scan)
         with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
             state.write(f"{FILE_SYNC_KEY}: {date_context}")
         logging.info(f"processed batch in date context '{date_context}'")
@@ -292,7 +309,7 @@ def key_date_context(mapping: tuple[str, str]) -> str:
 if __name__ == '__main__':
     # setup
     common.configure_log(level=logging.DEBUG, filename=__file__)
-    script_args = parse_args(Namespace.FUNCTIONS)
+    script_args = parse_args(Namespace.FUNCTIONS, Namespace.SCAN_MODES)
     
     logging.info(f"running function '{script_args.function}'")
     if script_args.function in {Namespace.FUNCTION_COPY, Namespace.FUNCTION_MOVE}:
@@ -314,7 +331,10 @@ if __name__ == '__main__':
         mappings.sort(key=lambda m: key_date_context(m))
     
         timestamp = time.time()
-        sync_from_mappings(mappings)
+        full_scan = True
+        if script_args.scan_mode == Namespace.SCAN_QUICK:
+            full_scan = False
+        sync_from_mappings(mappings, full_scan)
         timestamp = time.time() - timestamp
         logging.info(f"sync time: {format_timing(timestamp)}")
     
