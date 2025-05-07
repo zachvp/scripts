@@ -12,10 +12,12 @@ import os
 import csv
 import sys
 
+import common
+
 def extract_tsv(path: str, fields: list[int]) -> list[str]:
     output = []
 
-    with open(path, 'r', encoding=get_encoding(path)) as file:
+    with open(path, 'r', encoding=common.get_encoding(path)) as file:
         rows = file.readlines()
         for row in rows:
             line = row.split('\t')
@@ -30,7 +32,7 @@ def extract_tsv(path: str, fields: list[int]) -> list[str]:
 def extract_csv(path: str, fields: list[int]) -> list[str]:
     output = []
 
-    with open(path, 'r', encoding=get_encoding(path)) as file:
+    with open(path, 'r', encoding=common.get_encoding(path)) as file:
         rows = csv.reader(file)
         for row in rows:
             output_line = ''
@@ -40,21 +42,6 @@ def extract_csv(path: str, fields: list[int]) -> list[str]:
             if len(output_line) > 0:
                 output.append(output_line)
     return output
-
-def get_encoding(path: str) -> str:
-    import chardet
-    
-    # Read, detect and decode the input file data
-    raw_bytes = b''
-    with open(path, 'rb') as file:
-        raw_bytes = file.read()
-    
-    # Attempt extract the detected encoding
-    result = chardet.detect(raw_bytes)
-    if result and result['encoding']:
-        return result['encoding']
-    else:
-        return ''
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Output each track from a rekordbox-exported playlist.\
@@ -71,24 +58,37 @@ def parse_args() -> argparse.Namespace:
     return args
 
 def find_column(path: str, name: str) -> int:
-    # options = ['#', 'Track_Title',	'Genre', 'Artist', 'Key', 'BPM', 'Time', 'Date_Added', 'DJ_Play_Count']
-    options = {
-        '#' : '#',
-        'Track Title' : 'Track_Title',
-        'Genre' : 'Genre',
-        'Artist' : 'Artist',
-        'Key' : 'Key',
-        'BPM' : 'BPM',
-        'Time' : 'Time',
-        'Date Added' : 'Date_Added',
-        'DJ Play Count': 'DJ_Play_Count'
-    }
-    # todo: preprocess columns without whitespace
+    """Locate the index of a column by name in a file's header row.
     
-    with open(path, 'r', encoding=get_encoding(path)) as file:
+    Args:
+        path: Path to the file to read.
+        name: Name of the column to find.
+    """
+    from typing import Callable
+    
+    # Helper functionality and data
+    normalize: Callable[[str], str] = lambda s: s.replace(' ', '_')
+    headers = {
+        '#',
+        'Track Title',
+        'Genre',
+        'Artist',
+        'Key',
+        'BPM',
+        'Time',
+        'Date Added',
+        'DJ Play Count'
+    }
+    options = { header : normalize(header) for header in headers }
+    columns_processed = []
+    
+    # Primary search loop
+    with open(path, 'r', encoding=common.get_encoding(path)) as file:
+        # Core mutable data
         columns = file.readline().split()
-        columns_processed = []
         multiword = ''
+        
+        # Process columns to handle multi-word header names
         for c in columns:
             if c in options:
                 columns_processed.append(options[c])
@@ -98,11 +98,13 @@ def find_column(path: str, name: str) -> int:
                 if multiword.strip() in options:
                     columns_processed.append(options[multiword.strip()])
                     multiword = ''
-            
-        for i, c in enumerate(columns_processed):
-            if c == name.replace(' ', '_'):
-                return i
-    print(f"error: unable to find name: '{name}' in path '{path}'")
+    
+    # Check for the search column
+    search_column = normalize(name)
+    try:
+        return columns_processed.index(search_column)
+    except ValueError:
+        print(f"error: unable to find name: '{name}' in path '{path}'")
     return -1
 
 def script(args: argparse.Namespace):

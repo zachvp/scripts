@@ -88,6 +88,22 @@ def remove_substring(source: str, start_inclusive: int, end_exclusive: int) -> s
     assert start_inclusive < end_exclusive, f"invalid start, end: '{start_inclusive}', '{end_exclusive}'"
     return f"{source[:start_inclusive]}{source[end_exclusive:]}"
 
+def get_encoding(path: str) -> str:
+    '''Uses chardet to guess the file encoding of the given path.'''
+    import chardet
+    
+    # Read, detect and decode the input file data
+    raw_bytes = b''
+    with open(path, 'rb') as file:
+        raw_bytes = file.read()
+    
+    # Attempt extract the detected encoding
+    result = chardet.detect(raw_bytes)
+    if result and result['encoding']:
+        return result['encoding']
+    else:
+        return ''
+
 # Development
 def dev_testing():
     # print(remove_substring('0123456789', 2, 8))
