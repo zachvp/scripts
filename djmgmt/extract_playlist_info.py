@@ -15,7 +15,7 @@ import sys
 def extract_tsv(path: str, fields: list[int]) -> list[str]:
     output = []
 
-    with open(path, 'r', encoding='utf-8') as file:
+    with open(path, 'r', encoding=get_encoding(path)) as file:
         rows = file.readlines()
         for row in rows:
             line = row.split('\t')
@@ -30,7 +30,7 @@ def extract_tsv(path: str, fields: list[int]) -> list[str]:
 def extract_csv(path: str, fields: list[int]) -> list[str]:
     output = []
 
-    with open(path, 'r', encoding='utf-8') as file:
+    with open(path, 'r', encoding=get_encoding(path)) as file:
         rows = csv.reader(file)
         for row in rows:
             output_line = ''
@@ -40,6 +40,21 @@ def extract_csv(path: str, fields: list[int]) -> list[str]:
             if len(output_line) > 0:
                 output.append(output_line)
     return output
+
+def get_encoding(path: str) -> str:
+    import chardet
+    
+    # Read, detect and decode the input file data
+    raw_bytes = b''
+    with open(path, 'rb') as file:
+        raw_bytes = file.read()
+    
+    # Attempt extract the detected encoding
+    result = chardet.detect(raw_bytes)
+    if result and result['encoding']:
+        return result['encoding']
+    else:
+        return ''
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Output each track from a rekordbox-exported playlist.\
@@ -70,7 +85,7 @@ def find_column(path: str, name: str) -> int:
     }
     # todo: preprocess columns without whitespace
     
-    with open(path, 'r', encoding='utf-8') as file:
+    with open(path, 'r', encoding=get_encoding(path)) as file:
         columns = file.readline().split()
         columns_processed = []
         multiword = ''
