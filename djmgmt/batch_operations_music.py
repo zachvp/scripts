@@ -18,6 +18,10 @@ import logging
 
 import common
 
+# constants
+EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', 'flac'}
+PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
+
 # classes
 class Namespace(argparse.Namespace):
     # arguments
@@ -142,13 +146,13 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
 
             # handle zip archive
             is_valid_archive = False
-            if name_split[1] == '.zip':                
+            if name_split[1] == '.zip':
                 is_valid_archive = True
-                valid_files = 0
                 
                 # inspect zip archive to determine if this is likely a music container
                 if not is_prefix_match(name, prefix_hints):
-                    with zipfile.ZipFile(input_path) as archive:
+                    valid_files = 0
+                    with zipfile.ZipFile(input_path, 'r') as archive:
                         for archive_file in archive.namelist():
                             if not is_valid_archive:
                                 logging.debug(f"invalid archive: '{input_path}''")
@@ -298,10 +302,6 @@ def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints:
 
 if __name__ == '__main__':
     common.configure_log(filename=__file__)
-    
-    # CONSTANTS
-    EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', 'flac'}
-    PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
 
     # parse arguments
     script_args = parse_args(Namespace.FUNCTIONS, Namespace.FUNCTIONS_SINGLE_ARG)
