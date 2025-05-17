@@ -1,8 +1,4 @@
 # Next steps
-? figure out which tracks are missing and why
-    navidrome < local sync folder < than rekordbox _pruned < mappings
-        2297            2327            2343                    2345
-    problem: sync script does not handle files in subfolders well; should map all files to same date dir structure
 
 # Migrate music to server
 1. Clear music files

@@ -174,7 +174,6 @@ def parse_args(valid_modes: set[str], valid_sources: set[str]) -> type[Namespace
     parser.add_argument('input', type=str, help="The input path to the XML collection.")
     parser.add_argument('mode', type=str, help=f"The script output mode. One of '{valid_modes}'.")
     parser.add_argument('source', type=str, help=f"The Rekordbox source. One of '{valid_sources}'")
-    
 
     args = parser.parse_args(namespace=Namespace)
     args.input = os.path.normpath(args.input)
