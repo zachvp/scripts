@@ -75,11 +75,12 @@ def is_prefix_match(value: str, prefixes: set[str]) -> bool:
     return False
 
 def flatten_zip(zip_path: str, extract_path: str) -> None:
-    logging.debug(f"output dir: {os.path.join(extract_path, os.path.splitext(os.path.basename(zip_path))[0])}")
+    output_directory = os.path.splitext(os.path.basename(zip_path))[0]
+    logging.debug(f"output dir: {os.path.join(extract_path, output_directory)}")
     with zipfile.ZipFile(zip_path, 'r') as file:
         file.extractall(os.path.normpath(extract_path))
 
-    unzipped_path = os.path.join(extract_path, os.path.splitext(os.path.basename(zip_path))[0])
+    unzipped_path = os.path.join(extract_path, output_directory)
     for working_dir, _, filenames in os.walk(unzipped_path):
         for name in filenames:
             logging.debug(f"move from {os.path.join(working_dir, name)} to {extract_path}")
@@ -97,13 +98,6 @@ def prune(working_dir: str, directories: list[str], filenames: list[str]) -> Non
         if name.startswith('.'):
             logging.info(f"prune: hidden file '{name}'")
             del filenames[index]
-
-def find_root_year(path: str) -> str:
-    parts : list[str] = path.split('/')
-    for i, part in enumerate(parts):
-        if part.isdecimal():
-            return '/'.join(parts[:i+1])
-    return ''
 
 def is_empty_dir(top: str) -> bool:
     if not os.path.isdir(top):
