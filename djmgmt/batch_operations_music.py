@@ -173,7 +173,7 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
                             if file_ext in valid_extensions:
                                 valid_files += 1
                             else:
-                                is_valid_archive &= file_ext in {'.jpg', '.png', 'jpeg'}
+                                is_valid_archive &= file_ext in {'.jpg', '.png', '.jpeg'}
                     is_valid_archive &= valid_files > 0
                     logging.debug(f"archive '{input_path}' valid = '{is_valid_archive}'")
 
