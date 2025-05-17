@@ -9,7 +9,6 @@ Functions to scan and manipulate a batch of music files.
 '''
 
 # todo: properly document
-# todo: use logging instead of print
 
 import argparse
 import os
