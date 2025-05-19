@@ -133,7 +133,6 @@ def get_dirs(top: str) -> list[str]:
 # Primary functions
 def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> None:
     for working_dir, _, filenames in os.walk(source):
-
         for name in filenames:
             # loop state
             input_path = os.path.join(working_dir, name)
@@ -198,7 +197,26 @@ def flatten_hierarchy(source: str, output: str, interactive: bool) -> None:
         for name in filenames:
             input_path = os.path.join(working_dir, name)
             output_path = os.path.join(output, name)
+            name_split = os.path.splitext(name)
 
+            # Handle zip files
+            if name_split[1] == '.zip':
+                logging.info(f"extracting and flattening zip: '{input_path}'")
+                if interactive:
+                    choice = input('Extract and flatten zip? [y/N/q]')
+                    if choice == 'q':
+                        logging.info('info: user quit')
+                        return
+                    if choice != 'y' or choice in 'nN':
+                        logging.info(f"skip: {input_path}")
+                        continue
+                try:
+                    flatten_zip(input_path, output)
+                except Exception as e:
+                    logging.error(f"Error extracting zip '{input_path}': {str(e)}")
+                continue
+
+            # Handle regular files
             if not os.path.exists(output_path):
                 logging.info(f"move '{input_path}' to '{output_path}'")
                 if interactive:
