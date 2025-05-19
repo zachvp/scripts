@@ -105,7 +105,6 @@ def read_ffprobe_value(args: type[Namespace], input_path: str, stream_key: str) 
         sys.exit()
 
 def command_ffprobe_json(path: str) -> list[str]:
-    # todo: read the tag data to try to determine if only 'Publisher Logotype' is expected.
     # ffprobe -v error -select_streams v -show_entries stream=index,codec_name,codec_type,width,height,:tags=comment -of json '/Users/zachvp/Music/DJ/Bernard Badie - Train feat Dajae (Original .aiff'
     
     command_str = f"ffprobe -v error -select_streams v"

@@ -82,10 +82,6 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
     If the args.date option is passed, today's date is used to construct the start of the modified path.
     So the full path would be 'Year/Month/Day/Artist/Album/Track_File'
     '''
-
-    # placeholders for missing file metadata
-    # todo: replace with constants.py refs
-
     # scan the input directory
     for working_dir, _, filenames in os.walk(args.input):
         batch_operations_music.prune(working_dir, [], filenames)

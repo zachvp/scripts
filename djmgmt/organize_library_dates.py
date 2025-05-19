@@ -110,7 +110,7 @@ def collection_path_to_syspath(path: str) -> str:
     syspath = unquote(path).lstrip(constants.REKORDBOX_ROOT)
     if not syspath.startswith('/'):
         syspath = '/' + syspath
-    return syspath # todo: fix
+    return syspath
 
 def swap_root(path: str, old_root: str, root: str) -> str:
     '''Returns the given path with its root replaced.
