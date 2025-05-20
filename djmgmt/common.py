@@ -11,7 +11,11 @@ def configure_log(level=logging.DEBUG, filename='scripts') -> None:
         if len(split) > 1:
             filename = split[0]
     
-    logging.basicConfig(filename=f"logs/{filename}.log",
+    logs_path = 'logs'
+    if not os.path.exists(logs_path):
+        os.makedirs(logs_path)
+    
+    logging.basicConfig(filename=f"{logs_path}/{filename}.log",
                         level=level,
                         format="%(asctime)s [%(levelname)s] %(message)s",
                         datefmt="%D %H:%M:%S",

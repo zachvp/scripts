@@ -111,12 +111,10 @@ def sync_from_path(args: type[Namespace]):
     previous_date_context = ''
 
     # Assign the action based on the given mode.
-    action: Callable[[str, str], None] = lambda x, y : print(f"dummy: {x}, {y}")
-    if args.function == Namespace.FUNCTION_COPY:
-        action = shutil.copy
-    elif args.function == Namespace.FUNCTION_MOVE:
+    action: Callable[[str, str], str] = shutil.copy
+    if args.function == Namespace.FUNCTION_MOVE:
         action = shutil.move
-    else:
+    elif args.function != Namespace.FUNCTION_COPY:
         print(f"error: unrecognized mode: {args.function}. Exiting.")
         return
 

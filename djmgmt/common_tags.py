@@ -99,8 +99,16 @@ def read_tags(path: str) -> Optional[Tags]:
         artist = artist[0]
     if isinstance(album, list):
         album = album[0]
+    
+    # convert to string or leave as None
+    if title is not None:
+        title = str(title)
+    if artist is not None:
+        artist = str(artist)
+    if album is not None:
+        album = str(album)
 
-    return Tags(str(artist), str(album), str(title))
+    return Tags(artist, album, title)
 
 def basic_identifier(title: str, artist: str) -> str:
     if not title:

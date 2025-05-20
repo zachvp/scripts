@@ -44,13 +44,6 @@ def create_files(dir_path: str, files: dict[str, Any]) -> None:
 def get_input_output_paths(filename: str) -> Tuple[str, str]:
     '''Returns tuple of input, output paths.'''
     return f"{INPUT_DIR}/{filename}", f"{OUTPUT_DIR}/{filename}"
-            
-def createFiles(files: dict[str, Any]):
-    for path, content in files.items():
-        full_path = os.path.join(INPUT_DIR, path)
-        os.makedirs(INPUT_DIR, exist_ok=True)
-        with open(full_path, 'wb') as f:
-            f.write(content)
 
 def clear_directory(path):
     for entry in os.listdir(path):
@@ -115,7 +108,7 @@ class TestSweepMusic(unittest.TestCase):
             'track_3.aiff' : DUMMY_DATA,
             'track_4.flac' : DUMMY_DATA,
         }
-        createFiles(files)
+        create_files(INPUT_DIR, files)
         
         batch_operations_music.sweep(INPUT_DIR, OUTPUT_DIR, False, batch_operations_music.EXTENSIONS, batch_operations_music.PREFIX_HINTS)
         for f in files:
@@ -130,7 +123,7 @@ class TestSweepMusic(unittest.TestCase):
             'img_1.jpeg'  : DUMMY_DATA,
             'img_2.png'   : DUMMY_DATA,
         }
-        createFiles(files)
+        create_files(INPUT_DIR, files)
         
         batch_operations_music.sweep(INPUT_DIR, OUTPUT_DIR, False, batch_operations_music.EXTENSIONS, batch_operations_music.PREFIX_HINTS)
         for f in files:
