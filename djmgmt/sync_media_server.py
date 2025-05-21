@@ -17,6 +17,8 @@ Definitions
     audio.file: must be an audio file type
 '''
 
+# TODO: refactor to support sync from path in addition to XML collection
+
 import argparse
 import os
 import shutil
