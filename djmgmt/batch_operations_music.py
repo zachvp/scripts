@@ -321,7 +321,7 @@ def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints:
 # TODO: add function to remove all non-music files
 
 if __name__ == '__main__':
-    common.configure_log(filename=__file__)
+    common.configure_log(path=__file__)
 
     # parse arguments
     script_args = parse_args(Namespace.FUNCTIONS, Namespace.FUNCTIONS_SINGLE_ARG)

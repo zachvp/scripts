@@ -435,7 +435,7 @@ def find_missing_art(collection_file_path: str, collection_xpath: str, playlist_
 
 # Main
 if __name__ == '__main__':
-    common.configure_log(level=logging.DEBUG, filename=__file__)
+    common.configure_log(level=logging.DEBUG, path=__file__)
     script_args = parse_args(Namespace.FUNCTIONS)
     
     if script_args.function == Namespace.FUNCTION_LOSSLESS:

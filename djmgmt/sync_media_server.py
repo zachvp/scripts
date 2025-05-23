@@ -305,7 +305,7 @@ def key_date_context(mapping: tuple[str, str]) -> str:
 
 if __name__ == '__main__':
     # setup
-    common.configure_log(level=logging.DEBUG, filename=__file__)
+    common.configure_log(level=logging.DEBUG, path=__file__)
     script_args = parse_args(Namespace.FUNCTIONS, Namespace.SCAN_MODES)
     
     logging.info(f"running function '{script_args.function}'")

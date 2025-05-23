@@ -91,7 +91,7 @@ def collect_filenames(root: str) -> list[str]:
 if __name__ == '__main__':
     import common
     
-    common.configure_log(level=logging.DEBUG, filename=__file__)
+    common.configure_log(level=logging.DEBUG, path=__file__)
     args = parse_args(Namespace.FUNCTIONS)
     
     logging.info(f"running function '{args.function}'")

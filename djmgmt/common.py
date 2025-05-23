@@ -3,17 +3,24 @@ import os
 
 import constants
 
-def configure_log(level=logging.DEBUG, filename='scripts') -> None:
+# Constants
+DEFAULT_PATH = __file__
+
+def configure_log(level=logging.DEBUG, path=DEFAULT_PATH) -> None:
     '''Standard log configuration.'''
-    if filename != 'scripts':
-        split = os.path.basename(filename)
-        split = os.path.splitext(split)
-        if len(split) > 1:
-            filename = split[0]
-    
-    logs_path = 'logs' # todo: update to write relative to this script dir
+    if path == DEFAULT_PATH:
+        logs_path = os.path.join(os.path.dirname(DEFAULT_PATH), 'logs')
+    else:
+        logs_path = os.path.join(os.path.dirname(path), 'logs') # todo: update to write relative to this script dir
     if not os.path.exists(logs_path):
         os.makedirs(logs_path)
+
+    # Determine filename
+    filename = DEFAULT_PATH
+    split = os.path.basename(filename)
+    split = os.path.splitext(split)
+    if len(split) > 1:
+        filename = split[0]
     
     logging.basicConfig(filename=f"{logs_path}/{filename}.log",
                         level=level,
@@ -107,16 +114,3 @@ def get_encoding(path: str) -> str:
         return result['encoding']
     else:
         return ''
-
-# Development
-def dev_testing():
-    # print(remove_substring('0123456789', 2, 8))
-    source = '/Users/zachvp/developer/test-private/data/tracks-output/_parental jams/blah/foo/2023/05 may/27/Carlos Santana/Supernatural/01 (Da Le) Yaleo.mp3'
-    # print(find_date_context(source))
-    date_context = find_date_context(source)
-    if date_context:
-        print(remove_subpath(source, '/Users/zachvp/developer/test-private/data/tracks-output', date_context[1]))
-    # print(find_date_context('/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3', ''))
-
-# dev_testing()
-    

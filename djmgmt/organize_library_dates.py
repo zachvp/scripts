@@ -272,7 +272,7 @@ def collect_filenames(collection: ET.Element, playlist_ids: set[str] = set()) ->
 # MAIN
 if __name__ == '__main__':
     # setup
-    common.configure_log(level=logging.DEBUG, filename=__file__)
+    common.configure_log(level=logging.DEBUG, path=__file__)
     script_args = parse_args(Namespace.FUNCTIONS)
 
     if script_args.root_path:
