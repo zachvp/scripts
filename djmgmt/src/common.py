@@ -4,19 +4,19 @@ import os
 from . import constants
 
 # Constants
-DEFAULT_PATH = __file__
+DEFAULT_PATH = os.path.abspath(__file__)
 
 def configure_log(level=logging.DEBUG, path=DEFAULT_PATH) -> None:
     '''Standard log configuration.'''
     if path == DEFAULT_PATH:
         logs_path = os.path.join(os.path.dirname(DEFAULT_PATH), 'logs')
     else:
-        logs_path = os.path.join(os.path.dirname(path), 'logs') # todo: update to write relative to this script dir
+        logs_path = os.path.join(os.path.dirname(os.path.abspath(path)), 'logs') # todo: update to write relative to this script dir
     if not os.path.exists(logs_path):
         os.makedirs(logs_path)
 
     # Determine filename
-    filename = DEFAULT_PATH
+    filename = os.path.abspath(path)
     split = os.path.basename(filename)
     split = os.path.splitext(split)
     if len(split) > 1:
