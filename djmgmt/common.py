@@ -11,7 +11,7 @@ def configure_log(level=logging.DEBUG, filename='scripts') -> None:
         if len(split) > 1:
             filename = split[0]
     
-    logs_path = 'logs'
+    logs_path = 'logs' # todo: update to write relative to this script dir
     if not os.path.exists(logs_path):
         os.makedirs(logs_path)
     

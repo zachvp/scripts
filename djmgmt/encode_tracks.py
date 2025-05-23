@@ -1,5 +1,5 @@
 '''
-re-encode tracks
+encode tracks scripts
 '''
 
 import subprocess
@@ -188,6 +188,7 @@ def encode_lossless(args: type[Namespace]) -> None:
     If `args` is configured properly, the script can also store each difference in file size before and after re-encoding.
     '''
 
+    # TODO: extend to keep current extension if extension not provided
     if not args.extension.startswith('.'):
         error = ValueError(f"invalid extension {args.extension}")
         logging.error(error)
@@ -449,5 +450,3 @@ if __name__ == '__main__':
         missing.sort()
         with open(script_args.output, 'w', encoding='utf-8') as file:
             file.writelines(missing)
-        
-            

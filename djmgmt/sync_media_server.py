@@ -5,9 +5,6 @@
         date and subdirectory structure of the source directory.
       2a. Suspends process when scan switches from one day to another.
 
-Usage:
-    `populate_media_server.py -h`
-
 Definitions
     date-structured directory:
         /year/month/day/** (e.g. /2020/january/01/artist/album/audio.file)
@@ -337,8 +334,3 @@ if __name__ == '__main__':
         sync_from_mappings(mappings, full_scan)
         timestamp = time.time() - timestamp
         logging.info(f"sync time: {format_timing(timestamp)}")
-    
-    # print(transform_implied_path('/Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'))
-    # print(date_path_root('/Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'))
-    # transfer_files(output_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
-    
