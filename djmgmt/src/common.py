@@ -1,7 +1,7 @@
 import logging
 import os
 
-from . import constants
+import constants
 
 # Constants
 DEFAULT_PATH = os.path.abspath(__file__)

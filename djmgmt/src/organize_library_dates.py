@@ -108,8 +108,8 @@ def collection_path_to_syspath(path: str) -> str:
         path -- The URL-like collection path
     '''
     syspath = unquote(path).lstrip(constants.REKORDBOX_ROOT)
-    if not syspath.startswith('/'):
-        syspath = '/' + syspath
+    if not syspath.startswith(os.path.sep):
+        syspath = os.path.sep + syspath
     return syspath
 
 def swap_root(path: str, old_root: str, root: str) -> str:
@@ -119,8 +119,8 @@ def swap_root(path: str, old_root: str, root: str) -> str:
         path -- The directory path
         root -- The new root to use
     '''
-    if not root.endswith('/'):
-        root += '/'
+    if not root.endswith(os.path.sep):
+        root += os.path.sep
 
     root = path.replace(old_root, root)
 
@@ -155,6 +155,7 @@ def generate_date_paths_cli(args: type[Namespace]) -> list[tuple[str, str]]:
     collection = find_node(args.xml_collection_path, constants.XPATH_COLLECTION)
     return generate_date_paths(collection, args.root_path, metadata_path=args.metadata_path)
 
+# TODO: clean this up, logic I/O logic seems jank...some way to use relative paths instead of passing in a swapped root path?
 def generate_date_paths(collection: ET.Element,
                         root_path: str,
                         playlist_ids: set[str] = set(),

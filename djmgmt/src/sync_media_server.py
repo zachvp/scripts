@@ -66,7 +66,7 @@ def parse_args(valid_functions: set[str], valid_scan_modes: set[str]) -> type[Na
     parser.add_argument('input', type=str, help="The top level directory to search.\
         It's expected to be structured in a year/month/audio.file format.")
     parser.add_argument('output', type=str, help="The output directory to populate.")
-    parser.add_argument('scan-mode', type=str, help=f"The scan mode for the server. One of: '{valid_scan_modes}'.")
+    parser.add_argument('scan_mode', type=str, help=f"The scan mode for the server. One of: '{valid_scan_modes}'.")
     parser.add_argument('--path-0', '-p0', type=str, help="An optional path. Sync uses this as the music root.")
 
     args = parser.parse_args(namespace=Namespace)
@@ -214,7 +214,7 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
                 if not content or content['scanning'] == 'false':
                     break
                 logging.debug("scan in progress, waiting...")
-                time.sleep(1)
+                time.sleep(1) # TODO: sleep for more time if full scan
     else:
         logging.error(f"empty transfer path: unable to transfer from '{source}' to '{dest}'")
 
@@ -231,6 +231,8 @@ def is_processed(date_context: str, date_context_previous: str) -> bool:
     logging.info(f"one date context is unprocessed: {date_context_previous}, {date_context}")
     return False
 
+# TODO: fix sync state write to only write if all calls succeed (currently will write if rsync fails)
+# TODO: add health check for rsync
 def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
     # core data
     batch: list[tuple[str, str]] = []
