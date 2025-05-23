@@ -1,7 +1,7 @@
 import logging
 import os
 
-import constants
+from . import constants
 
 # Constants
 DEFAULT_PATH = __file__

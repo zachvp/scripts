@@ -8,6 +8,7 @@ __sublime*
 # auto-generated directories
 .vscode/
 __pycache__/
+*.egg-info/
 
 # custom directories
 data/write/
