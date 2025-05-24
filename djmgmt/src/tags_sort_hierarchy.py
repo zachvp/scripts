@@ -20,6 +20,11 @@ import common_tags
 import batch_operations_music
 import constants
 
+# Constants
+FUNCTION_VALIDATE = 'validate'
+FUNCTION_SORT = 'sort'
+EXPECTED_DEPTH = 6
+
 # Helper functions
 def clean_dirname(dirname: str, replacements: dict[str, str]) -> str:
     '''Cleans any dirty substrings in `dirname`.
@@ -43,7 +48,7 @@ def clean_dirname_fat32(dirname: str) -> str:
     replacements: dict[str,str] = {
         '\\' : '()',
         '/'  : '&',
-        ':'  : '()',
+        ':'  : '-',
         '*'  : '()',
         '?'  : '()',
         '"'  : '()',
@@ -58,7 +63,7 @@ def clean_dirname_simple(dirname: str) -> str:
     '''Cleans reserved directory characters'''
     replacements: dict[str,str] = {
         '/'  : '&',
-        ':'  : '()',
+        ':'  : '-',
     }
 
     return clean_dirname(dirname, replacements)
@@ -82,10 +87,6 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
     If the args.date option is passed, today's date is used to construct the start of the modified path.
     So the full path would be 'Year/Month/Day/Artist/Album/Track_File'
     '''
-
-    # placeholders for missing file metadata
-    # todo: replace with constants.py refs
-
     # scan the input directory
     for working_dir, _, filenames in os.walk(args.input):
         batch_operations_music.prune(working_dir, [], filenames)
@@ -129,7 +130,7 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
 
                     # define the parent path for the music filename and the full output file path
                     parent_path = os.path.join(output_path, artist, album)
-                    output_path = os.path.join(output_path, filename)
+                    output_path = os.path.join(parent_path, filename)
 
                     # skip files that are already in the right place
                     if os.path.exists(output_path):
@@ -254,11 +255,6 @@ def parse_args(valid_functions: set[str]) -> argparse.Namespace:
 
 # Main
 if __name__ == '__main__':
-    # constants
-    FUNCTION_VALIDATE = 'validate'
-    FUNCTION_SORT = 'sort'
-    EXPECTED_DEPTH = 6
-
     # script arguments
     script_functions = {FUNCTION_VALIDATE, FUNCTION_SORT}
     script_args = parse_args(script_functions)

@@ -3,16 +3,26 @@ import os
 
 import constants
 
-def configure_log(level=logging.DEBUG, filename='scripts') -> None:
+# Constants
+DEFAULT_PATH = os.path.abspath(__file__)
+
+def configure_log(level=logging.DEBUG, path=DEFAULT_PATH) -> None:
     '''Standard log configuration.'''
-    print(f"dbg: name: {filename}")
-    if filename != 'scripts':
-        split = os.path.basename(filename)
-        split = os.path.splitext(split)
-        if len(split) > 1:
-            filename = split[0]
+    if path == DEFAULT_PATH:
+        logs_path = os.path.join(os.path.dirname(DEFAULT_PATH), 'logs')
+    else:
+        logs_path = os.path.join(os.path.dirname(os.path.abspath(path)), 'logs') # todo: update to write relative to this script dir
+    if not os.path.exists(logs_path):
+        os.makedirs(logs_path)
+
+    # Determine filename
+    filename = os.path.abspath(path)
+    split = os.path.basename(filename)
+    split = os.path.splitext(split)
+    if len(split) > 1:
+        filename = split[0]
     
-    logging.basicConfig(filename=f"logs/{filename}.log",
+    logging.basicConfig(filename=f"{logs_path}/{filename}.log",
                         level=level,
                         format="%(asctime)s [%(levelname)s] %(message)s",
                         datefmt="%D %H:%M:%S",
@@ -46,10 +56,10 @@ def raise_exception(error: Exception):
     logging.exception(error)
     raise error
 
-def find_date_context(path: str) -> str | None:
-    '''Extracts the date subpath from the input path.
+def find_date_context(path: str) -> tuple[str, int] | None:
+    '''Extracts the date subpath and start path component index from the input path.
     Example path: '/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3'
-    Example output: '2022/04 april/24'
+    Example output: '2022/04 april/24', 3
     '''
     # Edge case: '/Users/zachvp/developer/test-private/data/tracks-output/2024/08 august/18/Paolo Mojo/1983/159678_1983_(Eric_Prydz_Remix).aiff'
     components = path.split(os.sep)
@@ -75,12 +85,32 @@ def find_date_context(path: str) -> str | None:
     if len(context) != 3:
         return None
     
-    return '/'.join(context)
+    return (os.sep.join(context), found['y'])
 
-# Development
-def dev_testing():
-    pass
-    # print(find_date_context('/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3', ''))
+def remove_subpath(path: str, preserve_root: str, preserve_index: int) -> str:
+    '''Given a path, removes the intermediary path components after the root and before the preserve index.'''
+    transformed = path.split(os.sep)
+    removals = [i for i in range(preserve_index)]
+    for _ in removals:
+        del transformed[0]
+    return os.path.join(preserve_root, os.sep.join(transformed))
 
-# dev_testing()
+def remove_substring(source: str, start_inclusive: int, end_exclusive: int) -> str:
+    assert start_inclusive < end_exclusive, f"invalid start, end: '{start_inclusive}', '{end_exclusive}'"
+    return f"{source[:start_inclusive]}{source[end_exclusive:]}"
+
+def get_encoding(path: str) -> str:
+    '''Uses chardet to guess the file encoding of the given path.'''
+    import chardet
     
+    # Read, detect and decode the input file data
+    raw_bytes = b''
+    with open(path, 'rb') as file:
+        raw_bytes = file.read()
+    
+    # Attempt extract the detected encoding
+    result = chardet.detect(raw_bytes)
+    if result and result['encoding']:
+        return result['encoding']
+    else:
+        return ''

@@ -20,6 +20,7 @@ import argparse
 import logging
 
 import constants
+import common
 
 # command support
 class Namespace(argparse.Namespace):
@@ -107,9 +108,9 @@ def collection_path_to_syspath(path: str) -> str:
         path -- The URL-like collection path
     '''
     syspath = unquote(path).lstrip(constants.REKORDBOX_ROOT)
-    if not syspath.startswith('/'):
-        syspath = '/' + syspath
-    return syspath # todo: fix
+    if not syspath.startswith(os.path.sep):
+        syspath = os.path.sep + syspath
+    return syspath
 
 def swap_root(path: str, old_root: str, root: str) -> str:
     '''Returns the given path with its root replaced.
@@ -118,8 +119,8 @@ def swap_root(path: str, old_root: str, root: str) -> str:
         path -- The directory path
         root -- The new root to use
     '''
-    if not root.endswith('/'):
-        root += '/'
+    if not root.endswith(os.path.sep):
+        root += os.path.sep
 
     root = path.replace(old_root, root)
 
@@ -154,6 +155,7 @@ def generate_date_paths_cli(args: type[Namespace]) -> list[tuple[str, str]]:
     collection = find_node(args.xml_collection_path, constants.XPATH_COLLECTION)
     return generate_date_paths(collection, args.root_path, metadata_path=args.metadata_path)
 
+# TODO: clean this up, logic I/O logic seems jank...some way to use relative paths instead of passing in a swapped root path?
 def generate_date_paths(collection: ET.Element,
                         root_path: str,
                         playlist_ids: set[str] = set(),
@@ -185,9 +187,16 @@ def generate_date_paths(collection: ET.Element,
 
         track_path_new = full_path(node, constants.REKORDBOX_ROOT, constants.MAPPING_MONTH, include_metadata=metadata_path)
         track_path_new = collection_path_to_syspath(track_path_new)
+        
+        # transform the new path to use the given root path
         if root_path:
             track_path_new = swap_root(track_path_new, swap_root_path, root_path)
-
+            context = common.find_date_context(track_path_new)
+            
+            # remove any intermediary subdirectories
+            if context:
+                track_path_new = common.remove_subpath(track_path_new, root_path, context[1])
+            
         paths.append((track_path_old, track_path_new))
             
     return paths
@@ -263,10 +272,8 @@ def collect_filenames(collection: ET.Element, playlist_ids: set[str] = set()) ->
 
 # MAIN
 if __name__ == '__main__':
-    import common
-    
     # setup
-    common.configure_log(level=logging.DEBUG, filename=__file__)
+    common.configure_log(level=logging.DEBUG, path=__file__)
     script_args = parse_args(Namespace.FUNCTIONS)
 
     if script_args.root_path:

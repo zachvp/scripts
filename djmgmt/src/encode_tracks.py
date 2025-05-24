@@ -1,5 +1,5 @@
 '''
-re-encode tracks
+encode tracks scripts
 '''
 
 import subprocess
@@ -17,7 +17,7 @@ from typing import Any
 import common
 import constants
 
-
+# classes
 class Namespace(argparse.Namespace):
     # arguments
     function: str
@@ -36,6 +36,7 @@ class Namespace(argparse.Namespace):
     FUNCTION_MISSING_ART = 'missing_art'
     FUNCTIONS = {FUNCTION_LOSSLESS, FUNCTION_LOSSY, FUNCTION_MISSING_ART}
 
+# helper functions
 def parse_args(functions: set[str]) -> type[Namespace]:
     '''Process the script's command line aruments.'''
     parser = argparse.ArgumentParser()
@@ -60,7 +61,7 @@ def parse_args(functions: set[str]) -> type[Namespace]:
     return args
 
 def ffmpeg_base(input_path: str, output_path: str, options: str) -> list[str]:
-    all_options = f"-ar 44100 -write_id3v2 1 {options}"
+    all_options = f"-ar 44100 -write_id3v2 1 {options}".strip()
     return ['ffmpeg', '-i', input_path] + shlex.split(all_options) + [output_path]
 
 def ffmpeg_standardize(input_path: str, output_path: str) -> list[str]:
@@ -69,7 +70,7 @@ def ffmpeg_standardize(input_path: str, output_path: str) -> list[str]:
         ffmpeg -i /path/to/input.foo -ar 44100 -c:a pcm_s16be -write_id3v2 1 -y path/to/output.bar
         ffmpeg options: 44100 Hz sample rate, decode audio stream, 16-bit PCM big-endian, write ID3V2 tags
     '''
-    options = '-c:a pcm_s16be'
+    options = '-c:a pcm_s16be -y'
 
     return ffmpeg_base(input_path, output_path, options)
 
@@ -104,7 +105,6 @@ def read_ffprobe_value(args: type[Namespace], input_path: str, stream_key: str) 
         sys.exit()
 
 def command_ffprobe_json(path: str) -> list[str]:
-    # todo: read the tag data to try to determine if only 'Publisher Logotype' is expected.
     # ffprobe -v error -select_streams v -show_entries stream=index,codec_name,codec_type,width,height,:tags=comment -of json '/Users/zachvp/Music/DJ/Bernard Badie - Train feat Dajae (Original .aiff'
     
     command_str = f"ffprobe -v error -select_streams v"
@@ -137,9 +137,11 @@ def guess_cover_stream_specifier(streams: list[dict[str, Any]]) -> int:
         if width / height >  threshold or height / width > threshold:
             logging.debug(f"found non-square video content at index {index}")
             continue
-        if 'comment' in stream['tags'] and 'logotype' in stream['tags']['comment'].lower():
+        if 'tags' in stream and 'comment' in stream['tags'] and 'logotype' in stream['tags']['comment'].lower():
             logging.debug(f"found non-cover video content at index {index}: '{stream['tags']['comment']}")
             continue
+        if width == height and width == 849:
+            return -2
         if diff < min_diff:
             min_diff = diff
             min_index = index
@@ -174,17 +176,19 @@ def setup_storage(args: type[Namespace], filename: str) -> str:
 
     return store_path
 
+# primary functions
 def encode_lossless(args: type[Namespace]) -> None:
     '''Primary script function. Recursively walks the input path specified in `args` to re-encode each eligible file.
-    A file is eligible if:
+    A file is eligible if all conditions are met:
         1) It is an uncompressed `aiff` or `wav` type.
-        2) It has a sample rate exceeding 44100 Hz or bit depth exceeding 16 bits.
+        2) It has a sample rate exceeding 44100 Hz or a bit depth exceeding 16 bits.
 
     All other files are skipped. If `args` is configured properly, the user can store each skipped path in a file.
 
     If `args` is configured properly, the script can also store each difference in file size before and after re-encoding.
     '''
 
+    # TODO: extend to keep current extension if extension not provided
     if not args.extension.startswith('.'):
         error = ValueError(f"invalid extension {args.extension}")
         logging.error(error)
@@ -239,7 +243,7 @@ def encode_lossless(args: type[Namespace]) -> None:
 
             # -- build the output path
             # swap existing extension with the configured one
-            output_filename = name_split[0] + args.extension
+            output_filename = f"{name_split[0]}{args.extension}"
             output_path = os.path.join(args.output, ''.join(output_filename))
 
             if os.path.splitext(os.path.basename(input_path))[0] != os.path.splitext(os.path.basename(output_path))[0]:
@@ -377,9 +381,10 @@ def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: 
         logging.debug(f"ran {len(tasks)} tasks")
         tasks.clear()
 
-def run_missing_art_tasks(loop: AbstractEventLoop, tasks: list[tuple[str, Task[tuple[int, str]]]], output_path: str):
+def run_missing_art_tasks(loop: AbstractEventLoop, tasks: list[tuple[str, Task[tuple[int, str]]]]) -> list[str]:
     import json
     
+    results: list[str] = []
     run_tasks = [task[1] for task in tasks]
     loop.run_until_complete(collect_tasks(run_tasks))
     logging.debug(f"ran {len(run_tasks)} tasks")
@@ -391,21 +396,19 @@ def run_missing_art_tasks(loop: AbstractEventLoop, tasks: list[tuple[str, Task[t
     
         if cover_stream > -1:
             logging.info(f"guessed cover image in stream: {cover_stream}")
+        elif cover_stream == -2:
+            logging.info(f"found potential placeholder cover for '{source}'")
         else:
             logging.info(f"no cover image found for '{source}'")
-            with open(output_path, 'a', encoding='utf-8') as file:
-                file.write(f"{os.path.basename(source)}\n")
-    tasks.clear()
+            results.append(source)
+    return results
 
-def find_missing_art(collection_file_path: str, output_path: str, collection_xpath: str, playlist_xpath: str, threads=24):
+def find_missing_art(collection_file_path: str, collection_xpath: str, playlist_xpath: str, threads=24) -> list[str]:
     import organize_library_dates as library
-    
-    # clear the output file
-    with open(output_path, 'w', encoding='utf-8'):
-        pass
     
     collection = library.find_node(collection_file_path, collection_xpath)
     playlist = library.find_node(collection_file_path, playlist_xpath)
+    missing: list[str] = []
     
     # collect the playlist IDs
     tasks: list[tuple[str, Task[tuple[int, str]]]] = []
@@ -423,14 +426,16 @@ def find_missing_art(collection_file_path: str, output_path: str, collection_xpa
         tasks.append((source, task))
         logging.debug(f"add task: {len(tasks)}")
         if len(tasks) > threads - 1:
-            run_missing_art_tasks(loop, tasks, output_path)
+            missing += run_missing_art_tasks(loop, tasks)
+            tasks.clear()
     
     # run remaining tasks
-    run_missing_art_tasks(loop, tasks, output_path)
+    missing += run_missing_art_tasks(loop, tasks)
+    return missing
 
 # Main
 if __name__ == '__main__':
-    common.configure_log(level=logging.DEBUG)
+    common.configure_log(level=logging.DEBUG, path=__file__)
     script_args = parse_args(Namespace.FUNCTIONS)
     
     if script_args.function == Namespace.FUNCTION_LOSSLESS:
@@ -439,6 +444,9 @@ if __name__ == '__main__':
         encode_lossy_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_MISSING_ART:
         # TODO: add timing
-        find_missing_art(script_args.input, script_args.output, constants.XPATH_COLLECTION, constants.XPATH_PRUNED, threads=72)
-            
-            
+        # clear the output file
+        missing = find_missing_art(script_args.input, constants.XPATH_COLLECTION, constants.XPATH_PRUNED, threads=72)
+        missing = [f"{os.path.splitext(os.path.basename(m))[0]}\n" for m in missing]
+        missing.sort()
+        with open(script_args.output, 'w', encoding='utf-8') as file:
+            file.writelines(missing)
