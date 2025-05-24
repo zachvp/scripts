@@ -168,7 +168,10 @@ def format_timing(timestamp: float) -> str:
     return f"{timestamp:.3f}s"
     
 def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tuple[int, str]:
-    '''Uses rsync to transfer files using remote daemon.'''
+    '''Uses rsync to transfer files using remote daemon.
+    example command: "rsync '/Users/zachvp/developer/test-private/data/tracks-output/./2025/03 march/14' 
+                        rsync://zachvp@corevega.local:12000/navidrome --progress -auvzitR --exclude '.*'"
+    '''
     import subprocess
     import shlex
     
@@ -187,6 +190,9 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tu
         logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
         return (error.returncode, error.stderr)
 
+# TODO: refactor so source and dest aren't required paths; move logging to caller function
+# TODO: add error handling for encoding
+# TODO: add error handling for RSYNC
 def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, dest: str, full_scan: bool) -> None:
     '''Transfers all files in the batch to the given destination, then tells the music server to perform a scan.'''
     import subsonic_client
@@ -218,6 +224,7 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
     else:
         logging.error(f"empty transfer path: unable to transfer from '{source}' to '{dest}'")
 
+# TODO: refactor to only take current date context
 def is_processed(date_context: str, date_context_previous: str) -> bool:
     date_context_processed = ''
     with open(FILE_SYNC, encoding='utf-8', mode='r') as state: # todo: optimize to only open if recent change
@@ -314,6 +321,21 @@ if __name__ == '__main__':
     if script_args.function in {Namespace.FUNCTION_COPY, Namespace.FUNCTION_MOVE}:
         sync_from_path(script_args)
     else:
+        # TODO: refactor this to be a one-line function
+        import subprocess
+        import shlex
+        import sys
+        
+        # check that rsync is running
+        command = shlex.split(f"rsync {constants.RSYNC_URL}")
+        try:
+            process = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
+            logging.info('rsync daemon is running')
+        except subprocess.CalledProcessError as error:
+            logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
+            sys.exit()
+        
+        # collect input parameters to sync files
         import organize_library_dates as library
         pruned = library.find_node(script_args.input, constants.XPATH_PRUNED)
         collection = library.find_node(script_args.input, constants.XPATH_COLLECTION)
@@ -330,9 +352,6 @@ if __name__ == '__main__':
         mappings.sort(key=lambda m: key_date_context(m))
     
         timestamp = time.time()
-        full_scan = True
-        if script_args.scan_mode == Namespace.SCAN_QUICK:
-            full_scan = False
-        sync_from_mappings(mappings, full_scan)
+        sync_from_mappings(mappings, script_args.scan_mode == Namespace.SCAN_FULL)
         timestamp = time.time() - timestamp
         logging.info(f"sync time: {format_timing(timestamp)}")

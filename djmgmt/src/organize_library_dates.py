@@ -156,6 +156,7 @@ def generate_date_paths_cli(args: type[Namespace]) -> list[tuple[str, str]]:
     return generate_date_paths(collection, args.root_path, metadata_path=args.metadata_path)
 
 # TODO: clean this up, logic I/O logic seems jank...some way to use relative paths instead of passing in a swapped root path?
+# TODO: update to handle '/' character in metadata path (e.g. a/jus/ted)
 def generate_date_paths(collection: ET.Element,
                         root_path: str,
                         playlist_ids: set[str] = set(),
