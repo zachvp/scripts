@@ -29,7 +29,8 @@ cv_check_continue()
 ## SERVER
 ps_rsyncd()
 {
-	if [ -e "$COREVEGA_PATH_RSYNC_PID" ]; then
+	if [ -e "$COREVEGA_PATH_RSYNC_PID" ] && rsync --list-only rsync://localhost:${COREVEGA_RSYNC_PORT}/ >/dev/null 2>&1
+	then
 		cv_echo "daemon PID: $(cat $COREVEGA_PATH_RSYNC_PID)"
 		ps aux | grep $(cat $COREVEGA_PATH_RSYNC_PID) | grep -v 'grep'
 	else
