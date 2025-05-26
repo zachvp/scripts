@@ -145,8 +145,8 @@ def sync_from_path(args: type[Namespace]):
 
 def transform_implied_path(path: str) -> str | None:
     '''Rsync-specific. Transforms the given path into a format that will include the required subdirectories.'''
-    # input : /Users/zachvp/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3
-    # output: /Users/zachvp/developer/test-private/data/tracks-output/./2022/04 april/24/
+    # input : /Users/user/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3
+    # output: /Users/user/developer/test-private/data/tracks-output/./2022/04 april/24/
     
     components = path.split(os.sep)[1:]
     if not common.find_date_context(path):
@@ -166,11 +166,15 @@ def format_timing(timestamp: float) -> str:
         minutes, seconds = divmod(remainder, 60)
         return f"{hours}h {minutes}m {seconds:.3f}s"
     return f"{timestamp:.3f}s"
+
+def key_date_context(mapping: tuple[str, str]) -> str:
+    date_context = common.find_date_context(mapping[1])
+    return date_context[0] if date_context else ''
     
 def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tuple[int, str]:
     '''Uses rsync to transfer files using remote daemon.
-    example command: "rsync '/Users/zachvp/developer/test-private/data/tracks-output/./2025/03 march/14' 
-                        rsync://zachvp@corevega.local:12000/navidrome --progress -auvzitR --exclude '.*'"
+    example command: "rsync '/Users/user/developer/test-private/data/tracks-output/./2025/03 march/14' 
+                        rsync://user@pi.local:12000/navidrome --progress -auvzitR --exclude '.*'"
     '''
     import subprocess
     import shlex
@@ -192,11 +196,16 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tu
 
 # TODO: refactor so source and dest aren't required paths; move logging to caller function
 # TODO: add error handling for encoding
-# TODO: add error handling for RSYNC
-def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, dest: str, full_scan: bool) -> None:
-    '''Transfers all files in the batch to the given destination, then tells the music server to perform a scan.'''
+def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, dest: str, full_scan: bool) -> bool:
+    '''Transfers all files in the batch to the given destination, then tells the music server to perform a scan.
+    
+    Returns True if the batch sync was successful, False otherwise.
+    '''
     import subsonic_client
     import encode_tracks
+    
+    # Return flag
+    success = True
     
     # encode the current batch to MP3 format
     logging.debug(f"encoding batch in date context {date_context}:\n{batch}")
@@ -205,24 +214,30 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
     # transfer batch to the media server
     transfer_path = transform_implied_path(dest)
     if transfer_path:
-        transfer_files(transfer_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
+        returncode, _ = transfer_files(transfer_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
+        success = returncode == 0
         
-        # tell the media server new files are available
-        scan_param = 'false'
-        if full_scan:
-            scan_param = 'true'
-        response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {'fullScan': scan_param})
-        if response.ok:
-            # wait until the server has stopped scanning
-            while True:
-                response = subsonic_client.call_endpoint(subsonic_client.API.GET_SCAN_STATUS)
-                content = subsonic_client.handle_response(response, subsonic_client.API.GET_SCAN_STATUS)
-                if not content or content['scanning'] == 'false':
-                    break
-                logging.debug("scan in progress, waiting...")
-                time.sleep(1) # TODO: sleep for more time if full scan
+        # Check if file transfer succeeded
+        if success:
+            # tell the media server new files are available
+            scan_param = 'false'
+            if full_scan:
+                scan_param = 'true'
+            response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {'fullScan': scan_param})
+            if response.ok:
+                # wait until the server has stopped scanning
+                while True:
+                    response = subsonic_client.call_endpoint(subsonic_client.API.GET_SCAN_STATUS)
+                    content = subsonic_client.handle_response(response, subsonic_client.API.GET_SCAN_STATUS)
+                    if not content or content['scanning'] == 'false':
+                        break
+                    logging.debug("scan in progress, waiting...")
+                    time.sleep(1) # TODO: sleep for more time if full scan
     else:
+        success = False
         logging.error(f"empty transfer path: unable to transfer from '{source}' to '{dest}'")
+    
+    return success
 
 # TODO: refactor to only take current date context
 def is_processed(date_context: str, date_context_previous: str) -> bool:
@@ -238,8 +253,6 @@ def is_processed(date_context: str, date_context_previous: str) -> bool:
     logging.info(f"one date context is unprocessed: {date_context_previous}, {date_context}")
     return False
 
-# TODO: fix sync state write to only write if all calls succeed (currently will write if rsync fails)
-# TODO: add health check for rsync
 def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
     # core data
     batch: list[tuple[str, str]] = []
@@ -279,7 +292,8 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
                 logging.debug(f"add to batch: {mapping}")
             elif batch:
                 logging.info(f"processing batch in date context '{date_context_previous}'")
-                sync_batch(batch, date_context_previous, source_previous, dest_previous, full_scan)
+                if not sync_batch(batch, date_context_previous, source_previous, dest_previous, full_scan):
+                    raise RuntimeError(f"Batch sync failed for date context '{date_context_previous}'")
                 batch.clear()
                 batch.append(mapping) # add the first mapping of the new context
                 logging.debug(f"add new context mapping: {mapping}")
@@ -302,15 +316,12 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
         if isinstance(date_context, tuple):
             date_context = date_context[0]
         logging.info(f"processing batch in date context '{date_context}'")
-        sync_batch(batch, date_context, source, dest, full_scan)
+        if not sync_batch(batch, date_context, source, dest, full_scan):
+            raise RuntimeError(f"Batch sync failed for date context '{date_context}'")
         with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
             state.write(f"{FILE_SYNC_KEY}: {date_context}")
         logging.info(f"processed batch in date context '{date_context}'")
         logging.info(f"sync progress: {progressFormat(index + 1)}")
-
-def key_date_context(mapping: tuple[str, str]) -> str:
-    date_context = common.find_date_context(mapping[1])
-    return date_context[0] if date_context else ''
 
 if __name__ == '__main__':
     # setup
