@@ -141,13 +141,13 @@ def find_node(file_path, xpath) -> ET.Element:
 def dev_debug():
     test_str =\
     '''
-        <TRACK TrackID="109970693" Name="花と鳥と山" Artist="haircuts for men" Composer="" Album="京都コネクション" Grouping="" Genre="Lounge/Ambient" Kind="AIFF File" Size="84226278" TotalTime="476" DiscNumber="0" TrackNumber="5" Year="2023" AverageBpm="134.00" DateAdded="2023-04-27" BitRate="1411" SampleRate="44100" Comments="8A - 1" PlayCount="1" Rating="0" Location="file://localhost/Volumes/ZVP-MUSIC/DJing/haircuts%20for%20men%20-%20%e8%8a%b1%e3%81%a8%e9%b3%a5%e3%81%a8%e5%b1%b1.aiff" Remixer="" Tonality="8A" Label="" Mix="">
+        <TRACK TrackID="109970693" Name="花と鳥と山" Artist="haircuts for men" Composer="" Album="京都コネクション" Grouping="" Genre="Lounge/Ambient" Kind="AIFF File" Size="84226278" TotalTime="476" DiscNumber="0" TrackNumber="5" Year="2023" AverageBpm="134.00" DateAdded="2023-04-27" BitRate="1411" SampleRate="44100" Comments="8A - 1" PlayCount="1" Rating="0" Location="file://localhost/Volumes/USR-MUSIC/DJing/haircuts%20for%20men%20-%20%e8%8a%b1%e3%81%a8%e9%b3%a5%e3%81%a8%e5%b1%b1.aiff" Remixer="" Tonality="8A" Label="" Mix="">
           <TEMPO Inizio="0.126" Bpm="134.00" Metro="4/4" Battito="1" />
         </TRACK>'''
     t = ET.fromstring(test_str)
     logging.debug(t.tag)
 
-    u = full_path(t, '/ZVP-MUSIC/DJing/', constants.MAPPING_MONTH)
+    u = full_path(t, '/USR-MUSIC/DJing/', constants.MAPPING_MONTH)
     logging.debug(u)
 
 # Primary functions
@@ -155,17 +155,14 @@ def generate_date_paths_cli(args: type[Namespace]) -> list[tuple[str, str]]:
     collection = find_node(args.xml_collection_path, constants.XPATH_COLLECTION)
     return generate_date_paths(collection, args.root_path, metadata_path=args.metadata_path)
 
-# TODO: clean this up, logic I/O logic seems jank...some way to use relative paths instead of passing in a swapped root path?
 # TODO: update to handle '/' character in metadata path (e.g. a/jus/ted)
 def generate_date_paths(collection: ET.Element,
                         root_path: str,
                         playlist_ids: set[str] = set(),
-                        metadata_path: bool = False,
-                        swap_root_path: str = '/Users/zachvp/',
-                        swap_input_root: bool = False) -> list[tuple[str, str]]:
-    '''Generates a list of path mappings.
-    Each item maps from the source path in the collection to the structured directory destination.
-    The structure includes the date added and optionally track metadata.
+                        metadata_path: bool = False) -> list[tuple[str, str]]:
+    '''Generates a list of path mappings for a flat source structure.
+    Each item maps from the original source path to a new date-structured path.
+    The new path combines the root_path with the date context (year/month/day), optional metadata, and filename.
     '''
     paths: list[tuple[str, str]] = []
 
@@ -183,23 +180,15 @@ def generate_date_paths(collection: ET.Element,
         
         # build each entry for the old and new path
         track_path_old = node_syspath
-        if root_path and swap_input_root:
-            track_path_old = swap_root(track_path_old, swap_root_path, root_path)
-
         track_path_new = full_path(node, constants.REKORDBOX_ROOT, constants.MAPPING_MONTH, include_metadata=metadata_path)
-        track_path_new = collection_path_to_syspath(track_path_new)
         
-        # transform the new path to use the given root path
-        if root_path:
-            track_path_new = swap_root(track_path_new, swap_root_path, root_path)
-            context = common.find_date_context(track_path_new)
-            
-            # remove any intermediary subdirectories
-            if context:
-                track_path_new = common.remove_subpath(track_path_new, root_path, context[1])
-            
+        context = common.find_date_context(track_path_new)
+        if context:
+            # remove path before the date context and replace with the root path
+            track_path_new = common.remove_subpath(track_path_new, root_path, context[1])
+        
         paths.append((track_path_old, track_path_new))
-            
+    
     return paths
 
 def get_pipe_output(structure: list[tuple[str, str]]) -> str:
