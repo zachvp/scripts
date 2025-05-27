@@ -7,6 +7,8 @@ import shutil
 import argparse
 from typing import Callable
 
+# TODO: refactor to use custom Namespace and constants pattern
+
 def batch_file_operation(args: argparse.Namespace) -> None:
     '''Performs the given operation on each file contained in the input file.
 
@@ -15,10 +17,11 @@ def batch_file_operation(args: argparse.Namespace) -> None:
     '''
     with open(args.input_path, 'r', encoding='utf-8') as input_file:
         lines : list[str] = input_file.readlines()
-        action: Callable[[str, str], None] = lambda x, y : print(f"default lambda: {x}, {y}")
+        action: Callable[[str, str], str] = shutil.move
 
-        if args.function == 'mv':
-            action = shutil.move
+        if args.function != 'mv':
+            print(f"error: unsupported operation: {args.function}")
+            return
 
         if not os.path.exists(os.path.normpath(args.output_path)):
             os.makedirs(os.path.normpath(args.output_path))
