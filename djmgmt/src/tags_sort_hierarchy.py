@@ -15,6 +15,7 @@ from datetime import datetime
 import argparse
 import os
 import shutil
+import logging
 
 import common_tags
 import batch_operations_music
@@ -80,7 +81,7 @@ def date_path(date: datetime, months: dict[int, str]) -> str:
     return f"{date.year}/{month}/{day}"
 
 # Primary functions
-def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
+def sort_hierarchy(source: str, compatibility: bool, date: bool, interactive: bool, months: dict[int, str]) -> None:
     ''' One of the main script functions. Performs an in-place sort of all music files in the args.input directory
     into a standardized 'Artist/Album/Track_File' directory format.
 
@@ -88,7 +89,7 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
     So the full path would be 'Year/Month/Day/Artist/Album/Track_File'
     '''
     # scan the input directory
-    for working_dir, _, filenames in os.walk(args.input):
+    for working_dir, _, filenames in os.walk(source):
         batch_operations_music.prune(working_dir, [], filenames)
 
         # scan all filenames
@@ -104,28 +105,26 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
                     artist = tags.artist if tags.artist else constants.UNKNOWN_ARTIST
                     artist_raw = artist
                     artist = clean_dirname_simple(artist)
-                    if args.compatibility:
+                    if compatibility:
                         artist = clean_dirname_fat32(artist)
                     if artist != artist_raw:
-                        print(f"info: artist '{artist_raw}' contains at least one illegal character, replacing")
-                        print(f"new artist name: '{artist}'")
+                        logging.info(f"artist '{artist_raw}' contains at least one illegal character, replacing with '{artist}'")
 
                     # extract and clean up the album string
                     album = tags.album if tags.album else constants.UNKNOWN_ALBUM
                     album_raw = album
                     album = clean_dirname_simple(album)
-                    if args.compatibility:
+                    if compatibility:
                         album = clean_dirname_fat32(album)
                     if album != album_raw:
-                        print(f"info: album '{album_raw}' contains at least one illegal character, replacing")
-                        print(f"new album name: '{album}'")
+                        logging.info(f"album '{album_raw}' contains at least one illegal character, replacing with '{album}'")
 
                     # build the output path
                     output_path = working_dir
 
                     # apply the date option if present
-                    if args.date:
-                        print("apply date folder structure")
+                    if date:
+                        logging.info("apply date folder structure")
                         output_path = os.path.join(output_path, date_path(datetime.now(), months))
 
                     # define the parent path for the music filename and the full output file path
@@ -134,32 +133,35 @@ def sort_hierarchy(args: argparse.Namespace, months: dict[int, str]) -> None:
 
                     # skip files that are already in the right place
                     if os.path.exists(output_path):
-                        print(f"info: skip: output path exists: '{output_path}'")
+                        logging.info(f"skip: output path exists: '{output_path}'")
                         continue
 
                     # check for the interactive option
-                    if args.interactive:
+                    if interactive:
                         choice = input(f"move {filepath} -> {output_path}? [y/N/q]")
                         if choice == 'q':
-                            print("info: user quit")
+                            logging.info("user quit")
                             return
                         if choice != 'y':
-                            print("info: skip: user skipped")
+                            logging.info("skip: user skipped")
                             continue
 
                     # create the music file's parent directory if needed
                     if not os.path.exists(parent_path):
-                        print(f"info: os.makedirs({parent_path})")
+                        logging.info(f"os.makedirs({parent_path})")
                         os.makedirs(parent_path)
 
                     # move the current file to the structured path
-                    print(f"shutil.move{(filepath, output_path)}")
+                    logging.info(f"shutil.move{(filepath, output_path)}")
                     shutil.move(filepath, output_path)
             else:
                 # skip non-music files
-                print(f"info: skip: unsupported file: '{filepath}'")
+                logging.info(f"skip: unsupported file: '{filepath}'")
 
-def validate_hierarchy(args: argparse.Namespace, expected_depth: int, months: set[str]) -> list[str]:
+def sort_hierarchy_cli(args: argparse.Namespace, months: dict[int, str]) -> None:
+    sort_hierarchy(args.input, args.compatibility, args.date, args.interactive, months)
+
+def validate_hierarchy(source: str, expected_depth: int, months: set[str]) -> list[str]:
     '''One of the main script functions. Validates that all files in the args.input directory
     conform to the expected format.
 
@@ -170,11 +172,11 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int, months: se
     invalid_paths: list[str] = []
 
     # scan all files in the input directory
-    for working_dir, dirs, filenames in os.walk(args.input):
+    for working_dir, dirs, filenames in os.walk(source):
         if len(filenames) < 1 and len(dirs) < 1:
             # empty directories are invalid
             invalid_paths.append(working_dir)
-            print(f"info: invalid: empty directory: {working_dir}")
+            logging.info(f"invalid: empty directory: {working_dir}")
 
         # scan all files
         for filename in filenames:
@@ -183,22 +185,22 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int, months: se
 
             # check for invalid hidden files
             if filename.startswith('.'):
-                print(f"info: invalid: illegal prefix: '{filename}'")
+                logging.info(f"invalid: illegal prefix: '{filename}'")
                 invalid_paths.append(filepath)
                 continue
 
             # validate file path depth
-            relpath = os.path.relpath(filepath, start=args.input)
+            relpath = os.path.relpath(filepath, start=source)
             relpath_split = relpath.split('/')
             if len(relpath_split) != expected_depth:
-                print(f"info: invalid: relative filepath depth: {relpath}; relative depth is: {len(relpath.split('/'))}")
+                logging.info(f"invalid: relative filepath depth: {relpath}; relative depth is: {len(relpath.split('/'))}")
                 invalid_paths.append(filepath)
                 continue
 
             # validate the path's year format
             index = 0
             if not relpath_split[index].isdecimal() or len(relpath_split[index]) != 4:
-                print(f"info: invalid: year path component: '{relpath_split[index]}': expect '4-digit year' format")
+                logging.info(f"invalid: year path component: '{relpath_split[index]}': expect '4-digit year' format")
                 invalid_paths.append(filepath)
                 continue
             index = 1
@@ -206,18 +208,21 @@ def validate_hierarchy(args: argparse.Namespace, expected_depth: int, months: se
             # validate the path's month format
             parts = relpath_split[index].split()
             if len(parts) != 2 or not parts[0].isdecimal() or parts[1] not in months:
-                print(f"info: invalid: month path component: '{relpath_split[index]}': expect '<month_index> <month_name>' format")
+                logging.info(f"invalid: month path component: '{relpath_split[index]}': expect '<month_index> <month_name>' format")
                 invalid_paths.append(filepath)
                 continue
             index = 2
 
             # validate the path's day format
             if len(relpath_split[index]) != 2 or not relpath_split[index].isdecimal():
-                print(f"info: invalid: day path component: '{relpath_split[index]}': expect '2-digit day' format")
+                logging.info(f"invalid: day path component: '{relpath_split[index]}': expect '2-digit day' format")
                 invalid_paths.append(filepath)
                 continue
 
     return invalid_paths
+
+def validate_hierarchy_cli(args: argparse.Namespace, expected_depth: int, months: set[str]) -> list[str]:
+    return validate_hierarchy(args.input, expected_depth, months)
 
 def parse_args(valid_functions: set[str]) -> argparse.Namespace:
     '''Returns the parsed command-line arguments.
@@ -259,10 +264,10 @@ if __name__ == '__main__':
     script_functions = {FUNCTION_VALIDATE, FUNCTION_SORT}
     script_args = parse_args(script_functions)
 
-    print(f"info: running function '{script_args.function}'")
+    logging.info(f"running function '{script_args.function}'")
 
     # run the given script function
     if script_args.function == FUNCTION_VALIDATE:
-        validate_hierarchy(script_args, EXPECTED_DEPTH, set(constants.MAPPING_MONTH.values()))
+        validate_hierarchy_cli(script_args, EXPECTED_DEPTH, set(constants.MAPPING_MONTH.values()))
     elif script_args.function == FUNCTION_SORT:
-        sort_hierarchy(script_args, constants.MAPPING_MONTH)
+        sort_hierarchy_cli(script_args, constants.MAPPING_MONTH)
