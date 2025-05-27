@@ -358,8 +358,7 @@ if __name__ == '__main__':
         mappings = library.generate_date_paths(collection,
                                                script_args.output,
                                                playlist_ids=playlist_ids,
-                                               metadata_path=True,
-                                               swap_root_path=script_args.path_0)
+                                               metadata_path=True)
         mappings.sort(key=lambda m: key_date_context(m))
     
         timestamp = time.time()
