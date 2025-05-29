@@ -8,7 +8,7 @@ Functions to scan and manipulate a batch of music files.
     process:  Convenience function to run sweep, extract, flatten in sequence for a directory.
 '''
 
-# todo: properly document
+# TODO: properly document
 
 import argparse
 import os
@@ -144,6 +144,7 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
                 continue
 
             # handle zip archive
+            # TODO: refactor so that is_music_archive is its own function
             is_valid_archive = False
             if name_split[1] == '.zip':
                 is_valid_archive = True

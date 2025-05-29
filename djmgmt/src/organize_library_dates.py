@@ -22,6 +22,9 @@ import logging
 import constants
 import common
 
+# TODO: breakdown of tracks included in recorded sets
+# TODO: breakdown of tracks excluded from recorded sets
+
 # command support
 class Namespace(argparse.Namespace):
     # required
