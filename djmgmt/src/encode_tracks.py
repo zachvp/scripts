@@ -74,7 +74,7 @@ def ffmpeg_standardize(input_path: str, output_path: str) -> list[str]:
 
     return ffmpeg_base(input_path, output_path, options)
 
-def ffmpeg_mp3(input_path: str, output_path: str, map_options: str='-map 0') -> list[str]: # todo: use shlex.quote()
+def ffmpeg_mp3(input_path: str, output_path: str, map_options: str='-map 0') -> list[str]:
     options = f"-b:a 320k {map_options}"
     return ffmpeg_base(input_path, output_path, options)
 
@@ -177,6 +177,10 @@ def setup_storage(args: type[Namespace], filename: str) -> str:
     return store_path
 
 # primary functions
+# TODO: parallelize
+# TODO: add support for FLAC
+# TODO: extend so that output extension can be passed as a parameter
+# TODO: extend to preserve input extension
 def encode_lossless(args: type[Namespace]) -> None:
     '''Primary script function. Recursively walks the input path specified in `args` to re-encode each eligible file.
     A file is eligible if all conditions are met:

@@ -325,7 +325,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
         logging.info(f"processed batch in date context '{date_context}'")
         logging.info(f"sync progress: {progressFormat(index + 1)}")
 
-# TODO add interactive mode before any sync batch is possible
+# TODO add interactive mode to confirm sync state before any sync batch is possible
 if __name__ == '__main__':
     # setup
     common.configure_log(level=logging.DEBUG, path=__file__)
@@ -358,6 +358,7 @@ if __name__ == '__main__':
         playlist_ids: set[str] = set()
         for track in pruned:
             playlist_ids.add(track.attrib[constants.ATTR_KEY])
+        # TODO: optimize so only the dates after sync_state are loaded
         mappings = library.generate_date_paths(collection,
                                                script_args.output,
                                                playlist_ids=playlist_ids,
