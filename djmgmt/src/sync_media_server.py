@@ -27,7 +27,7 @@ import common
 import constants
 
 # Constants
-FILE_SYNC = 'state/sync_state.txt'
+FILE_SYNC =f"{constants.PROJECT_ROOT}{os.sep}state{os.sep}sync_state.txt"
 FILE_SYNC_KEY = 'sync_date'
 
 # Classes
@@ -187,6 +187,7 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tu
         logging.debug(f'run command: "{shlex.join(command)}"')
         timestamp = time.time()
         process = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
+        logging.info("transferred files to remote")
         timestamp = time.time() - timestamp
         logging.debug(f"time: {format_timing(timestamp)}\n{process.stdout.strip()}")
         return (process.returncode, process.stdout)
@@ -208,7 +209,7 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
     success = True
     
     # encode the current batch to MP3 format
-    logging.debug(f"encoding batch in date context {date_context}:\n{batch}")
+    logging.info(f"encoding batch in date context {date_context}:\n{batch}")
     encode_tracks.encode_lossy(batch, '.mp3', threads=28)
     
     # transfer batch to the media server
@@ -285,6 +286,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
             break
         
         # skip processed dates
+        # TODO: only check if processed date_context has not been checked already
         if not is_processed(date_context, date_context_previous):
             # collect each mapping in a given date context
             if date_context_previous == date_context:
@@ -323,6 +325,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
         logging.info(f"processed batch in date context '{date_context}'")
         logging.info(f"sync progress: {progressFormat(index + 1)}")
 
+# TODO add interactive mode before any sync batch is possible
 if __name__ == '__main__':
     # setup
     common.configure_log(level=logging.DEBUG, path=__file__)
@@ -362,6 +365,10 @@ if __name__ == '__main__':
         mappings.sort(key=lambda m: key_date_context(m))
     
         timestamp = time.time()
-        sync_from_mappings(mappings, script_args.scan_mode == Namespace.SCAN_FULL)
+        try:
+            sync_from_mappings(mappings, script_args.scan_mode == Namespace.SCAN_FULL)
+        except Exception as e:
+            logging.error(e)
+            raise
         timestamp = time.time() - timestamp
         logging.info(f"sync time: {format_timing(timestamp)}")
