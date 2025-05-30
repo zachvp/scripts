@@ -181,6 +181,15 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tu
     
     logging.info(f"transfer from '{source_path}' to '{dest_address}'")
     
+    # Options
+    #   --progess: show progress during transfer
+    #   -a: archive mode
+    #   -u: skip files that are newer on the receiver 
+    #   -v: increase verbosity
+    #   -z: compress file data during the transfer
+    #   -i: output a change-summary for all updates
+    #   -t: preserve modification times
+    #   -R: use relative path names
     options = "--progress -auvzitR --exclude '.*'"
     command = shlex.split(f"rsync {shlex.quote(source_path)} {dest_address}/{rsync_module} {options}")
     try:
@@ -254,6 +263,7 @@ def is_processed(date_context: str, date_context_previous: str) -> bool:
     logging.info(f"one date context is unprocessed: {date_context_previous}, {date_context}")
     return False
 
+# TODO: Support file updates (e.g. if metadata changes)
 def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
     # core data
     batch: list[tuple[str, str]] = []

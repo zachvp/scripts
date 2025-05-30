@@ -316,6 +316,7 @@ def prune_empty_cli(args: type[Namespace]) -> None:
 
 # TODO: add function to remove all non-music files
 # TODO: run encode_lossless as part of process
+# TODO: write to RB-compatible XML
 def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
     sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
     extract(args.output, args.output, args.interactive)

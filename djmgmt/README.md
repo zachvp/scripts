@@ -1,4 +1,7 @@
 # Next steps
+1. Integrate latest changes from development project
+2. Process downloads: extract batch metadata, write to RB-compatible XML
+3. Read Rekordbox DB for unassigned Tags in _pruned
 
 # Migrate music to server
 1. Clear music files
