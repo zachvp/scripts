@@ -184,19 +184,17 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tu
     # Options
     #   --progess: show progress during transfer
     #   -a: archive mode
-    #   -u: skip files that are newer on the receiver 
     #   -v: increase verbosity
     #   -z: compress file data during the transfer
     #   -i: output a change-summary for all updates
     #   -t: preserve modification times
     #   -R: use relative path names
-    options = "--progress -auvzitR --exclude '.*'"
+    options = "--progress -avzitR --exclude '.*'"
     command = shlex.split(f"rsync {shlex.quote(source_path)} {dest_address}/{rsync_module} {options}")
     try:
         logging.debug(f'run command: "{shlex.join(command)}"')
         timestamp = time.time()
         process = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-        logging.info("transferred files to remote")
         timestamp = time.time() - timestamp
         logging.debug(f"time: {format_timing(timestamp)}\n{process.stdout.strip()}")
         return (process.returncode, process.stdout)
@@ -220,6 +218,7 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
     # encode the current batch to MP3 format
     logging.info(f"encoding batch in date context {date_context}:\n{batch}")
     encode_tracks.encode_lossy(batch, '.mp3', threads=28)
+    logging.info(f"finished encoding batch in date context {date_context}")
     
     # transfer batch to the media server
     transfer_path = transform_implied_path(dest)
@@ -229,6 +228,7 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
         
         # Check if file transfer succeeded
         if success:
+            logging.info('file transfer succeeded, initiating remote scan')
             # tell the media server new files are available
             scan_param = 'false'
             if full_scan:
@@ -237,12 +237,14 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
             if response.ok:
                 # wait until the server has stopped scanning
                 while True:
+                    # TODO: add error handling
                     response = subsonic_client.call_endpoint(subsonic_client.API.GET_SCAN_STATUS)
                     content = subsonic_client.handle_response(response, subsonic_client.API.GET_SCAN_STATUS)
                     if not content or content['scanning'] == 'false':
                         break
-                    logging.debug("scan in progress, waiting...")
+                    logging.debug("remote scan in progress, waiting...")
                     time.sleep(1) # TODO: sleep for more time if full scan
+                logging.info('remote scan complete')
     else:
         success = False
         logging.error(f"empty transfer path: unable to transfer from '{source}' to '{dest}'")
