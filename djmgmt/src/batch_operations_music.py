@@ -1,11 +1,12 @@
 '''
 Functions to scan and manipulate a batch of music files.
-    sweep:    Moves all music files and archives to another directory.
-    flatten:  Flattens all files in a given directory, including subdirectories.
-    extract:  Extract files from all archives.
-    compress: Zips the contents of a given directory.
-    prune:    Removes all empty folders and non-music files from a directory.
-    process:  Convenience function to run sweep, extract, flatten in sequence for a directory.
+    sweep:           Moves all music files and archives to another directory.
+    flatten:         Flattens all files in a given directory, including subdirectories.
+    extract:         Extract files from all archives.
+    compress:        Zips the contents of a given directory.
+    prune:           Removes all empty folders and non-music files from a directory.
+    prune_non_music: Removes all non-music files from a directory.
+    process:         Convenience function to run sweep, extract, flatten, and all prune functions in sequence for a directory.
 '''
 
 # TODO: properly document
@@ -19,7 +20,7 @@ import logging
 import common
 
 # constants
-EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', 'flac'}
+EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'}
 PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
 
 # classes
@@ -30,15 +31,16 @@ class Namespace(argparse.Namespace):
     output: str
     interactive: bool
     
-    # functions
+    # primary functions
     FUNCTION_SWEEP = 'sweep'
     FUNCTION_FLATTEN = 'flatten'
     FUNCTION_EXTRACT = 'extract'
     FUNCTION_COMPRESS = 'compress'
     FUNCTION_PRUNE = 'prune'
     FUNCTION_PROCESS = 'process'
+    FUNCTION_PRUNE_NON_MUSIC = 'prune_non_music'
     
-    FUNCTIONS_SINGLE_ARG = {FUNCTION_COMPRESS, FUNCTION_FLATTEN, FUNCTION_PRUNE}
+    FUNCTIONS_SINGLE_ARG = {FUNCTION_COMPRESS, FUNCTION_FLATTEN, FUNCTION_PRUNE, FUNCTION_PRUNE_NON_MUSIC}
     FUNCTIONS = {FUNCTION_SWEEP, FUNCTION_EXTRACT, FUNCTION_PROCESS}.union(FUNCTIONS_SINGLE_ARG)
 
 # Helper functions
@@ -92,16 +94,6 @@ def flatten_zip(zip_path: str, extract_path: str) -> None:
     if os.path.exists(unzipped_path) and len(os.listdir(unzipped_path)) < 1:
         logging.info(f"remove empty unzipped path {unzipped_path}")
         shutil.rmtree(unzipped_path)
-
-def prune(working_dir: str, directories: list[str], filenames: list[str]) -> None:
-    for index, directory in enumerate(directories):
-        if is_prefix_match(directory, {'.', '_'}) or '.app' in directory:
-            logging.info(f"prune: hidden directory or '.app' archive '{os.path.join(working_dir, directory)}'")
-            del directories[index]
-    for index, name in enumerate(filenames):
-        if name.startswith('.'):
-            logging.info(f"prune: hidden file '{name}'")
-            del filenames[index]
 
 def is_empty_dir(top: str) -> bool:
     if not os.path.isdir(top):
@@ -313,14 +305,40 @@ def prune_empty(source: str, interactive: bool) -> None:
 def prune_empty_cli(args: type[Namespace]) -> None:
     prune_empty(args.input, args.interactive)
     
+def prune_non_music(source: str, valid_extensions: set[str], interactive: bool) -> None:
+    """Removes all files that don't have a valid music extension from the given directory."""
+    for working_dir, _, filenames in os.walk(source):
+        for name in filenames:
+            input_path = os.path.join(working_dir, name)
+            name_split = os.path.splitext(name)
+            
+            # Check extension
+            if name_split[1] not in valid_extensions:
+                logging.info(f"non-music file found: '{input_path}'")
+                if interactive:
+                    choice = input("continue? [y/N]")
+                    if choice != 'y':
+                        logging.info('skip: user skipped')
+                        continue
+                try:
+                    if name_split[1] == '.app':
+                        shutil.rmtree(input_path)
+                    else:
+                        os.remove(input_path)
+                    logging.info(f"removed: '{input_path}'")
+                except OSError as e:
+                    logging.error(f"Error removing file '{input_path}': {str(e)}")
 
-# TODO: add function to remove all non-music files
+def prune_non_music_cli(args: type[Namespace], valid_extensions: set[str]) -> None:
+    prune_non_music(args.input, valid_extensions, args.interactive)
+
 # TODO: run encode_lossless as part of process
 # TODO: write to RB-compatible XML
 def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
     sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
     extract(args.output, args.output, args.interactive)
     flatten_hierarchy(args.output, args.output, args.interactive)
+    prune_non_music(args.output, valid_extensions, args.interactive)
     prune_empty(args.output, args.interactive)
 
 if __name__ == '__main__':
@@ -340,5 +358,7 @@ if __name__ == '__main__':
         compress_all_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_PRUNE:
         prune_empty_cli(script_args)
+    elif script_args.function == Namespace.FUNCTION_PRUNE_NON_MUSIC:
+        prune_non_music_cli(script_args, EXTENSIONS)
     elif script_args.function == Namespace.FUNCTION_PROCESS:
         process_cli(script_args, EXTENSIONS, PREFIX_HINTS)
