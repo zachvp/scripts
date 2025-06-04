@@ -13,7 +13,6 @@ import asyncio
 from asyncio import Task, Future, AbstractEventLoop
 from typing import Any
 
-
 import common
 import constants
 
@@ -78,7 +77,7 @@ def ffmpeg_mp3(input_path: str, output_path: str, map_options: str='-map 0') -> 
     options = f"-b:a 320k {map_options}"
     return ffmpeg_base(input_path, output_path, options)
 
-def read_ffprobe_value(args: type[Namespace], input_path: str, stream_key: str) -> str:
+def read_ffprobe_value(input_path: str, stream_key: str) -> str:
     '''Uses ffprobe command line tool. Reads the ffprobe value for a particular stream entry.
 
     Args:
@@ -93,11 +92,9 @@ def read_ffprobe_value(args: type[Namespace], input_path: str, stream_key: str) 
     command.append(input_path)
 
     try:
-        if args.verbose:
-            logging.debug(f"read_ffprobe_value: {command}")
+        logging.debug(f"read_ffprobe_value command: {command}")
         value = subprocess.run(command, check=True, capture_output=True, encoding='utf-8').stdout.strip()
-        if args.verbose:
-            logging.debug(f"read_ffprobe_value: {value}")
+        logging.debug(f"read_ffprobe_value result: {value}")
         return value
     except subprocess.CalledProcessError as error:
         logging.error(f"fatal: read_ffprobe_value: CalledProcessError:\n{error.stderr.strip()}")
@@ -147,24 +144,24 @@ def guess_cover_stream_specifier(streams: list[dict[str, Any]]) -> int:
             min_index = index
     return min_index
 
-def check_skip_sample_rate(args: type[Namespace], input_path: str) -> bool:
+def check_skip_sample_rate(input_path: str) -> bool:
     '''Returns `True` if sample rate for `input_path` is at or below the standardized value.'''
-    result = read_ffprobe_value(args, input_path, 'sample_rate')
+    result = read_ffprobe_value(input_path, 'sample_rate')
     return False if len(result) < 1 else int(result) <= 44100
 
-def check_skip_bit_depth(args: type[Namespace], input_path: str) -> bool:
+def check_skip_bit_depth(input_path: str) -> bool:
     '''Returns `True` if bit depth (aka 'sample format') is at or below the standardized value.'''
-    result = read_ffprobe_value(args, input_path, 'sample_fmt').lstrip('s')
+    result = read_ffprobe_value(input_path, 'sample_fmt').lstrip('s')
     return False if len(result) < 1 else int(result) <= 16
 
-def setup_storage(args: type[Namespace], filename: str) -> str:
+def setup_storage(dir_path: str, filename: str) -> str:
     '''Create or clear a storage file called `filename` at the path specified in `args`.
 
     Returns:
     The absolute path to the storage file.
     '''
     script_path_list = os.path.normpath(__file__).split(os.sep)
-    storage_dir = os.path.normpath(f"{args.store_path}/{script_path_list[-1].rstrip('.py')}/")
+    storage_dir = os.path.normpath(f"{dir_path}/{script_path_list[-1].rstrip('.py')}/")
     if not os.path.exists(storage_dir):
         os.makedirs(storage_dir)
 
@@ -177,12 +174,21 @@ def setup_storage(args: type[Namespace], filename: str) -> str:
     return store_path
 
 # primary functions
+def encode_lossless_cli(args: type[Namespace]) -> list[tuple[str, str]]:
+    return encode_lossless(args.input, args.output, args.extension, args.store_path, args.store_skipped, args.interactive)
+
 # TODO: parallelize
 # TODO: add support for FLAC
 # TODO: extend so that output extension can be passed as a parameter
 # TODO: extend to preserve input extension
-def encode_lossless(args: type[Namespace]) -> None:
+def encode_lossless(input_dir: str,
+                    output_dir: str,
+                    extension: str,
+                    store_path: str | None = None,
+                    store_skipped: bool = False,
+                    interactive: bool = False) -> list[tuple[str, str]]:
     '''Primary script function. Recursively walks the input path specified in `args` to re-encode each eligible file.
+    Returns a list of the processed (input_file_path, output_file_path) tuples.
     A file is eligible if all conditions are met:
         1) It is an uncompressed `aiff` or `wav` type.
         2) It has a sample rate exceeding 44100 Hz or a bit depth exceeding 16 bits.
@@ -191,33 +197,35 @@ def encode_lossless(args: type[Namespace]) -> None:
 
     If `args` is configured properly, the script can also store each difference in file size before and after re-encoding.
     '''
-
     # TODO: extend to keep current extension if extension not provided
-    if not args.extension.startswith('.'):
-        error = ValueError(f"invalid extension {args.extension}")
+    if not extension.startswith('.'):
+        error = ValueError(f"invalid extension {extension}")
         logging.error(error)
         raise error
+    
+    # Core data
+    processed_files: list[tuple[str, str]] = []
     size_diff_sum = 0.0
 
     # set up storage
     store_path_size_diff: str | None = None
     store_path_skipped: str | None = None
     skipped_files: list[str] | None = None
-    if args.store_path:
-        store_path_size_diff = setup_storage(args, 'size-diff.tsv')
-    if args.store_skipped:
-        store_path_skipped = setup_storage(args, 'skipped.tsv')
-        skipped_files = []
+    if store_path:
+        store_path_size_diff = setup_storage(store_path, 'size-diff.tsv')
+        if store_skipped:
+            store_path_skipped = setup_storage(store_path, 'skipped.tsv')
+            skipped_files = []
 
-    # confirm storage with user
-    if args.interactive and args.store_path:
-        choice = input("storage set up, does everything look okay? [y/N]")
-        if choice != 'y':
-            logging.info("user quit")
-            return
+        # interactive mode: confirm storage with user
+        if interactive:
+            choice = input("storage set up, does everything look okay? [y/N]")
+            if choice != 'y':
+                logging.info("user quit")
+                return processed_files
 
     # main processing loop
-    for working_dir, dirnames, filenames in os.walk(args.input):
+    for working_dir, dirnames, filenames in os.walk(input_dir):
         # prune hidden directories
         for index, directory in enumerate(dirnames):
             if directory.startswith('.'):
@@ -238,8 +246,8 @@ def encode_lossless(args: type[Namespace]) -> None:
                     skipped_files.append(f"{input_path}\n")
                 continue
             if not name.endswith('.wav') and\
-            check_skip_sample_rate(args, input_path) and\
-            check_skip_bit_depth(args, input_path):
+            check_skip_sample_rate(input_path) and\
+            check_skip_bit_depth(input_path):
                 logging.debug(f"skip: optimal sample rate and bit depth: '{input_path}'")
                 if skipped_files:
                     skipped_files.append(f"{input_path}\n")
@@ -247,8 +255,8 @@ def encode_lossless(args: type[Namespace]) -> None:
 
             # -- build the output path
             # swap existing extension with the configured one
-            output_filename = f"{name_split[0]}{args.extension}"
-            output_path = os.path.join(args.output, ''.join(output_filename))
+            output_filename = f"{name_split[0]}{extension}"
+            output_path = os.path.join(output_dir, ''.join(output_filename))
 
             if os.path.splitext(os.path.basename(input_path))[0] != os.path.splitext(os.path.basename(output_path))[0]:
                 choice = input(f"warn: mismatched file names for '{input_path}' and '{output_path}'. Continue? [y/N]")
@@ -257,7 +265,7 @@ def encode_lossless(args: type[Namespace]) -> None:
                     break
 
             # interactive mode
-            if args.interactive:
+            if interactive:
                 choice = input(f"re-encode '{input_path}'? [y/N]")
                 if choice != 'y':
                     logging.info('exit, user quit')
@@ -265,10 +273,10 @@ def encode_lossless(args: type[Namespace]) -> None:
 
             # -- build and run the ffmpeg encode command
             command = ffmpeg_standardize(input_path, output_path)
-            if args.verbose:
-                logging.debug(f"run cmd:\n\t{command}")
+            logging.debug(f"run cmd:\n\t{command}")
             try:
                 subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
+                processed_files.append((input_path, output_path))
                 logging.debug(f"success: {output_path}")
             except subprocess.CalledProcessError as error:
                 logging.error(f"subprocess:\n{error.stderr.strip()}")
@@ -279,20 +287,22 @@ def encode_lossless(args: type[Namespace]) -> None:
             size_diff = round(size_diff, 2)
             logging.info(f"file size diff: {size_diff} MB")
 
-            if args.store_path and store_path_size_diff:
+            if store_path and store_path_size_diff:
                 with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
                     store_file.write(f"{input_path}\t{output_path}\t{size_diff}\n")
             # separate entries
             logging.info("= = = =")
 
-    if args.store_path and store_path_size_diff:
+    if store_path and store_path_size_diff:
         with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
             store_file.write(f"\n=> size diff sum: {round(size_diff_sum, 2)} MB")
             logging.info(f"wrote cumulative size difference to '{store_path_size_diff}'")
-    if args.store_skipped and store_path_skipped and skipped_files:
+    if store_skipped and store_path_skipped and skipped_files:
         with open(store_path_skipped, 'a', encoding='utf-8') as store_file:
             store_file.writelines(skipped_files)
             logging.info(f"wrote skipped files to '{store_path_skipped}'")
+    
+    return processed_files
 
 def run_command(command: list[str]) -> tuple[int, str]:
     try:
@@ -443,7 +453,7 @@ if __name__ == '__main__':
     script_args = parse_args(Namespace.FUNCTIONS)
     
     if script_args.function == Namespace.FUNCTION_LOSSLESS:
-        encode_lossless(script_args)
+        encode_lossless_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_LOSSY:
         encode_lossy_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_MISSING_ART:

@@ -479,8 +479,14 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_remove.assert_called_once()
         mock_rmtree.assert_not_called()
         
-        
 class TestProcess(unittest.TestCase):
+    @patch('shutil.rmtree')
+    @patch('tempfile.TemporaryDirectory')
+    @patch('os.remove')
+    @patch('os.makedirs')
+    @patch('os.mkdir')
+    # ^ Inject mocks for possible file operations
+    @patch('encode_tracks.encode_lossless')
     @patch('batch_operations_music.prune_non_music')
     @patch('batch_operations_music.prune_empty')
     @patch('batch_operations_music.flatten_hierarchy')
@@ -491,9 +497,14 @@ class TestProcess(unittest.TestCase):
                      mock_extract: MagicMock,
                      mock_flatten: MagicMock,
                      mock_prune_empty: MagicMock,
-                     mock_prune_non_music: MagicMock) -> None:
+                     mock_prune_non_music: MagicMock,
+                     mock_encode_lossless: MagicMock,
+                     mock_mkdir: MagicMock,
+                     mock_make_dirs: MagicMock,
+                     mock_remove: MagicMock,
+                     mock_temp_dir: MagicMock,
+                     mock_rmtree: MagicMock) -> None:
         '''Tests that the process function calls the expected functions in the the correct order.'''
-        
         # Set up mocks
         mock_call_container = MagicMock()
         mock_sweep.side_effect = lambda *_, **__: mock_call_container.sweep()
@@ -501,19 +512,36 @@ class TestProcess(unittest.TestCase):
         mock_flatten.side_effect = lambda *_, **__: mock_call_container.flatten()
         mock_prune_empty.side_effect = lambda *_, **__: mock_call_container.prune_empty()
         mock_prune_non_music.side_effect = lambda *_, **__: mock_call_container.prune_non_music()
+        mock_encode_lossless.side_effect = lambda *_, **__: mock_call_container.encode_lossless()
+        
+        # Mock the result of the lossless function
+        mock_encode_lossless.return_value = [
+            ('/mock/input/file_0.aif', '/mock/output/file_0.aiff'),
+            ('/mock/input/file_1.wav', '/mock/output/file_1.aiff')
+        ]
         
         # Call target function
-        mock_namespace = Namespace(input='/mock/input/', output='/mock/output/', interactive=False)
-        batch_operations_music.process_cli(mock_namespace, set(), set()) # type: ignore
+        args = Namespace(input='/mock/input/', output='/mock/output/', interactive=False)
+        batch_operations_music.process_cli(args, set(), set()) # type: ignore
         
-        # Assert that the dependent functions are called in the correct order
-        self.assertEqual(len(mock_call_container.mock_calls), 5)
+        # Assert that the primary dependent functions are called in the correct order
         self.assertEqual(mock_call_container.mock_calls[0], call.sweep())
         self.assertEqual(mock_call_container.mock_calls[1], call.extract())
         self.assertEqual(mock_call_container.mock_calls[2], call.flatten())
-                
-        self.assertTrue(mock_call_container.mock_calls[3] == call.prune_empty() or mock_call_container.mock_calls[3] == call.prune_non_music())
-        self.assertTrue(mock_call_container.mock_calls[4] == call.prune_empty() or mock_call_container.mock_calls[4] == call.prune_non_music())
+        self.assertEqual(mock_call_container.mock_calls[3], call.encode_lossless())
+        
+        # The last two calls are expected to be the same last two calls as existing implementation
+        self.assertEqual(mock_call_container.mock_calls[-2], call.prune_non_music())
+        self.assertEqual(mock_call_container.mock_calls[-1], call.prune_empty())
+        
+        # Assert that encoding was not called with the same input and output
+        self.assertNotEqual(mock_encode_lossless.call_args.args[0], mock_encode_lossless.call_args.args[1])
+        
+        # Assert that encoding was called for AIFF format
+        self.assertEqual(mock_encode_lossless.call_args.args[2], '.aiff')
+        
+        # Assert that defined interactive mode was respected
+        self.assertEqual(args.interactive, mock_encode_lossless.call_args.kwargs['interactive'])
 
 class TestPruneEmpty(unittest.TestCase):
     @patch('shutil.rmtree')

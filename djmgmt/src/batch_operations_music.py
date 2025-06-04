@@ -18,6 +18,7 @@ import zipfile
 import logging
 
 import common
+import encode_tracks
 
 # constants
 EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'}
@@ -121,6 +122,18 @@ def get_dirs(top: str) -> list[str]:
         if os.path.isdir(path):
             dirs.append(path)
     return dirs
+
+def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: set[str], interactive: bool) -> None:
+    from tempfile import TemporaryDirectory
+    
+    # Create a temporary directory to place the encoded files.
+    with TemporaryDirectory() as temp_dir:
+        result = encode_tracks.encode_lossless(source, temp_dir, '.aiff', interactive=interactive)
+        # Remove all of the original non-standard files that have been encoded.
+        for input_path, _ in result:
+            os.remove(input_path)
+        # Sweep all the encoded files from the temporary directory to the original source directory
+        sweep(temp_dir, source, False, valid_extensions, prefix_hints)
 
 # Primary functions
 def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> None:
@@ -332,12 +345,13 @@ def prune_non_music(source: str, valid_extensions: set[str], interactive: bool) 
 def prune_non_music_cli(args: type[Namespace], valid_extensions: set[str]) -> None:
     prune_non_music(args.input, valid_extensions, args.interactive)
 
-# TODO: run encode_lossless as part of process
 # TODO: write to RB-compatible XML
+# TODO: check for missing art
 def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
     sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
     extract(args.output, args.output, args.interactive)
     flatten_hierarchy(args.output, args.output, args.interactive)
+    standardize_lossless(args.output, valid_extensions, prefix_hints, args.interactive)
     prune_non_music(args.output, valid_extensions, args.interactive)
     prune_empty(args.output, args.interactive)
 
