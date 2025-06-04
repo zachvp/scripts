@@ -173,6 +173,46 @@ def setup_storage(dir_path: str, filename: str) -> str:
 
     return store_path
 
+def run_command(command: list[str]) -> tuple[int, str]:
+    try:
+        logging.debug(f"run command: {shlex.join(command)}")
+        result = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
+        logging.debug(f"command success:\n{result.stdout.strip()}")
+        return (result.returncode, result.stdout.strip())
+    except subprocess.CalledProcessError as error:
+        logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
+        return (error.returncode, error.stderr.strip())
+
+async def run_command_async(command: list[str]) -> tuple[int, str]:
+    logging.debug(f"run command: {shlex.join(command)}")
+    process = await asyncio.create_subprocess_shell(
+        shlex.join(command),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE)
+    
+    # wait for process to finish
+    stdout, stderr = await process.communicate()
+    if process.returncode is None:
+        raise RuntimeError(f"process has return code 'None'.")
+    if process.returncode == 0:
+        message = f"command output:\n"
+        output = ''
+        if stdout:
+            output = stdout.decode()
+        elif stderr:
+            output = stderr.decode()
+        
+        message += output
+        logging.debug(message)
+        return (process.returncode, output)
+    else:
+        stderr = stderr.decode()
+        logging.error(f"return code '{process.returncode}':\n{stderr}")
+        return (process.returncode, stderr)
+
+async def collect_tasks(tasks: list[Task]) -> list[Future]:
+    return await asyncio.gather(*tasks)
+
 # primary functions
 def encode_lossless_cli(args: type[Namespace]) -> list[tuple[str, str]]:
     return encode_lossless(args.input, args.output, args.extension, args.store_path, args.store_skipped, args.interactive)
@@ -303,46 +343,6 @@ def encode_lossless(input_dir: str,
             logging.info(f"wrote skipped files to '{store_path_skipped}'")
     
     return processed_files
-
-def run_command(command: list[str]) -> tuple[int, str]:
-    try:
-        logging.debug(f"run command: {shlex.join(command)}")
-        result = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-        logging.debug(f"command success:\n{result.stdout.strip()}")
-        return (result.returncode, result.stdout.strip())
-    except subprocess.CalledProcessError as error:
-        logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
-        return (error.returncode, error.stderr.strip())
-
-async def run_command_async(command: list[str]) -> tuple[int, str]:
-    logging.debug(f"run command: {shlex.join(command)}")
-    process = await asyncio.create_subprocess_shell(
-        shlex.join(command),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE)
-    
-    # wait for process to finish
-    stdout, stderr = await process.communicate()
-    if process.returncode is None:
-        raise RuntimeError(f"process has return code 'None'.")
-    if process.returncode == 0:
-        message = f"command output:\n"
-        output = ''
-        if stdout:
-            output = stdout.decode()
-        elif stderr:
-            output = stderr.decode()
-        
-        message += output
-        logging.debug(message)
-        return (process.returncode, output)
-    else:
-        stderr = stderr.decode()
-        logging.error(f"return code '{process.returncode}':\n{stderr}")
-        return (process.returncode, stderr)
-
-async def collect_tasks(tasks: list[Task]) -> list[Future]:
-    return await asyncio.gather(*tasks)
 
 def encode_lossy_cli(args: type[Namespace]) -> None:
     '''Parse each path mapping entry into an encoding operation.'''
