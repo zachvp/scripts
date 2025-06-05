@@ -102,7 +102,7 @@ def read_ffprobe_value(input_path: str, stream_key: str) -> str:
         sys.exit()
 
 def command_ffprobe_json(path: str) -> list[str]:
-    # ffprobe -v error -select_streams v -show_entries stream=index,codec_name,codec_type,width,height,:tags=comment -of json '/Users/zachvp/Music/DJ/Bernard Badie - Train feat Dajae (Original .aiff'
+    # ffprobe -v error -select_streams v -show_entries stream=index,codec_name,codec_type,width,height,:tags=comment -of json '/Users/user/Music/DJ/Bernard Badie - Train feat Dajae (Original .aiff'
     
     command_str = f"ffprobe -v error -select_streams v"
     command_str += f" -show_entries stream=index,width,height,:tags=comment -of json {shlex.quote(path)}"
