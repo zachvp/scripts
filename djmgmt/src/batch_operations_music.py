@@ -16,13 +16,20 @@ import os
 import shutil
 import zipfile
 import logging
+import constants
+
+from datetime import datetime
+import uuid
+import xml.etree.ElementTree as ET
 
 import common
 import encode_tracks
+from common_tags import read_tags 
 
 # constants
 EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'}
 PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
+COLLECTION_PATH = os.path.join(os.path.dirname(__file__), 'data', 'processed-collection.xml')
 
 # classes
 class Namespace(argparse.Namespace):
@@ -134,6 +141,76 @@ def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: 
             os.remove(input_path)
         # Sweep all the encoded files from the temporary directory to the original source directory
         sweep(temp_dir, source, False, valid_extensions, prefix_hints)
+
+def record_collection(source: str, collection_path: str) -> None:
+    TAG_TRACK = 'TRACK'
+    
+    # Create or load the collection XML
+    if os.path.exists(collection_path):
+        try:
+            tree = ET.parse(collection_path)
+            root = tree.getroot()
+            collection = root.find('.//COLLECTION')
+            if collection is None:
+                raise ValueError('Invalid collection file format: missing COLLECTION element')
+        except Exception as e:
+            logging.error(f"Error loading collection file: {e}")
+            return
+    else:
+        # Create a new collection file with the basic structure
+        root = ET.Element('DJ_PLAYLISTS', {'Version': '1.0.0'})
+        ET.SubElement(root, 'PRODUCT', {'Name': 'rekordbox', 'Version': '6.8.5', 'Company': 'AlphaTheta'})
+        collection = ET.SubElement(root, 'COLLECTION', {'Entries': '0'})
+    
+    # Count existing tracks
+    existing_tracks = len(collection.findall(TAG_TRACK))
+    new_tracks = 0
+    
+    # Process all music files in the source directory
+    for working_dir, _, filenames in os.walk(source):
+        for name in filenames:
+            file_path = os.path.join(working_dir, name)
+            name_split = os.path.splitext(name)
+            
+            # Only process music files
+            if name_split[1] in EXTENSIONS:
+                # Check if file is already in collection
+                file_url = f"file://localhost{file_path}"
+                existing = collection.find(f"./TRACK[@Location='{file_url}']")
+                if existing is not None:
+                    logging.debug(f"Skip: track already in collection: {file_path}")
+                    continue
+                
+                # Get track metadata
+                tags = read_tags(file_path)
+                if not tags:
+                    logging.warning(f"Skip: could not read tags for {file_path}")
+                    continue
+                
+                # Create track element with required attributes
+                track_id = str(uuid.uuid4().int)[:9]  # Generate a unique ID
+                today = datetime.now().strftime('%Y-%m-%d')
+                
+                track_attrs = {
+                    constants.ATTR_TRACK_ID: track_id,
+                    'Name': tags.title or name_split[0], # Unable to confirm whether this constant exists from context files
+                    constants.ATTR_ARTIST: tags.artist or constants.UNKNOWN_ARTIST,
+                    constants.ATTR_ALBUM: tags.album or constants.UNKNOWN_ALBUM,
+                    constants.ATTR_DATE_ADDED: today,
+                    constants.ATTR_PATH: file_url
+                }
+                
+                ET.SubElement(collection, TAG_TRACK, track_attrs)
+                new_tracks += 1
+                logging.info(f"Added track to collection: {file_path}")
+    
+    # Update the Entries attribute
+    collection.set('Entries', str(existing_tracks + new_tracks))
+    
+    # Write the updated XML to file
+    tree = ET.ElementTree(root)
+    tree.write(collection_path, encoding='UTF-8', xml_declaration=True)
+    logging.info(f"Collection updated with {new_tracks} new tracks at {collection_path}")
 
 # Primary functions
 def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> None:
@@ -345,7 +422,6 @@ def prune_non_music(source: str, valid_extensions: set[str], interactive: bool) 
 def prune_non_music_cli(args: type[Namespace], valid_extensions: set[str]) -> None:
     prune_non_music(args.input, valid_extensions, args.interactive)
 
-# TODO: write to RB-compatible XML
 # TODO: check for missing art
 def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
     sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
@@ -354,6 +430,7 @@ def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints:
     standardize_lossless(args.output, valid_extensions, prefix_hints, args.interactive)
     prune_non_music(args.output, valid_extensions, args.interactive)
     prune_empty(args.output, args.interactive)
+    record_collection(args.output, COLLECTION_PATH)
 
 if __name__ == '__main__':
     common.configure_log(path=__file__)

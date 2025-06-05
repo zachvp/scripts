@@ -10,7 +10,7 @@ The following Track attributes will be corrected:
 import sys
 import xml.etree.ElementTree as ET
 
-# Constants
+# Constants - TODO: move to constants file
 XPATH_COLLECTION = './/COLLECTION'
 
 ATTR_NAME = 'Name'
@@ -75,7 +75,7 @@ def script(
 
     # write the corrected collection to the specified file
     tree_incorrect.write(
-        file_or_filename=path_collection_output,
+        path_collection_output,
         encoding='UTF-8',
         xml_declaration=True)
 
