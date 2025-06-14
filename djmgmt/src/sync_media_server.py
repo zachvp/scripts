@@ -366,10 +366,11 @@ if __name__ == '__main__':
         pruned = library.find_node(script_args.input, constants.XPATH_PRUNED)
         collection = library.find_node(script_args.input, constants.XPATH_COLLECTION)
         
-        # collect the playlist IDs
-        playlist_ids: set[str] = set()
-        for track in pruned:
-            playlist_ids.add(track.attrib[constants.ATTR_KEY])
+        # collect the target playlist IDs to sync
+        playlist_ids: set[str] = {
+            track.attrib[constants.ATTR_KEY]
+            for track in pruned
+        }
         # TODO: optimize so only the dates after sync_state are passed to sync function
         mappings = library.generate_date_paths(collection,
                                                script_args.output,
