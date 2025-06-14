@@ -27,7 +27,6 @@ class Namespace(argparse.Namespace):
     store_path: str
     store_skipped: bool
     interactive: bool
-    verbose: bool
     
     # functions
     FUNCTION_LOSSLESS = 'lossless'
@@ -47,7 +46,6 @@ def parse_args(functions: set[str]) -> type[Namespace]:
     parser.add_argument('--store-path', type=str, help='the script storage path to write to')
     parser.add_argument('--store-skipped', action='store_true', help='store the skipped files in store path')
     parser.add_argument('--interactive', '-i', action='store_true', help='run the script in interactive mode')
-    parser.add_argument('--verbose', '-v', action='store_true', help='run the script with verbose output')
 
     args = parser.parse_args(namespace=Namespace)
     
