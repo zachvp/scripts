@@ -1,9 +1,7 @@
 # Next steps
-1. Integrate latest changes from development project
-2. Process downloads: extract batch metadata, write to RB-compatible XML
-3. Read Rekordbox DB for unassigned Tags in _pruned
-4. Discover unplayed tracks: read RB XML to determine played tracks in archive; create playlist of all tracks not in archive
-5. Check if existing playlist has any previously played tracks
+1. Read Rekordbox DB for unassigned Tags in _pruned
+2. Discover unplayed tracks: read RB XML to determine played tracks in archive; create playlist of all tracks not in archive
+3. Check if existing playlist has any previously played tracks
 
 # Migrate music to server
 1. Clear music files
