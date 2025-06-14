@@ -29,7 +29,7 @@ from common_tags import read_tags
 # constants
 EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'}
 PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
-COLLECTION_PATH = os.path.join(os.path.dirname(__file__), 'data', 'processed-collection.xml')
+COLLECTION_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'processed-collection.xml')
 
 # classes
 class Namespace(argparse.Namespace):
@@ -52,6 +52,7 @@ class Namespace(argparse.Namespace):
     FUNCTIONS = {FUNCTION_SWEEP, FUNCTION_EXTRACT, FUNCTION_PROCESS}.union(FUNCTIONS_SINGLE_ARG)
 
 # Helper functions
+# TODO: include function docstring in help summary (-h)
 def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> type[Namespace]:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('function', type=str, help=f"Which script function to run. One of '{valid_functions}'.\
@@ -142,6 +143,7 @@ def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: 
         # Sweep all the encoded files from the temporary directory to the original source directory
         sweep(temp_dir, source, False, valid_extensions, prefix_hints)
 
+# TODO: extend to save backup of previous X versions
 def record_collection(source: str, collection_path: str) -> None:
     TAG_TRACK = 'TRACK'
     
@@ -167,6 +169,7 @@ def record_collection(source: str, collection_path: str) -> None:
     new_tracks = 0
     
     # Process all music files in the source directory
+    # TODO: refactor to use common.collect_paths
     for working_dir, _, filenames in os.walk(source):
         for name in filenames:
             file_path = os.path.join(working_dir, name)
@@ -175,6 +178,8 @@ def record_collection(source: str, collection_path: str) -> None:
             # Only process music files
             if name_split[1] in EXTENSIONS:
                 # Check if file is already in collection
+                # TODO: check using 'generate_id' in restore_collection_metadata
+                # TODO: if exists, update with new information
                 file_url = f"file://localhost{file_path}"
                 existing = collection.find(f"./TRACK[@Location='{file_url}']")
                 if existing is not None:
@@ -396,7 +401,7 @@ def prune_empty_cli(args: type[Namespace]) -> None:
     prune_empty(args.input, args.interactive)
     
 def prune_non_music(source: str, valid_extensions: set[str], interactive: bool) -> None:
-    """Removes all files that don't have a valid music extension from the given directory."""
+    '''Removes all files that don't have a valid music extension from the given directory.'''
     for working_dir, _, filenames in os.walk(source):
         for name in filenames:
             input_path = os.path.join(working_dir, name)
@@ -424,6 +429,15 @@ def prune_non_music_cli(args: type[Namespace], valid_extensions: set[str]) -> No
 
 # TODO: check for missing art
 def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
+    '''Performs the following, in sequence:
+        1. Sweeps all music files and archives from a source directory into a target directory.
+        2. Flattens the files within the target directory.
+        3. Standardizes lossless encodings.
+        4. Removes all non-music files, archives, and folders in the target directory.
+        5. Records the processed files to a Rekordbox-like XML file.
+        
+        The source and target directories may be the same for effectively in-place processing.
+    '''
     sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
     extract(args.output, args.output, args.interactive)
     flatten_hierarchy(args.output, args.output, args.interactive)
