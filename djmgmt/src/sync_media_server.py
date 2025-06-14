@@ -370,7 +370,7 @@ if __name__ == '__main__':
         playlist_ids: set[str] = set()
         for track in pruned:
             playlist_ids.add(track.attrib[constants.ATTR_KEY])
-        # TODO: optimize so only the dates after sync_state are loaded
+        # TODO: optimize so only the dates after sync_state are passed to sync function
         mappings = library.generate_date_paths(collection,
                                                script_args.output,
                                                playlist_ids=playlist_ids,
