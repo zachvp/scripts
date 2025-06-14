@@ -16,7 +16,7 @@ class Namespace(argparse.Namespace):
     
     # optional
     output: str
-    comparison: str  # Added for comparison directory (required for 'find_changed')
+    comparison: str
     
     # constants
     FUNCTION_LOG_DUPLICATES = 'log_duplicates'

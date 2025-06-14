@@ -58,12 +58,12 @@ def parse_args() -> argparse.Namespace:
     return args
 
 def find_column(path: str, name: str) -> int:
-    """Locate the index of a column by name in a file's header row.
+    '''Locate the index of a column by name in a file's header row.
     
     Args:
         path: Path to the file to read.
         name: Name of the column to find.
-    """
+    '''
     from typing import Callable
     
     # Helper functionality and data
