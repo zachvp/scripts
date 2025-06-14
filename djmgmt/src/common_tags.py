@@ -3,21 +3,23 @@ import mutagen
 import logging
 
 class Tags:
-    def __init__(self, artist: Optional[str]=None, album: Optional[str]=None, title: Optional[str]=None):
+    def __init__(self, artist: Optional[str]=None, album: Optional[str]=None, title: Optional[str]=None, genre: Optional[str]=None):
         self.artist = artist
         self.album = album
         self.title = title
+        self.genre = genre
     
     def __str__(self) -> str:
-        return f"artist/album/title = {self.artist}/{self.album}/{self.title}"
+        return f"artist/album/title/genre = {self.artist}/{self.album}/{self.title}/{self.genre}"
 
 # DEV - Investigation
-# relevant_keys = {'genre', 'beatgrid', 'TENC', 'TOAL', 'TCOM', 'TDRC', 'USLT::eng', 'initialkey', 'TIT1', 'TCOP', 'TBPM', 'TOPE', 'cuepoints', 'TDRL', 'TSSE', 'TDEN', 'TPOS', 'WPUB', 'TSRC', 'artist', 'energy', 'TPE1', 'album', 'WOAF', 'TFLT', 'TDTG', 'key', 'metadata_block_picture', 'TCMP', 'TCON', 'PCNT', 'TALB', 'TDOR', 'comment', 'title', 'TPE2', 'TPE4', 'energylevel', 'TPUB', 'tracknumber', 'TLEN', 'TIT2'}
+relevant_keys = {'genre', 'beatgrid', 'TENC', 'TOAL', 'TCOM', 'TDRC', 'USLT::eng', 'initialkey', 'TIT1', 'TCOP', 'TBPM', 'TOPE', 'cuepoints', 'TDRL', 'TSSE', 'TDEN', 'TPOS', 'WPUB', 'TSRC', 'artist', 'energy', 'TPE1', 'album', 'WOAF', 'TFLT', 'TDTG', 'key', 'metadata_block_picture', 'TCMP', 'TCON', 'PCNT', 'TALB', 'TDOR', 'comment', 'title', 'TPE2', 'TPE4', 'energylevel', 'TPUB', 'tracknumber', 'TLEN', 'TIT2'}
 
 def dev_determine_relevant_keys(track: mutagen.FileType) -> set[str]:
     # -- dev: determine possibly relevant keys
     # print(track.keys())
-    ignore = { 'GEOB', 'TXXX', 'TRCK', 'COMM', 'TKEY', 'UFID', 'APIC', 'metadata_block', 'TCMP', 'TBPM', 'TENC', 'TPE1' }
+    # ignore = { 'GEOB', 'COMM', 'UFID', 'APIC', 'metadata_block', 'TCMP', 'TENC' }
+    ignore = {}
     relevant_keys: set[str] = set()
     for k in track:
         skip = False
@@ -45,6 +47,7 @@ def dev_print_relevant_values(track: mutagen.FileType, relevant_keys: set[str]) 
                     printed[k].add(line)
     return printed
 
+# Primary functions
 def get_track_key(track: mutagen.FileType, options: set[str]) -> Optional[str]:
     '''Tries to find a key present in the given track based on the given options.'''
     try:
@@ -61,6 +64,7 @@ def read_tags(path: str) -> Optional[Tags]:
     artist_keys = {'TPE1', 'TPE2', 'TPE4', '©ART', 'Author', 'artist', 'TOPE'}
     album_keys = {'TALB', 'TOAL', 'album'}
     title_keys = {'TIT2', '©nam', 'Title', 'title'}
+    genre_keys = {'TCON', 'genre'}
 
     # load track tags, check for errors
     try:
@@ -77,13 +81,14 @@ def read_tags(path: str) -> Optional[Tags]:
     title_key = get_track_key(track, title_keys)
     artist_key = get_track_key(track, artist_keys)
     album_key = get_track_key(track, album_keys)
+    genre_key = get_track_key(track, genre_keys)
 
-    if title_key is None and artist_key is None and album_key is None:
+    if title_key is None and artist_key is None:
         logging.error(f"unable to find any valid tags for '{path}'")
         return None
 
     # skip 'tracks' that don't contain both an artist and title
-    if title_key not in track and artist_key not in track and album_key not in track:
+    if title_key not in track and artist_key not in track:
         logging.error(f"unable to read any valid tags for '{path}'")
         return None
 
@@ -91,6 +96,7 @@ def read_tags(path: str) -> Optional[Tags]:
     title = track[title_key] if title_key in track else None
     artist = track[artist_key] if artist_key in track else None
     album = track[album_key] if album_key in track else None
+    genre = track[genre_key] if genre_key in track else None
 
     # some tags are stored as a list
     if isinstance(title, list):
@@ -99,6 +105,8 @@ def read_tags(path: str) -> Optional[Tags]:
         artist = artist[0]
     if isinstance(album, list):
         album = album[0]
+    if isinstance(genre, list):
+        genre = genre[0]
     
     # convert to string or leave as None
     if title is not None:
@@ -107,8 +115,10 @@ def read_tags(path: str) -> Optional[Tags]:
         artist = str(artist)
     if album is not None:
         album = str(album)
+    if genre is not None:
+        genre = str(genre)
 
-    return Tags(artist, album, title)
+    return Tags(artist, album, title, genre)
 
 def basic_identifier(title: str, artist: str) -> str:
     if not title:
