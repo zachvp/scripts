@@ -217,7 +217,6 @@ async def collect_tasks(tasks: list[Task]) -> list[Future]:
 def encode_lossless_cli(args: type[Namespace]) -> list[tuple[str, str]]:
     return encode_lossless(args.input, args.output, args.extension, args.store_path, args.store_skipped, args.interactive)
 
-# TODO: parallelize
 # TODO: add support for FLAC
 # TODO: extend so that output extension can be passed as a parameter
 # TODO: extend to preserve input extension
@@ -226,7 +225,8 @@ def encode_lossless(input_dir: str,
                     extension: str,
                     store_path: str | None = None,
                     store_skipped: bool = False,
-                    interactive: bool = False) -> list[tuple[str, str]]:
+                    interactive: bool = False,
+                    threads: int = 4) -> list[tuple[str, str]]:
     '''Primary script function. Recursively walks the input path specified in `args` to re-encode each eligible file.
     Returns a list of the processed (input_file_path, output_file_path) tuples.
     A file is eligible if all conditions are met:
@@ -246,6 +246,8 @@ def encode_lossless(input_dir: str,
     # Core data
     processed_files: list[tuple[str, str]] = []
     size_diff_sum = 0.0
+    tasks: list[tuple[str, str, Task[tuple[int, str]]]] = []
+    loop = asyncio.get_event_loop()
 
     # set up storage
     store_path_size_diff: str | None = None
@@ -313,25 +315,50 @@ def encode_lossless(input_dir: str,
 
             # -- build and run the ffmpeg encode command
             command = ffmpeg_standardize(input_path, output_path)
-            logging.debug(f"run cmd:\n\t{command}")
-            try:
-                subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-                processed_files.append((input_path, output_path))
-                logging.debug(f"success: {output_path}")
-            except subprocess.CalledProcessError as error:
-                logging.error(f"subprocess:\n{error.stderr.strip()}")
-
+            task = loop.create_task(run_command_async(command))
+            tasks.append((input_path, output_path, task))
+            
+            # Run task batch
+            if len(tasks) > threads - 1:
+                run_tasks = [t[2] for t in tasks]
+                loop.run_until_complete(collect_tasks(run_tasks))
+                for src_path, dest_path, _ in tasks:
+                    processed_files.append((src_path, dest_path))
+                    
+                    # compute (input - output) size difference after encoding
+                    size_diff = os.path.getsize(src_path)/10**6 - os.path.getsize(dest_path)/10**6
+                    size_diff_sum += size_diff
+                    size_diff = round(size_diff, 2)
+                    logging.info(f"file size diff: {size_diff} MB")
+                    
+                    if store_path and store_path_size_diff:
+                        with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
+                            store_file.write(f"{src_path}\t{dest_path}\t{size_diff}\n")
+                logging.debug(f"ran {len(run_tasks)} tasks")
+                tasks.clear()
+                # separate entries
+                logging.info("= = = =")
+    
+    # Run final batch
+    if tasks:
+        run_tasks = [t[2] for t in tasks]
+        loop.run_until_complete(collect_tasks(run_tasks))
+        for src_path, dest_path, _ in tasks:
+            processed_files.append((src_path, dest_path))
+            
             # compute (input - output) size difference after encoding
-            size_diff = os.path.getsize(input_path)/10**6 - os.path.getsize(output_path)/10**6
+            size_diff = os.path.getsize(src_path)/10**6 - os.path.getsize(dest_path)/10**6
             size_diff_sum += size_diff
             size_diff = round(size_diff, 2)
             logging.info(f"file size diff: {size_diff} MB")
-
+            
             if store_path and store_path_size_diff:
                 with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
-                    store_file.write(f"{input_path}\t{output_path}\t{size_diff}\n")
-            # separate entries
-            logging.info("= = = =")
+                    store_file.write(f"{src_path}\t{dest_path}\t{size_diff}\n")
+        logging.debug(f"ran {len(run_tasks)} tasks")
+        tasks.clear()
+        # separate entries
+        logging.info("= = = =")
 
     if store_path and store_path_size_diff:
         with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
