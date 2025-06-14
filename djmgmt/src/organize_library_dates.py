@@ -102,7 +102,6 @@ def full_path(node: ET.Element, library_root: str, mapping: dict, include_metada
         path = os.path.join(path, artist, album)   # append metadata
     path = os.path.join(path, path_components[-1]) # append file name
     return path
-    # return f"{path_components[0]}{pivot}{subpath_date}/{path_components[1]}"
 
 def collection_path_to_syspath(path: str) -> str:
     '''Transforms the given XML collection path to a directory path.
@@ -159,6 +158,7 @@ def generate_date_paths_cli(args: type[Namespace]) -> list[tuple[str, str]]:
     return generate_date_paths(collection, args.root_path, metadata_path=args.metadata_path)
 
 # TODO: update to handle '/' character in metadata path (e.g. a/jus/ted)
+# TODO: add test coverage for URL-encoded paths (i.e. Rekordbox file location)
 def generate_date_paths(collection: ET.Element,
                         root_path: str,
                         playlist_ids: set[str] = set(),
@@ -184,6 +184,7 @@ def generate_date_paths(collection: ET.Element,
         # build each entry for the old and new path
         track_path_old = node_syspath
         track_path_new = full_path(node, constants.REKORDBOX_ROOT, constants.MAPPING_MONTH, include_metadata=metadata_path)
+        track_path_new = collection_path_to_syspath(track_path_new)
         
         context = common.find_date_context(track_path_new)
         if context:
