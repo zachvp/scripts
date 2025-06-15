@@ -298,7 +298,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
             break
         
         # skip processed dates
-        # TODO: only check if processed date_context has not been checked already
+        # TODO: remove is_processed logic
         if not is_processed(date_context):
             # collect each mapping in a given date context
             if date_context_previous == date_context:
@@ -354,21 +354,26 @@ def rsync_healthcheck() -> bool:
 def create_sync_mappings(input_dir: str, output_dir: str) -> list[tuple[str, str]]:
     # collect input parameters to sync files
     from . import organize_library_dates as library
-    pruned = library.find_node(input_dir, constants.XPATH_PRUNED)
-    collection = library.find_node(input_dir, constants.XPATH_COLLECTION)
     
     # collect the target playlist IDs to sync
+    pruned = library.find_node(input_dir, constants.XPATH_PRUNED)
     playlist_ids: set[str] = {
         track.attrib[constants.ATTR_KEY]
         for track in pruned
     }
-    # TODO: optimize so only the dates after sync_state are passed to sync function
+    collection = library.find_node(input_dir, constants.XPATH_COLLECTION)
     mappings = library.generate_date_paths(collection,
-                                            output_dir,
-                                            playlist_ids=playlist_ids,
-                                            metadata_path=True)
-    mappings.sort(key=lambda m: key_date_context(m))
-    return mappings
+                                           output_dir,
+                                           playlist_ids=playlist_ids,
+                                           metadata_path=True)
+    filtered_mappings: list[tuple[str, str]] = []
+    for input_path, output_path in mappings:
+        context = common.find_date_context(output_path)
+        if context and not is_processed(context[0]):
+            filtered_mappings.append((input_path, output_path))
+    
+    filtered_mappings.sort(key=lambda m: key_date_context(m))
+    return filtered_mappings
 
 def run_sync_mappings(input_dir: str, output_dir: str) -> None:
     timestamp = time.time()
