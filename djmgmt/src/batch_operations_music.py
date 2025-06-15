@@ -444,7 +444,9 @@ def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints:
     standardize_lossless(args.output, valid_extensions, prefix_hints, args.interactive)
     prune_non_music(args.output, valid_extensions, args.interactive)
     prune_empty(args.output, args.interactive)
-    record_collection(args.output, COLLECTION_PATH)
+
+# TODO: add function to update library: runs process_cli, sweeps to local library dir, records collection, syncs to remote
+# record_collection(args.output, COLLECTION_PATH)
 
 if __name__ == '__main__':
     common.configure_log(path=__file__)

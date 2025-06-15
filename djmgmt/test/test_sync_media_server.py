@@ -1,3 +1,6 @@
+# TODO: add coverage for rsync_healthcheck
+# TODO: add coverage for create_sync_mappings
+
 import unittest
 import subprocess
 from unittest.mock import patch, MagicMock, mock_open, call
