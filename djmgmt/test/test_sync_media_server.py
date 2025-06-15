@@ -1,15 +1,9 @@
 import unittest
 import subprocess
-import os
 from unittest.mock import patch, MagicMock, mock_open, call
 
-# Constants
-PROJECT_ROOT = os.path.abspath(f"{os.path.dirname(__file__)}{os.sep}{os.path.pardir}") # TODO: centralize this
-
-# Custom imports
-import sys
-sys.path.append(PROJECT_ROOT)
-
+# Imports required to call source code and patch with mocks.
+from .context import src
 from src import sync_media_server, constants, subsonic_client, encode_tracks
 
 # Constants
@@ -18,7 +12,7 @@ DATE_PROCESSED_PAST     = '2025/05 may/19'
 DATE_PROCESSED_CURRENT  = '2025/05 may/20'
 DATE_PROCESSED_FUTURE   = '2025/05 may/21'
 
-# Primary test class
+# Primary test clas
 class TestIsProcessed(unittest.TestCase):
     # Past dates
     @patch('builtins.open', new_callable=mock_open, read_data=f"sync_date: {DATE_PROCESSED_CURRENT}")
