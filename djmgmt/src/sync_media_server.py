@@ -252,18 +252,17 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
     
     return success
 
-# TODO: refactor to only take current date context
-def is_processed(date_context: str, date_context_previous: str) -> bool:
+def is_processed(date_context: str) -> bool:
     date_context_processed = ''
     with open(FILE_SYNC, encoding='utf-8', mode='r') as state: # todo: optimize to only open if recent change
         saved_state = state.readline()
         if saved_state:
             date_context_processed = saved_state.split(':')[1].strip()
     if date_context_processed:
-        if date_context <= date_context_processed and date_context_previous <= date_context_processed:
-            logging.info(f"already processed date contexts: {date_context_previous}, {date_context}")
+        if date_context <= date_context_processed:
+            logging.info(f"already processed date context: {date_context}")
             return True
-    logging.info(f"one date context is unprocessed: {date_context_previous}, {date_context}")
+    logging.info(f"date context is unprocessed: {date_context}")
     return False
 
 # TODO: Support file updates (e.g. if metadata changes)
@@ -300,7 +299,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
         
         # skip processed dates
         # TODO: only check if processed date_context has not been checked already
-        if not is_processed(date_context, date_context_previous):
+        if not is_processed(date_context):
             # collect each mapping in a given date context
             if date_context_previous == date_context:
                 batch.append(mapping)

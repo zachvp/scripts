@@ -7,7 +7,6 @@ from .context import src
 from src import sync_media_server, constants, subsonic_client, encode_tracks
 
 # Constants
-DATE_PROCESSED_EARLIEST = '2020/01 january/01'
 DATE_PROCESSED_PAST     = '2025/05 may/19'
 DATE_PROCESSED_CURRENT  = '2025/05 may/20'
 DATE_PROCESSED_FUTURE   = '2025/05 may/21'
@@ -16,46 +15,25 @@ DATE_PROCESSED_FUTURE   = '2025/05 may/21'
 class TestIsProcessed(unittest.TestCase):
     # Past dates
     @patch('builtins.open', new_callable=mock_open, read_data=f"sync_date: {DATE_PROCESSED_CURRENT}")
-    def test_is_processed_past_contexts_match(self, mock_sync_state: MagicMock) -> None:
+    def test_is_processed_past(self, mock_sync_state: MagicMock) -> None:
         '''Tests that matching date contexts before the processed date are considered processed.'''
-        actual = sync_media_server.is_processed(DATE_PROCESSED_PAST, DATE_PROCESSED_PAST)
+        actual = sync_media_server.is_processed(DATE_PROCESSED_PAST)
         self.assertTrue(actual, f"Date context '{DATE_PROCESSED_PAST}' is expected to be already processed.")
-        mock_sync_state.assert_called_once()
-        
-    @patch('builtins.open', new_callable=mock_open, read_data=f"sync_date: {DATE_PROCESSED_CURRENT}")
-    def test_is_processed_past_contexts_differ(self, mock_sync_state: MagicMock) -> None:
-        '''Tests that different date contexts before the processed date are considered processed.'''
-        actual = sync_media_server.is_processed(DATE_PROCESSED_PAST, DATE_PROCESSED_EARLIEST)
-        self.assertTrue(actual, f"Date contexts '{DATE_PROCESSED_PAST}' and '{DATE_PROCESSED_EARLIEST}' are expected to be already processed.")
         mock_sync_state.assert_called_once()
     
     # Current dates
     @patch('builtins.open', new_callable=mock_open, read_data=f"sync_date: {DATE_PROCESSED_CURRENT}")
-    def test_is_processed_current_contexts_match(self, mock_sync_state: MagicMock) -> None:
+    def test_is_processed_current(self, mock_sync_state: MagicMock) -> None:
         '''Tests that matching date contexts equal to the processed date are considered processed.'''
-        actual = sync_media_server.is_processed(DATE_PROCESSED_CURRENT, DATE_PROCESSED_CURRENT)
+        actual = sync_media_server.is_processed(DATE_PROCESSED_CURRENT)
         self.assertTrue(actual, f"Date context '{DATE_PROCESSED_CURRENT}' is expected to be already processed.")
-        mock_sync_state.assert_called_once()
-        
-    @patch('builtins.open', new_callable=mock_open, read_data=f"sync_date: {DATE_PROCESSED_CURRENT}")
-    def test_is_processed_current_contexts_differ(self, mock_sync_state: MagicMock) -> None:
-        '''Tests that date contexts that are equal to and before the processed date are considered processed.'''
-        actual = sync_media_server.is_processed(DATE_PROCESSED_CURRENT, DATE_PROCESSED_PAST)
-        self.assertTrue(actual, f"Date contexts '{DATE_PROCESSED_CURRENT}' and '{DATE_PROCESSED_PAST}' are expected to be already processed.")
         mock_sync_state.assert_called_once()
     
     # Future dates
     @patch('builtins.open', new_callable=mock_open, read_data=f"sync_date: {DATE_PROCESSED_CURRENT}")
-    def test_is_processed_future_contexts_match(self, mock_sync_state: MagicMock) -> None:
+    def test_is_processed_future(self, mock_sync_state: MagicMock) -> None:
         '''Tests that matching date contexts later than the processed date are NOT considered processed.'''
-        actual = sync_media_server.is_processed(DATE_PROCESSED_FUTURE, DATE_PROCESSED_FUTURE)
-        self.assertFalse(actual, f"Date context '{DATE_PROCESSED_FUTURE}' is NOT expected to be already processed.")
-        mock_sync_state.assert_called_once()
-        
-    @patch('builtins.open', new_callable=mock_open, read_data=f"sync_date: {DATE_PROCESSED_CURRENT}")
-    def test_is_processed_future_contexts_differ(self, mock_sync_state: MagicMock) -> None:
-        '''Tests that date contexts that are after and equal to the processed date are NOT considered processed.'''
-        actual = sync_media_server.is_processed(DATE_PROCESSED_FUTURE, DATE_PROCESSED_CURRENT)
+        actual = sync_media_server.is_processed(DATE_PROCESSED_FUTURE)
         self.assertFalse(actual, f"Date context '{DATE_PROCESSED_FUTURE}' is NOT expected to be already processed.")
         mock_sync_state.assert_called_once()
 
