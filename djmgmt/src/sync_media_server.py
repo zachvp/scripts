@@ -337,6 +337,50 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
         logging.info(f"processed batch in date context '{date_context}'")
         logging.info(f"sync progress: {progressFormat(index + 1)}")
 
+def rsync_healthcheck() -> bool:
+        import subprocess
+        import shlex
+        
+        # check that rsync is running
+        command = shlex.split(f"rsync {constants.RSYNC_URL}")
+        try:
+            subprocess.run(command, check=True)
+            logging.info('rsync daemon is running')
+            return True
+        except subprocess.CalledProcessError as error:
+            logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
+            return False
+        
+def create_sync_mappings(input_dir: str, output_dir: str) -> list[tuple[str, str]]:
+    # collect input parameters to sync files
+    from . import organize_library_dates as library
+    pruned = library.find_node(input_dir, constants.XPATH_PRUNED)
+    collection = library.find_node(input_dir, constants.XPATH_COLLECTION)
+    
+    # collect the target playlist IDs to sync
+    playlist_ids: set[str] = {
+        track.attrib[constants.ATTR_KEY]
+        for track in pruned
+    }
+    # TODO: optimize so only the dates after sync_state are passed to sync function
+    mappings = library.generate_date_paths(collection,
+                                            output_dir,
+                                            playlist_ids=playlist_ids,
+                                            metadata_path=True)
+    mappings.sort(key=lambda m: key_date_context(m))
+    return mappings
+
+def run_sync_mappings(input_dir: str, output_dir: str) -> None:
+    timestamp = time.time()
+    mappings = create_sync_mappings(input_dir, output_dir)
+    try:
+        sync_from_mappings(mappings, script_args.scan_mode == Namespace.SCAN_FULL)
+    except Exception as e:
+        logging.error(e)
+        raise
+    timestamp = time.time() - timestamp
+    logging.info(f"sync time: {format_timing(timestamp)}")
+
 # TODO add interactive mode to confirm sync state before any sync batch is possible
 if __name__ == '__main__':
     # setup
@@ -348,41 +392,8 @@ if __name__ == '__main__':
         sync_from_path(script_args)
     else:
         # TODO: refactor this to be a one-line function
-        import subprocess
-        import shlex
-        import sys
         
-        # check that rsync is running
-        command = shlex.split(f"rsync {constants.RSYNC_URL}")
-        try:
-            process = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
-            logging.info('rsync daemon is running')
-        except subprocess.CalledProcessError as error:
-            logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
-            sys.exit()
-        
-        # collect input parameters to sync files
-        from . import organize_library_dates as library
-        pruned = library.find_node(script_args.input, constants.XPATH_PRUNED)
-        collection = library.find_node(script_args.input, constants.XPATH_COLLECTION)
-        
-        # collect the target playlist IDs to sync
-        playlist_ids: set[str] = {
-            track.attrib[constants.ATTR_KEY]
-            for track in pruned
-        }
-        # TODO: optimize so only the dates after sync_state are passed to sync function
-        mappings = library.generate_date_paths(collection,
-                                               script_args.output,
-                                               playlist_ids=playlist_ids,
-                                               metadata_path=True)
-        mappings.sort(key=lambda m: key_date_context(m))
-    
-        timestamp = time.time()
-        try:
-            sync_from_mappings(mappings, script_args.scan_mode == Namespace.SCAN_FULL)
-        except Exception as e:
-            logging.error(e)
-            raise
-        timestamp = time.time() - timestamp
-        logging.info(f"sync time: {format_timing(timestamp)}")
+        if rsync_healthcheck():
+            run_sync_mappings(script_args.input, script_args.output)
+        else:
+            logging.error("rsync unhealthy, aborting sync")
