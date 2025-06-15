@@ -21,9 +21,9 @@ import json
 import xml.etree.ElementTree as ET
 import keyring
 import argparse
-
 import logging
-import common
+
+from . import common
 
 def parse_args(valid_endpoints: set[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()

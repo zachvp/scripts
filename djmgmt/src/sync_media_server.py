@@ -23,8 +23,8 @@ import logging
 from typing import Callable
 import time
 
-import common
-import constants
+from . import common
+from . import constants
 
 # Constants
 FILE_SYNC =f"{constants.PROJECT_ROOT}{os.sep}state{os.sep}sync_state.txt"
@@ -209,8 +209,8 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
     
     Returns True if the batch sync was successful, False otherwise.
     '''
-    import subsonic_client
-    import encode_tracks
+    from . import subsonic_client
+    from . import encode_tracks
     
     # Return flag
     success = True
@@ -234,7 +234,8 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
             if full_scan:
                 scan_param = 'true'
             response = subsonic_client.call_endpoint(subsonic_client.API.START_SCAN, {'fullScan': scan_param})
-            if response.ok:
+            success = response.ok
+            if success:
                 # wait until the server has stopped scanning
                 while True:
                     # TODO: add error handling
@@ -362,7 +363,7 @@ if __name__ == '__main__':
             sys.exit()
         
         # collect input parameters to sync files
-        import organize_library_dates as library
+        from . import organize_library_dates as library
         pruned = library.find_node(script_args.input, constants.XPATH_PRUNED)
         collection = library.find_node(script_args.input, constants.XPATH_COLLECTION)
         

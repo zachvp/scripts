@@ -13,8 +13,8 @@ import asyncio
 from asyncio import Task, Future, AbstractEventLoop
 from typing import Any
 
-import common
-import constants
+from . import common
+from . import constants
 
 # classes
 class Namespace(argparse.Namespace):

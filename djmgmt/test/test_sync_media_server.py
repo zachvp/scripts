@@ -4,17 +4,13 @@ import os
 from unittest.mock import patch, MagicMock, mock_open, call
 
 # Constants
-PROJECT_ROOT = os.path.abspath(f"{os.path.dirname(__file__)}/{os.path.pardir}") # TODO: centralize this
+PROJECT_ROOT = os.path.abspath(f"{os.path.dirname(__file__)}{os.sep}{os.path.pardir}") # TODO: centralize this
 
 # Custom imports
 import sys
 sys.path.append(PROJECT_ROOT)
 
-from src import sync_media_server
-from src import constants
-from src import subsonic_client
-
-from src import sync_media_server
+from src import sync_media_server, constants, subsonic_client, encode_tracks
 
 # Constants
 DATE_PROCESSED_EARLIEST = '2020/01 january/01'
@@ -70,11 +66,11 @@ class TestIsProcessed(unittest.TestCase):
         mock_sync_state.assert_called_once()
 
 class TestSyncBatch(unittest.TestCase):
-    @patch('encode_tracks.encode_lossy')
-    @patch('sync_media_server.transform_implied_path')
-    @patch('sync_media_server.transfer_files')
-    @patch('subsonic_client.call_endpoint')
-    @patch('subsonic_client.handle_response')
+    @patch('src.encode_tracks.encode_lossy')
+    @patch('src.sync_media_server.transform_implied_path')
+    @patch('src.sync_media_server.transfer_files')
+    @patch('src.subsonic_client.call_endpoint')
+    @patch('src.subsonic_client.handle_response')
     @patch('time.sleep')
     def test_success_full_scan(self,
                                mock_sleep: MagicMock,
@@ -120,11 +116,11 @@ class TestSyncBatch(unittest.TestCase):
         ])
         mock_sleep.assert_called()
 
-    @patch('encode_tracks.encode_lossy')
-    @patch('sync_media_server.transform_implied_path')
-    @patch('sync_media_server.transfer_files')
-    @patch('subsonic_client.call_endpoint')
-    @patch('subsonic_client.handle_response')
+    @patch('src.encode_tracks.encode_lossy')
+    @patch('src.sync_media_server.transform_implied_path')
+    @patch('src.sync_media_server.transfer_files')
+    @patch('src.subsonic_client.call_endpoint')
+    @patch('src.subsonic_client.handle_response')
     def test_success_quick_scan(self,
                                 mock_handle_response: MagicMock,
                                 mock_call_endpoint: MagicMock,
@@ -168,8 +164,8 @@ class TestSyncBatch(unittest.TestCase):
             call(subsonic_client.API.GET_SCAN_STATUS),
         ])
 
-    @patch('encode_tracks.encode_lossy')
-    @patch('sync_media_server.transform_implied_path')
+    @patch('src.encode_tracks.encode_lossy')
+    @patch('src.sync_media_server.transform_implied_path')
     @patch('logging.error')
     def test_error_no_transfer_path(self,
                                     mock_log_error: MagicMock,
@@ -195,11 +191,11 @@ class TestSyncBatch(unittest.TestCase):
         mock_transform.assert_called_once_with(dest)
         mock_log_error.assert_called_once()  # Should log an error about empty transfer path
         
-    @patch('encode_tracks.encode_lossy')
-    @patch('sync_media_server.transform_implied_path')
-    @patch('sync_media_server.transfer_files')
-    @patch('subsonic_client.call_endpoint')
-    @patch('subsonic_client.handle_response')
+    @patch('src.encode_tracks.encode_lossy')
+    @patch('src.sync_media_server.transform_implied_path')
+    @patch('src.sync_media_server.transfer_files')
+    @patch('src.subsonic_client.call_endpoint')
+    @patch('src.subsonic_client.handle_response')
     def test_error_api(self,
                        mock_handle_response: MagicMock,
                        mock_call_endpoint: MagicMock,
@@ -291,11 +287,11 @@ class TestTransferFiles(unittest.TestCase):
         
         # Assertions
         self.assertEqual(return_code, 1)
-        self.assertEqual(output, 'Connection refused')
+        self.assertEqual(output, 'Error')
         mock_log_error.assert_called_once()
     
 class TestSyncMappings(unittest.TestCase):
-    @patch('sync_media_server.sync_batch')
+    @patch('src.sync_media_server.sync_batch')
     @patch('builtins.open', new_callable=mock_open, read_data='')
     def test_success_one_context(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
         '''Tests that a single batch with mappings in the same date context is synced properly.'''
@@ -315,7 +311,7 @@ class TestSyncMappings(unittest.TestCase):
         # Expect 3 calls to open the sync state file: 1 for each mapping (2 total) and 1 after batch is synced
         self.assertEqual(mock_sync_state.call_count, 3)
         
-    @patch('sync_media_server.sync_batch')
+    @patch('src.sync_media_server.sync_batch')
     @patch('builtins.open', new_callable=mock_open, read_data='')
     def test_success_multiple_contexts(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
         '''Tests that two batches with mappings in two date contexts are synced properly.'''
@@ -340,7 +336,7 @@ class TestSyncMappings(unittest.TestCase):
         # Expect 3 calls per batch to open the sync state file:
         self.assertEqual(mock_sync_state.call_count, 6)
         
-    @patch('sync_media_server.sync_batch')
+    @patch('src.sync_media_server.sync_batch')
     @patch('builtins.open', new_callable=mock_open, read_data='')
     def test_error_empty_mappings(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
         '''Tests that nothing is synced for an empty mappings list and error is raised.'''
@@ -355,7 +351,7 @@ class TestSyncMappings(unittest.TestCase):
         mock_sync_batch.assert_not_called()
         mock_sync_state.assert_not_called()
     
-    @patch('sync_media_server.sync_batch')
+    @patch('src.sync_media_server.sync_batch')
     @patch('builtins.open', new_callable=mock_open, read_data='')
     def test_error_sync_batch(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
         '''Tests that an error is raised when a batch sync call fails'''
