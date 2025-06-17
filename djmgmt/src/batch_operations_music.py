@@ -428,7 +428,7 @@ def prune_non_music_cli(args: type[Namespace], valid_extensions: set[str]) -> No
     prune_non_music(args.input, valid_extensions, args.interactive)
 
 # TODO: check for missing art
-def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
+def process(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> None:
     '''Performs the following, in sequence:
         1. Sweeps all music files and archives from a source directory into a target directory.
         2. Flattens the files within the target directory.
@@ -438,12 +438,43 @@ def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints:
         
         The source and target directories may be the same for effectively in-place processing.
     '''
-    sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
-    extract(args.output, args.output, args.interactive)
-    flatten_hierarchy(args.output, args.output, args.interactive)
-    standardize_lossless(args.output, valid_extensions, prefix_hints, args.interactive)
-    prune_non_music(args.output, valid_extensions, args.interactive)
-    prune_empty(args.output, args.interactive)
+    sweep(source, output, interactive, valid_extensions, prefix_hints)
+    extract(output, output, interactive)
+    flatten_hierarchy(output, output, interactive)
+    standardize_lossless(output, valid_extensions, prefix_hints, interactive)
+    prune_non_music(output, valid_extensions, interactive)
+    prune_empty(output, interactive)
+
+def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
+    process(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
+
+def update_library(source: str,
+                   library: str,
+                   client_mirror_path: str,
+                   interactive: bool,
+                   valid_extensions: set[str],
+                   prefix_hints: set[str]) -> None:
+    '''Performs the following, in sequence:
+        1. Processes files from source -> temp
+        2. Sweeps files from temp -> library
+        3. Records the updated library to the XML collection
+        4. Syncs files based on the updated XML collection to the given client mirror path
+        
+        The source, library, and client_mirror_path parameters should all be distinct directories.
+    '''
+    import sync_media_server
+    from tempfile import TemporaryDirectory
+    
+    # Create a temporary directory to process the files from 'source'
+    with TemporaryDirectory() as temp_dir:
+        process(source, temp_dir, interactive, valid_extensions, prefix_hints)
+        sweep(temp_dir, library, interactive, valid_extensions, prefix_hints)
+        record_collection(library, COLLECTION_PATH)
+        
+        if sync_media_server.rsync_healthcheck():
+            sync_media_server.run_sync_mappings(COLLECTION_PATH, client_mirror_path, True)
+        else:
+            logging.error("rsync unhealthy, aborting sync")
 
 # TODO: add function to update library: runs process_cli, sweeps to local library dir, records collection, syncs to remote
 # record_collection(args.output, COLLECTION_PATH)
