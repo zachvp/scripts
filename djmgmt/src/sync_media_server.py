@@ -46,7 +46,7 @@ class Namespace(argparse.Namespace):
     FUNCTION_COPY = 'copy'
     FUNCTION_MOVE = 'move'
     FUNCTION_SYNC = 'sync'
-
+    
     FUNCTIONS = {FUNCTION_COPY, FUNCTION_MOVE, FUNCTION_SYNC}
     
     # Scan modes

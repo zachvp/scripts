@@ -7,9 +7,58 @@ import shutil
 import argparse
 from typing import Callable
 
-# TODO: refactor to use custom Namespace and constants pattern
+# classes
+class Namespace(argparse.Namespace):
+    # Arguments
+    ## Required
+    function: str
+    input_path: str
+    output_path: str
+    
+    ## Optional
+    column: int
+    interactive: bool
+    
+    # Functions
+    FUNCTION_MOVE = 'move'
+    SCRIPT_FUNCTIONS = {'move'}
 
-def batch_file_operation(args: argparse.Namespace) -> None:
+# helper functions
+def parse_args(functions: set[str]) -> type[Namespace]:
+    '''Returns the parsed command-line arguments.
+
+    Function parameters:
+        functions -- The valid functions that this script can run.
+    '''
+    parser = argparse.ArgumentParser()
+    parser.add_argument('function', type=str,
+        help=f"The type of function to perform. One of: {functions}")
+    parser.add_argument('input_path', type=str,
+        help='The input path to the file containing the list of paths. Expects TSV format.')
+    parser.add_argument('output_path', type=str, help='The output path that all files will be written to.')
+    parser.add_argument('--column', '-c', type=int, help="The column to process in the input file. Defaults to '0'")
+    parser.add_argument('--interactive', '-i', action='store_true',
+        help="Run the script in interactive mode. Defaults to 'False'")
+
+    args = parser.parse_args(namespace=Namespace)
+
+    # validate arguments
+    if args.function not in functions:
+        parser.error(f"Invalid parameter '{args.function}' for positional argument 'function'. Expect one of: {functions}.")
+
+    # normalize arguments
+    args.input_path = os.path.normpath(args.input_path)
+    args.output_path = os.path.normpath(args.output_path)
+    if not args.column:
+        args.column = 0
+
+    # check filetype
+    if os.path.splitext(args.input_path)[1] != '.tsv':
+        parser.error(f"Invalid parameter {args.input_path} for positional argument 'input_path'. Expect '*.tsv' file.")
+
+    return args
+
+def batch_file_operation(args: type[Namespace]) -> None:
     '''Performs the given operation on each file contained in the input file.
 
     Function parameters:
@@ -51,45 +100,9 @@ def batch_file_operation(args: argparse.Namespace) -> None:
 
             action(input_path, args.output_path)
 
-def parse_args(functions: set[str]) -> argparse.Namespace:
-    '''Returns the parsed command-line arguments.
-
-    Function parameters:
-        functions -- The valid functions that this script can run.
-    '''
-    parser = argparse.ArgumentParser()
-    parser.add_argument('function', type=str,
-        help=f"The type of function to perform. One of: {functions}")
-    parser.add_argument('input_path', type=str,
-        help='The input path to the file containing the list of paths. Expects TSV format.')
-    parser.add_argument('output_path', type=str, help='The output path that all files will be written to.')
-    parser.add_argument('--column', '-c', type=int, help="The column to process in the input file. Defaults to '0'")
-    parser.add_argument('--interactive', '-i', action='store_true',
-        help="Run the script in interactive mode. Defaults to 'False'")
-
-    args = parser.parse_args()
-
-    # validate arguments
-    if args.function not in functions:
-        parser.error(f"Invalid parameter '{args.function}' for positional argument 'function'. Expect one of: {functions}.")
-
-    # normalize arguments
-    args.input_path = os.path.normpath(args.input_path)
-    args.output_path = os.path.normpath(args.output_path)
-    if not args.column:
-        args.column = 0
-
-    # check filetype
-    if os.path.splitext(args.input_path)[1] != '.tsv':
-        parser.error(f"Invalid parameter {args.input_path} for positional argument 'input_path'. Expect '*.tsv' file.")
-
-    return args
-
 # Main
 if __name__ == '__main__':
-    FUNCTION_MOVE = 'move'
-    SCRIPT_FUNCTIONS = {'move'}
-    script_args = parse_args(SCRIPT_FUNCTIONS)
+    script_args = parse_args(Namespace.SCRIPT_FUNCTIONS)
 
-    if script_args.function == FUNCTION_MOVE:
+    if script_args.function == Namespace.FUNCTION_MOVE:
         batch_file_operation(script_args)
