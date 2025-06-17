@@ -96,53 +96,6 @@ def normalize_paths(paths: list[str], parent: str) -> list[str]:
         normalized.append(os.path.relpath(path, start=parent))
     return normalized
 
-def sync_from_path(args: type[Namespace]):
-    '''A primary script function.
-
-    Function arguments:
-        args -- The parsed command-line arguments.
-    '''
-
-    # Collect the sorted input paths relative to the input directory.
-    input_paths = sorted(normalize_paths(common.collect_paths(args.input), args.input))
-
-    # Define the date context tracker to determine when a new date context is entered.
-    previous_date_context = ''
-
-    # Assign the action based on the given mode.
-    action: Callable[[str, str], str] = shutil.copy
-    if args.function == Namespace.FUNCTION_MOVE:
-        action = shutil.move
-    elif args.function != Namespace.FUNCTION_COPY:
-        print(f"error: unrecognized mode: {args.function}. Exiting.")
-        return
-
-    # Performs the configured action for each input and output path
-    # Waits for user input when input path date context changes
-    for path in input_paths:
-        # Skip any existing valid output paths.
-        output_path_full = os.path.join(args.output, path)
-        if os.path.exists(output_path_full):
-            print(f"info: skip: output path exists: '{output_path_full}'")
-            continue
-        input_path_full = os.path.join(args.input, path)
-        print(f"info: {args.function}: '{input_path_full}' -> {output_path_full}")
-
-        # Notify the user if the current date context is different from the previous date context,
-        date_context = '/'.join(os.path.split(path)[:3]) # format: 'year/month/day'
-        if len(previous_date_context) > 0 and previous_date_context != date_context:
-            choice = input(f"info: date context changed from '{previous_date_context}' to '{date_context}' continue? [y/N]")
-            if choice != 'y':
-                print('info: user quit')
-                return
-        previous_date_context = date_context
-
-        # Copy or move the input file to the output path, creating the output directories if needed.
-        output_parent_path = os.path.split(output_path_full)[0]
-        if not os.path.exists(output_parent_path):
-            os.makedirs(output_parent_path)
-        action(input_path_full, output_path_full)
-
 def transform_implied_path(path: str) -> str | None:
     '''Rsync-specific. Transforms the given path into a format that will include the required subdirectories.'''
     # input : /Users/user/developer/test-private/data/tracks-output/2022/04 april/24/1-Gloria_Jones_-_Tainted_Love_(single_version).mp3
@@ -297,31 +250,28 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
             logging.error(f"no date context in path '{dest}'")
             break
         
-        # skip processed dates
-        # TODO: remove is_processed logic
-        if not is_processed(date_context):
-            # collect each mapping in a given date context
-            if date_context_previous == date_context:
-                batch.append(mapping)
-                logging.debug(f"add to batch: {mapping}")
-            elif batch:
-                logging.info(f"processing batch in date context '{date_context_previous}'")
-                if not sync_batch(batch, date_context_previous, source_previous, dest_previous, full_scan):
-                    raise RuntimeError(f"Batch sync failed for date context '{date_context_previous}'")
-                batch.clear()
-                batch.append(mapping) # add the first mapping of the new context
-                logging.debug(f"add new context mapping: {mapping}")
-                
-                # persist the processed date context
-                with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
-                    state.write(f"{FILE_SYNC_KEY}: {date_context_previous}")
-                logging.debug(f"add to batch: {mapping}")
-                logging.info(f"processed batch in date context '{date_context_previous}'")
-                logging.info(f"sync progress: {progressFormat(index + 1)}")
-            else:
-                batch.append(mapping) # add the first mapping of the new context
-                logging.debug(f"add new context mapping: {mapping}")
-                logging.info(f"skip empty batch: {date_context_previous}")
+        # collect each mapping in a given date context
+        if date_context_previous == date_context:
+            batch.append(mapping)
+            logging.debug(f"add to batch: {mapping}")
+        elif batch:
+            logging.info(f"processing batch in date context '{date_context_previous}'")
+            if not sync_batch(batch, date_context_previous, source_previous, dest_previous, full_scan):
+                raise RuntimeError(f"Batch sync failed for date context '{date_context_previous}'")
+            batch.clear()
+            batch.append(mapping) # add the first mapping of the new context
+            logging.debug(f"add new context mapping: {mapping}")
+            
+            # persist the processed date context
+            with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
+                state.write(f"{FILE_SYNC_KEY}: {date_context_previous}")
+            logging.debug(f"add to batch: {mapping}")
+            logging.info(f"processed batch in date context '{date_context_previous}'")
+            logging.info(f"sync progress: {progressFormat(index + 1)}")
+        else:
+            batch.append(mapping) # add the first mapping of the new context
+            logging.debug(f"add new context mapping: {mapping}")
+            logging.info(f"skip empty batch: {date_context_previous}")
         source_previous = source
         dest_previous = dest
     
@@ -351,17 +301,17 @@ def rsync_healthcheck() -> bool:
             logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
             return False
         
-def create_sync_mappings(input_dir: str, output_dir: str) -> list[tuple[str, str]]:
+def create_sync_mappings(collection_path: str, output_dir: str) -> list[tuple[str, str]]:
     # collect input parameters to sync files
     from . import organize_library_dates as library
     
     # collect the target playlist IDs to sync
-    pruned = library.find_node(input_dir, constants.XPATH_PRUNED)
+    pruned = library.find_node(collection_path, constants.XPATH_PRUNED)
     playlist_ids: set[str] = {
         track.attrib[constants.ATTR_KEY]
         for track in pruned
     }
-    collection = library.find_node(input_dir, constants.XPATH_COLLECTION)
+    collection = library.find_node(collection_path, constants.XPATH_COLLECTION)
     mappings = library.generate_date_paths(collection,
                                            output_dir,
                                            playlist_ids=playlist_ids,
@@ -375,9 +325,63 @@ def create_sync_mappings(input_dir: str, output_dir: str) -> list[tuple[str, str
     filtered_mappings.sort(key=lambda m: key_date_context(m))
     return filtered_mappings
 
-def run_sync_mappings(input_dir: str, output_dir: str, full_scan: bool) -> None:
+# Primary functions
+def sync_from_path(args: type[Namespace]):
+    '''A primary script function.
+
+    Function arguments:
+        args -- The parsed command-line arguments.
+    '''
+
+    # Collect the sorted input paths relative to the input directory.
+    input_paths = sorted(normalize_paths(common.collect_paths(args.input), args.input))
+
+    # Define the date context tracker to determine when a new date context is entered.
+    previous_date_context = ''
+
+    # Assign the action based on the given mode.
+    action: Callable[[str, str], str] = shutil.copy
+    if args.function == Namespace.FUNCTION_MOVE:
+        action = shutil.move
+    elif args.function != Namespace.FUNCTION_COPY:
+        print(f"error: unrecognized mode: {args.function}. Exiting.")
+        return
+
+    # Performs the configured action for each input and output path
+    # Waits for user input when input path date context changes
+    for path in input_paths:
+        # Skip any existing valid output paths.
+        output_path_full = os.path.join(args.output, path)
+        if os.path.exists(output_path_full):
+            print(f"info: skip: output path exists: '{output_path_full}'")
+            continue
+        input_path_full = os.path.join(args.input, path)
+        print(f"info: {args.function}: '{input_path_full}' -> {output_path_full}")
+
+        # Notify the user if the current date context is different from the previous date context,
+        date_context = '/'.join(os.path.split(path)[:3]) # format: 'year/month/day'
+        if len(previous_date_context) > 0 and previous_date_context != date_context:
+            choice = input(f"info: date context changed from '{previous_date_context}' to '{date_context}' continue? [y/N]")
+            if choice != 'y':
+                print('info: user quit')
+                return
+        previous_date_context = date_context
+
+        # Copy or move the input file to the output path, creating the output directories if needed.
+        output_parent_path = os.path.split(output_path_full)[0]
+        if not os.path.exists(output_parent_path):
+            os.makedirs(output_parent_path)
+        action(input_path_full, output_path_full)
+
+def run_sync_mappings(collection_path: str, output_dir: str, full_scan: bool) -> None:
+    # Only attempt sync if remote is accessible
+    if not rsync_healthcheck():
+        logging.error("rsync unhealthy, aborting sync")
+        return
+    
+    # Initialize timing and run the sync
     timestamp = time.time()
-    mappings = create_sync_mappings(input_dir, output_dir)
+    mappings = create_sync_mappings(collection_path, output_dir)
     try:
         sync_from_mappings(mappings, full_scan)
     except Exception as e:
@@ -392,13 +396,9 @@ if __name__ == '__main__':
     common.configure_log(level=logging.DEBUG, path=__file__)
     script_args = parse_args(Namespace.FUNCTIONS, Namespace.SCAN_MODES)
     
+    # run the given command
     logging.info(f"running function '{script_args.function}'")
     if script_args.function in {Namespace.FUNCTION_COPY, Namespace.FUNCTION_MOVE}:
         sync_from_path(script_args)
-    else:
-        # TODO: refactor this to be a one-line function
-        
-        if rsync_healthcheck():
-            run_sync_mappings(script_args.input, script_args.output, script_args.scan_mode == Namespace.SCAN_FULL)
-        else:
-            logging.error("rsync unhealthy, aborting sync")
+    elif script_args.function == Namespace.FUNCTION_SYNC:
+        run_sync_mappings(script_args.input, script_args.output, script_args.scan_mode == Namespace.SCAN_FULL)
