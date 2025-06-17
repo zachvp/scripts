@@ -9,8 +9,6 @@ Functions to scan and manipulate a batch of music files.
     process:         Convenience function to run sweep, extract, flatten, and all prune functions in sequence for a directory.
 '''
 
-# TODO: properly document
-
 import argparse
 import os
 import shutil
@@ -144,6 +142,7 @@ def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: 
         sweep(temp_dir, source, False, valid_extensions, prefix_hints)
 
 # TODO: extend to save backup of previous X versions
+# TODO: fix XML bug
 def record_collection(source: str, collection_path: str) -> None:
     TAG_TRACK = 'TRACK'
     
@@ -178,11 +177,12 @@ def record_collection(source: str, collection_path: str) -> None:
             # Only process music files
             if name_split[1] in EXTENSIONS:
                 # Check if file is already in collection
-                # TODO: check using 'generate_id' in restore_collection_metadata
-                # TODO: if exists, update with new information
+                # TODO: improve uniqueness check (use sys filename)
+                # TODO: URL encode 'file_url'
                 file_url = f"file://localhost{file_path}"
-                existing = collection.find(f"./TRACK[@Location='{file_url}']")
+                existing = collection.find(f"./TRACK[@Location=\"{file_url}\"]")
                 if existing is not None:
+                    # TODO: if exists, update with new information
                     logging.debug(f"Skip: track already in collection: {file_path}")
                     continue
                 
@@ -197,12 +197,12 @@ def record_collection(source: str, collection_path: str) -> None:
                 today = datetime.now().strftime('%Y-%m-%d')
                 
                 track_attrs = {
-                    constants.ATTR_TRACK_ID: track_id,
-                    'Name': tags.title or name_split[0], # Unable to confirm whether this constant exists from context files
-                    constants.ATTR_ARTIST: tags.artist or constants.UNKNOWN_ARTIST,
-                    constants.ATTR_ALBUM: tags.album or constants.UNKNOWN_ALBUM,
-                    constants.ATTR_DATE_ADDED: today,
-                    constants.ATTR_PATH: file_url
+                    constants.ATTR_TRACK_ID   : track_id,
+                    constants.ATTR_TITLE      : tags.title or name_split[0],
+                    constants.ATTR_ARTIST     : tags.artist or constants.UNKNOWN_ARTIST,
+                    constants.ATTR_ALBUM      : tags.album or constants.UNKNOWN_ALBUM,
+                    constants.ATTR_DATE_ADDED : today,
+                    constants.ATTR_PATH       : file_url
                 }
                 
                 ET.SubElement(collection, TAG_TRACK, track_attrs)
@@ -476,8 +476,7 @@ def update_library(source: str,
         else:
             logging.error("rsync unhealthy, aborting sync")
 
-# TODO: add function to update library: runs process_cli, sweeps to local library dir, records collection, syncs to remote
-# record_collection(args.output, COLLECTION_PATH)
+
 
 if __name__ == '__main__':
     common.configure_log(path=__file__)
