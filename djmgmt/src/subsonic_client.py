@@ -93,7 +93,7 @@ def handle_response(response: Response, endpoint: str) -> dict[str, str] | None:
         60 	The trial period for the Subsonic server is over. Please upgrade to Subsonic Premium. Visit subsonic.org for details.
         70 	The requested data was not found.
         '''
-        logging.error(f'error: {response.text}')
+        logging.error(f'error: {response.json()}')
         return None
 
 class API:
