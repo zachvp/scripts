@@ -609,7 +609,7 @@ class TestPruneEmpty(unittest.TestCase):
         batch_operations_music.prune_empty('/mock/source/', False)
         mock_prune_empty.assert_called_once_with('/mock/source/', False)
         
-class TestWriteXML(unittest.TestCase):
+class TestRecordCollection(unittest.TestCase):
     @patch('batch_operations_music.ET.ElementTree')
     @patch('batch_operations_music.ET.parse')
     @patch('os.path.exists')
