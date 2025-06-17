@@ -470,13 +470,8 @@ def update_library(source: str,
         process(source, temp_dir, interactive, valid_extensions, prefix_hints)
         sweep(temp_dir, library, interactive, valid_extensions, prefix_hints)
         record_collection(library, COLLECTION_PATH)
-        
-        if sync_media_server.rsync_healthcheck():
-            sync_media_server.run_sync_mappings(COLLECTION_PATH, client_mirror_path, True)
-        else:
-            logging.error("rsync unhealthy, aborting sync")
 
-
+        sync_media_server.run_sync_mappings(COLLECTION_PATH, client_mirror_path, True)
 
 if __name__ == '__main__':
     common.configure_log(path=__file__)
