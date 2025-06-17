@@ -155,9 +155,8 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tu
         logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
         return (error.returncode, error.stderr)
 
-# TODO: refactor so source and dest aren't required paths; move logging to caller function
 # TODO: add error handling for encoding
-def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, dest: str, full_scan: bool) -> bool:
+def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, full_scan: bool) -> bool:
     '''Transfers all files in the batch to the given destination, then tells the music server to perform a scan.
     
     Returns True if the batch sync was successful, False otherwise.
@@ -174,8 +173,10 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
     logging.info(f"finished encoding batch in date context {date_context}")
     
     # transfer batch to the media server
-    transfer_path = transform_implied_path(dest)
+    transfer_path = transform_implied_path(source)
+    success = bool(transfer_path)
     if transfer_path:
+        logging.info(f"transferring files from {source}")
         returncode, _ = transfer_files(transfer_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
         success = returncode == 0
         
@@ -194,15 +195,14 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, des
                     # TODO: add error handling
                     response = subsonic_client.call_endpoint(subsonic_client.API.GET_SCAN_STATUS)
                     content = subsonic_client.handle_response(response, subsonic_client.API.GET_SCAN_STATUS)
-                    if not content or content['scanning'] == 'false':
+                    if not content:
+                      success = False
+                      logging.error('unable to get scan status')  
+                    elif content['scanning'] == 'false':
+                        logging.info('remote scan complete')
                         break
                     logging.debug("remote scan in progress, waiting...")
                     time.sleep(1) # TODO: sleep for more time if full scan
-                logging.info('remote scan complete')
-    else:
-        success = False
-        logging.error(f"empty transfer path: unable to transfer from '{source}' to '{dest}'")
-    
     return success
 
 def is_processed(date_context: str) -> bool:
@@ -222,7 +222,7 @@ def is_processed(date_context: str) -> bool:
 def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
     # core data
     batch: list[tuple[str, str]] = []
-    source_previous, dest_previous = mappings[0]
+    dest_previous = mappings[0][1]
     date_context, source, dest = '', '', ''
     index = 0
     
@@ -234,7 +234,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
     logging.debug(f"sync '{len(mappings)}' mappings:\n{mappings}")
     
     for index, mapping in enumerate(mappings):
-        source, dest = mapping
+        dest = mapping[1]
         date_context_previous = common.find_date_context(dest_previous)
         date_context = common.find_date_context(dest)
         
@@ -256,7 +256,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
             logging.debug(f"add to batch: {mapping}")
         elif batch:
             logging.info(f"processing batch in date context '{date_context_previous}'")
-            if not sync_batch(batch, date_context_previous, source_previous, dest_previous, full_scan):
+            if not sync_batch(batch, date_context_previous, os.path.dirname(dest_previous), full_scan):
                 raise RuntimeError(f"Batch sync failed for date context '{date_context_previous}'")
             batch.clear()
             batch.append(mapping) # add the first mapping of the new context
@@ -272,15 +272,14 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
             batch.append(mapping) # add the first mapping of the new context
             logging.debug(f"add new context mapping: {mapping}")
             logging.info(f"skip empty batch: {date_context_previous}")
-        source_previous = source
         dest_previous = dest
     
     # process the final batch
-    if batch and date_context and source and dest:
+    if batch and date_context and dest:
         if isinstance(date_context, tuple):
             date_context = date_context[0]
         logging.info(f"processing batch in date context '{date_context}'")
-        if not sync_batch(batch, date_context, source, dest, full_scan):
+        if not sync_batch(batch, date_context, os.path.dirname(dest), full_scan):
             raise RuntimeError(f"Batch sync failed for date context '{date_context}'")
         with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
             state.write(f"{FILE_SYNC_KEY}: {date_context}")
