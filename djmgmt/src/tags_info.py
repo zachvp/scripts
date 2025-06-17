@@ -138,7 +138,7 @@ def compare_tags(source: str, comparison: str) -> list[str]:
 
 # main
 if __name__ == '__main__':
-    import common
+    from . import common
     
     common.configure_log(level=logging.DEBUG, path=__file__)
     args = parse_args(Namespace.FUNCTIONS)

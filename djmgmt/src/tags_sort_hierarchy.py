@@ -17,9 +17,9 @@ import os
 import shutil
 import logging
 
-import common_tags
-import batch_operations_music
-import constants
+from . import common_tags
+from . import batch_operations_music
+from . import constants
 
 # Constants
 FUNCTION_VALIDATE = 'validate'

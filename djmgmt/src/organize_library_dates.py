@@ -19,8 +19,8 @@ from urllib.parse import unquote
 import argparse
 import logging
 
-import constants
-import common
+from . import constants
+from . import common
 
 # TODO: breakdown of tracks included in recorded sets
 # TODO: breakdown of tracks excluded from recorded sets
@@ -231,7 +231,7 @@ def move_files(args: type[Namespace], path_mappings: list[str]) -> None:
         shutil.move(source, dest)
 
 def collect_identifiers(collection: ET.Element, playlist_ids: set[str] = set()) -> list[str]:
-    import common_tags
+    from . import common_tags
     
     identifiers: list[str] = []
     

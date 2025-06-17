@@ -7,8 +7,9 @@ import argparse
 from collections import defaultdict
 import xml.etree.ElementTree as ET
 from collections.abc import Collection
-import organize_library_dates as ORG
-import constants
+
+from . import organize_library_dates as ORG
+from . import constants
 
 # print the tracks present in collection, but not the given playlist
 def output_missing_tracks(playlist_ids: set[str], collection: ET.Element) -> list[str]:

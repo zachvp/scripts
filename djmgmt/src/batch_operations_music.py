@@ -16,15 +16,15 @@ import os
 import shutil
 import zipfile
 import logging
-import constants
 
 from datetime import datetime
 import uuid
 import xml.etree.ElementTree as ET
 
-import common
-import encode_tracks
-from common_tags import read_tags 
+from . import constants
+from . import common
+from . import encode_tracks
+from .common_tags import read_tags 
 
 # constants
 EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'}
@@ -462,7 +462,7 @@ def update_library(source: str,
         
         The source, library, and client_mirror_path parameters should all be distinct directories.
     '''
-    import sync_media_server
+    from . import sync_media_server
     from tempfile import TemporaryDirectory
     
     # Create a temporary directory to process the files from 'source'
