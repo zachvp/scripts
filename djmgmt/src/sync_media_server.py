@@ -375,11 +375,11 @@ def create_sync_mappings(input_dir: str, output_dir: str) -> list[tuple[str, str
     filtered_mappings.sort(key=lambda m: key_date_context(m))
     return filtered_mappings
 
-def run_sync_mappings(input_dir: str, output_dir: str) -> None:
+def run_sync_mappings(input_dir: str, output_dir: str, full_scan: bool) -> None:
     timestamp = time.time()
     mappings = create_sync_mappings(input_dir, output_dir)
     try:
-        sync_from_mappings(mappings, script_args.scan_mode == Namespace.SCAN_FULL)
+        sync_from_mappings(mappings, full_scan)
     except Exception as e:
         logging.error(e)
         raise
@@ -399,6 +399,6 @@ if __name__ == '__main__':
         # TODO: refactor this to be a one-line function
         
         if rsync_healthcheck():
-            run_sync_mappings(script_args.input, script_args.output)
+            run_sync_mappings(script_args.input, script_args.output, script_args.scan_mode == Namespace.SCAN_FULL)
         else:
             logging.error("rsync unhealthy, aborting sync")
