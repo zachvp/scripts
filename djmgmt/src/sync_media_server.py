@@ -223,7 +223,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
     # core data
     batch: list[tuple[str, str]] = []
     dest_previous = mappings[0][1]
-    date_context, source, dest = '', '', ''
+    date_context, dest = '', ''
     index = 0
     
     # helper

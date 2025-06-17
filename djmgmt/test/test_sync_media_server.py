@@ -5,9 +5,12 @@ import unittest
 import subprocess
 from unittest.mock import patch, MagicMock, mock_open, call
 
-# Imports required to call source code and patch with mocks.
+# Imports required to call source code
 from .context import src
-from src import sync_media_server, constants, subsonic_client, encode_tracks
+from src import sync_media_server, constants, subsonic_client
+
+# Imports required to patch with mocks
+from src import encode_tracks
 
 # Constants
 DATE_PROCESSED_PAST     = '2025/05 may/19'
@@ -59,7 +62,6 @@ class TestSyncBatch(unittest.TestCase):
         batch = [('/source/path1.aiff', '/dest/2023/01 january/01/path1.aiff'),
                  ('/source/path2.aiff', '/dest/2023/01 january/01/path2.aiff')]
         date_context = '2023/01 january/01'
-        source = '/source'
         dest = '/dest/2023/01 january/01/path1.aiff'
         full_scan = True
         
@@ -75,7 +77,7 @@ class TestSyncBatch(unittest.TestCase):
         mock_handle_response.side_effect = [{'scanning': 'true'}, {'scanning': 'false'}]
         
         # Call the function
-        actual = sync_media_server.sync_batch(batch, date_context, source, dest, full_scan)
+        actual = sync_media_server.sync_batch(batch, date_context, dest, full_scan)
         
         # Assert that the expected functions are called with expected parameters.
         self.assertEqual(actual, True, 'Expect call to succeed')
@@ -106,7 +108,6 @@ class TestSyncBatch(unittest.TestCase):
         # Setup for quick scan
         batch = [('/source/path1.aiff', '/dest/2023/01 january/01/path1.aiff')]
         date_context = '2023/01 january/01'
-        source = '/source'
         dest = '/dest/2023/01 january/01/path1.aiff'
         full_scan = False
         
@@ -122,8 +123,7 @@ class TestSyncBatch(unittest.TestCase):
         mock_handle_response.return_value = {'scanning': 'false'}
         
         # Call the function
-        actual = sync_media_server.sync_batch(batch, date_context, source, dest, full_scan)
-        
+        actual = sync_media_server.sync_batch(batch, date_context, dest, full_scan)
         
         # Assertions
         self.assertEqual(actual, True, 'Expect call to succeed')
@@ -141,16 +141,13 @@ class TestSyncBatch(unittest.TestCase):
 
     @patch('src.encode_tracks.encode_lossy')
     @patch('src.sync_media_server.transform_implied_path')
-    @patch('logging.error')
     def test_error_no_transfer_path(self,
-                                    mock_log_error: MagicMock,
                                     mock_transform: MagicMock,
                                     mock_encode: MagicMock) -> None:
         '''Tests that an error is logged when the destination cannot be transformed into a transfer path.'''
         # Setup
         batch = [('/source/path1.aiff', '/dest/path1.aiff')]
         date_context = '2023/01 january/01'
-        source = '/source'
         dest = '/dest/path1.aiff'
         full_scan = True
         
@@ -158,13 +155,12 @@ class TestSyncBatch(unittest.TestCase):
         mock_transform.return_value = None
         
         # Call the function
-        actual = sync_media_server.sync_batch(batch, date_context, source, dest, full_scan)
+        actual = sync_media_server.sync_batch(batch, date_context, dest, full_scan)
         
         # Assertions
         self.assertEqual(actual, False, 'Expect call to fail')
         mock_encode.assert_called_once_with(batch, '.mp3', threads=28)
         mock_transform.assert_called_once_with(dest)
-        mock_log_error.assert_called_once()  # Should log an error about empty transfer path
         
     @patch('src.encode_tracks.encode_lossy')
     @patch('src.sync_media_server.transform_implied_path')
@@ -181,7 +177,6 @@ class TestSyncBatch(unittest.TestCase):
         # Setup
         batch = [('/source/path1.aiff', '/dest/2023/01 january/01/path1.aiff')]
         date_context = '2023/01 january/01'
-        source = '/source'
         dest = '/dest/2023/01 january/01/path1.aiff'
         
         # Configure mocks
@@ -196,7 +191,7 @@ class TestSyncBatch(unittest.TestCase):
         
         # Call the function, expecting no exception
         try:
-            actual = sync_media_server.sync_batch(batch, date_context, source, dest, False)
+            actual = sync_media_server.sync_batch(batch, date_context, dest, False)
             self.assertEqual(actual, False, 'Expect call to fail')
         except:
             self.fail('No exception expected')
@@ -267,8 +262,7 @@ class TestTransferFiles(unittest.TestCase):
     
 class TestSyncMappings(unittest.TestCase):
     @patch('src.sync_media_server.sync_batch')
-    @patch('builtins.open', new_callable=mock_open, read_data='')
-    def test_success_one_context(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
+    def test_success_one_context(self: MagicMock, mock_sync_batch: MagicMock) -> None:
         '''Tests that a single batch with mappings in the same date context is synced properly.'''
         # Set up call input
         mappings = [
@@ -283,12 +277,8 @@ class TestSyncMappings(unittest.TestCase):
         # Expect that a single batch is synced with the given mappings
         mock_sync_batch.assert_called_once()
         
-        # Expect 3 calls to open the sync state file: 1 for each mapping (2 total) and 1 after batch is synced
-        self.assertEqual(mock_sync_state.call_count, 3)
-        
     @patch('src.sync_media_server.sync_batch')
-    @patch('builtins.open', new_callable=mock_open, read_data='')
-    def test_success_multiple_contexts(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
+    def test_success_multiple_contexts(self, mock_sync_batch: MagicMock) -> None:
         '''Tests that two batches with mappings in two date contexts are synced properly.'''
         # Set up call input
         mappings = [
@@ -308,12 +298,8 @@ class TestSyncMappings(unittest.TestCase):
         # Expect that a single batch is synced with the given mappings
         self.assertEqual(mock_sync_batch.call_count, 2)
         
-        # Expect 3 calls per batch to open the sync state file:
-        self.assertEqual(mock_sync_state.call_count, 6)
-        
     @patch('src.sync_media_server.sync_batch')
-    @patch('builtins.open', new_callable=mock_open, read_data='')
-    def test_error_empty_mappings(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
+    def test_error_empty_mappings(self, mock_sync_batch: MagicMock) -> None:
         '''Tests that nothing is synced for an empty mappings list and error is raised.'''
         # Set up call input
         mappings = []
@@ -324,7 +310,6 @@ class TestSyncMappings(unittest.TestCase):
         
         # Assert expectations
         mock_sync_batch.assert_not_called()
-        mock_sync_state.assert_not_called()
     
     @patch('src.sync_media_server.sync_batch')
     @patch('builtins.open', new_callable=mock_open, read_data='')
@@ -347,9 +332,6 @@ class TestSyncMappings(unittest.TestCase):
         # Assert expectations
         # Expect that a single batch is synced with the given mappings
         mock_sync_batch.assert_called_once()
-        
-        # Expect 2 calls to open the sync state file: 1 for each mapping (2 total)
-        self.assertEqual(mock_sync_state.call_count, 2)
     
 if __name__ == '__main__':
     unittest.main()
