@@ -100,6 +100,16 @@ def is_prefix_match(value: str, prefixes: set[str]) -> bool:
             return True
     return False
 
+def prune(working_dir: str, directories: list[str], filenames: list[str]) -> None:
+    for index, directory in enumerate(directories):
+        if is_prefix_match(directory, {'.', '_'}) or '.app' in directory:
+            logging.info(f"prune: hidden directory or '.app' archive '{os.path.join(working_dir, directory)}'")
+            del directories[index]
+    for index, name in enumerate(filenames):
+        if name.startswith('.'):
+            logging.info(f"prune: hidden file '{name}'")
+            del filenames[index]
+
 def flatten_zip(zip_path: str, extract_path: str) -> None:
     output_directory = os.path.splitext(os.path.basename(zip_path))[0]
     logging.debug(f"output dir: {os.path.join(extract_path, output_directory)}")
