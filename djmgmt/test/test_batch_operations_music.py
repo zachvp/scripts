@@ -2,7 +2,7 @@ import unittest
 import zipfile
 import os
 import shutil
-from typing import Any, Tuple
+from typing import Any, Tuple, cast
 from argparse import Namespace
 import xml.etree.ElementTree as ET
 from unittest.mock import patch, MagicMock, call
@@ -610,46 +610,46 @@ class TestPruneEmpty(unittest.TestCase):
         mock_prune_empty.assert_called_once_with('/mock/source/', False)
         
 class TestRecordCollection(unittest.TestCase):
-    @patch('batch_operations_music.ET.ElementTree')
-    @patch('batch_operations_music.ET.parse')
+    @patch.object(ET.ElementTree, "write")
+    @patch('src.batch_operations_music.ET.parse')
     @patch('os.path.exists')
-    @patch('batch_operations_music.read_tags')
+    @patch('src.batch_operations_music.read_tags')
     @patch('os.walk')
     def test_success_file_not_exist(self,
                                     mock_walk: MagicMock,
                                     mock_read_tags: MagicMock,
-                                    mock_path_exists: MagicMock, # mock in case implementation uses os API
+                                    mock_path_exists: MagicMock,
                                     mock_xml_parse: MagicMock,
-                                    mock_xml_tree: MagicMock) -> None:
+                                    mock_xml_write: MagicMock) -> None:
         '''Tests that a single music file is correctly written to a non-existent XML file.'''
         # Set up mocks
         mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file.aiff'])]
         mock_read_tags.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE)
         mock_path_exists.return_value = False
-        mock_xml_parse.side_effect = FileNotFoundError() # mock in case implementation catches exception to check for file
         
         # Call the target function
-        batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
         
-        # Assert expectations
-        mock_walk.assert_called_once()
+        # Assert call expectations
+        mock_path_exists.assert_called_once()
+        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_xml_parse.assert_not_called()
+        mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
         
         # Assert that the function reads the file tags
         FILE_PATH_MUSIC = f"{MOCK_INPUT_DIR}{os.sep}mock_file.aiff"
         mock_read_tags.assert_called_once_with(FILE_PATH_MUSIC)
         
         # Assert that the XML contents are expected
-        xml_root: ET.Element  = mock_xml_tree.call_args[0]
-        self.assertEqual(len(xml_root), 1)
-        
-        # Check DJ_PLAYLISTS node
-        dj_playlists = xml_root[0]
+        # Check DJ_PLAYLISTS root node
+        dj_playlists: ET.Element  = cast(ET.Element, actual.getroot()) 
+        self.assertEqual(len(dj_playlists), 3)
         self.assertEqual(dj_playlists.tag, 'DJ_PLAYLISTS')
         self.assertEqual(dj_playlists.attrib, {'Version': '1.0.0'})
-        self.assertEqual(len(dj_playlists), 2)
         
         # Check PRODUCT node
         product = dj_playlists[0]
+        self.assertEqual(len(product), 0)
         expected_attrib = {'Name': 'rekordbox', 'Version': '6.8.5', 'Company': 'AlphaTheta'}
         self.assertEqual(product.tag, 'PRODUCT')
         self.assertEqual(product.attrib, expected_attrib)
@@ -681,100 +681,140 @@ class TestRecordCollection(unittest.TestCase):
         self.assertRegex(track.attrib['DateAdded'], r"\d{4}-\d{2}-\d{2}")
         
         self.assertIn('Location', track.attrib)
-        self.assertRegex(track.attrib['Location'], r'file://localhost/.+')
-                
-        # Assert that the function writes to the given XML file
-        self.assertIn(call().write(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True), mock_xml_tree.mock_calls)
+        self.assertRegex(track.attrib['Location'], r'^file://localhost/.+$')
+        
+        # Check PLAYLISTS node
+        playlists = cast(ET.Element, actual.find('.//PLAYLISTS'))
+        self.assertIsNotNone(playlists)
+        
+        # Check _pruned playlist
+        pruned = cast(ET.Element, actual.find('./PLAYLISTS//NODE[@Name="_pruned"]'))
+        self.assertIsNotNone(pruned)
+        self.assertIn('Name', pruned.attrib)
+        self.assertEqual(pruned.attrib['Name'], '_pruned')
+        self.assertEqual(len(pruned), 1)
+        
+        # Check _pruned track
+        track = pruned[0]
+        self.assertIn("Key", track.attrib)
+        self.assertRegex(track.attrib['Key'], r'\d+')
 
-    @patch('batch_operations_music.ET.parse')
+    @patch.object(ET.ElementTree, "write")
+    @patch('src.batch_operations_music.ET.parse')
     @patch('os.path.exists')
-    @patch('batch_operations_music.read_tags')
+    @patch('src.batch_operations_music.read_tags')
     @patch('os.walk')
     def test_success_file_exists(self,
                                  mock_walk: MagicMock,
                                  mock_read_tags: MagicMock,
-                                 mock_path_exists: MagicMock, # mock in case implementation uses os API
-                                 mock_xml_parse: MagicMock) -> None:
-        '''Tests that a single music file is correctly written to an existing XML file.'''
+                                 mock_path_exists: MagicMock,
+                                 mock_xml_parse: MagicMock,
+                                 mock_xml_write: MagicMock) -> None:
+        '''Tests that a single music file is correctly added to an existing XML file that contains an entry.'''
         # Set up mocks
         mock_path_exists.return_value = True
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file.aiff'])]
+        mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file_0.aiff'])]
         mock_read_tags.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE)
         mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(COLLECTION_XML))
         
-        # Call the target function
-        # Limit the path scope for ElementTree so a real instance can be used in the return value above
-        with patch('batch_operations_music.ET.ElementTree') as mock_xml_tree:
-            batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        # Insert the first track
+        first_call = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        
+        # Reset mocks from first call
+        mock_walk.reset_mock()
+        mock_read_tags.reset_mock()
+        mock_path_exists.reset_mock()
+        mock_xml_parse.reset_mock()
+        mock_xml_write.reset_mock()
+        
+        # Set up mocks for second call
+        mock_path_exists.return_value = True
+        mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file_1.aiff'])]
+        mock_read_tags.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE)
+        mock_xml_parse.return_value = first_call
+        
+        # Call the target function to check that 'mock_file_1' was inserted
+        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
             
-            # Assert expectations
-            mock_walk.assert_called_once()
-            mock_xml_parse.assert_called_with(MOCK_XML_FILE_PATH)
+        # Assert call expectations
+        mock_path_exists.assert_called_once()
+        mock_walk.assert_called_once()
+        mock_xml_parse.assert_called_with(MOCK_XML_FILE_PATH)
+        mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
+        
+        # Assert that the function reads the file tags
+        FILE_PATH_MUSIC = f"{MOCK_INPUT_DIR}{os.sep}mock_file_1.aiff"
+        mock_read_tags.assert_called_once_with(FILE_PATH_MUSIC)
+        
+        # Assert that the XML contents are expected
+        # Check DJ_PLAYLISTS root node
+        dj_playlists = cast(ET.Element, actual.getroot())
+        self.assertEqual(len(dj_playlists), 3)
+        self.assertEqual(dj_playlists.tag, 'DJ_PLAYLISTS')
+        self.assertEqual(dj_playlists.attrib, {'Version': '1.0.0'})
+        
+        # Check PRODUCT node
+        product = dj_playlists[0]
+        expected_attrib = {'Name': 'rekordbox', 'Version': '6.8.5', 'Company': 'AlphaTheta'}
+        self.assertEqual(product.tag, 'PRODUCT')
+        self.assertEqual(product.attrib, expected_attrib)
+        
+        # Check COLLECTION node
+        collection = dj_playlists[1]
+        self.assertEqual(collection.tag, 'COLLECTION')
+        self.assertEqual(collection.attrib, {'Entries': '2'})
+        self.assertEqual(len(collection), 2)
+        
+        # Check TRACK nodes
+        for track in collection:
+            self.assertEqual(track.tag, 'TRACK')
+            self.assertEqual(len(track), 0)
             
-            # Assert that the function reads the file tags
-            FILE_PATH_MUSIC = f"{MOCK_INPUT_DIR}{os.sep}mock_file.aiff"
-            mock_read_tags.assert_called_once_with(FILE_PATH_MUSIC)
+            self.assertIn('TrackID', track.attrib)
+            self.assertRegex(track.attrib['TrackID'], r'\d+')
             
-            # Assert that the XML contents are expected
-            xml_root: ET.Element  = mock_xml_tree.call_args[0]
-            self.assertEqual(len(xml_root), 1)
+            self.assertIn('Name', track.attrib)
+            self.assertEqual(track.attrib['Name'], MOCK_TITLE)
             
-            # Check DJ_PLAYLISTS node
-            dj_playlists = xml_root[0]
-            self.assertEqual(dj_playlists.tag, 'DJ_PLAYLISTS')
-            self.assertEqual(dj_playlists.attrib, {'Version': '1.0.0'})
-            self.assertEqual(len(dj_playlists), 2)
+            self.assertIn('Artist', track.attrib)
+            self.assertEqual(track.attrib['Artist'], MOCK_ARTIST)
             
-            # Check PRODUCT node
-            product = dj_playlists[0]
-            expected_attrib = {'Name': 'rekordbox', 'Version': '6.8.5', 'Company': 'AlphaTheta'}
-            self.assertEqual(product.tag, 'PRODUCT')
-            self.assertEqual(product.attrib, expected_attrib)
+            self.assertIn('Album', track.attrib)
+            self.assertEqual(track.attrib['Album'], MOCK_ALBUM)
             
-            # Check COLLECTION node
-            collection = dj_playlists[1]
-            self.assertEqual(collection.tag, 'COLLECTION')
-            self.assertEqual(collection.attrib, {'Entries': '2'})
-            self.assertEqual(len(collection), 2)
+            self.assertIn('DateAdded', track.attrib)
+            self.assertRegex(track.attrib['DateAdded'], r"\d{4}-\d{2}-\d{2}")
             
-            # Check TRACK nodes
-            for track in collection:
-            # track = collection[0]
-                self.assertEqual(track.tag, 'TRACK')
-                self.assertEqual(len(track), 0)
-                
-                self.assertIn('TrackID', track.attrib)
-                self.assertRegex(track.attrib['TrackID'], r'\d+')
-                
-                self.assertIn('Name', track.attrib)
-                self.assertEqual(track.attrib['Name'], MOCK_TITLE)
-                
-                self.assertIn('Artist', track.attrib)
-                self.assertEqual(track.attrib['Artist'], MOCK_ARTIST)
-                
-                self.assertIn('Album', track.attrib)
-                self.assertEqual(track.attrib['Album'], MOCK_ALBUM)
-                
-                self.assertIn('DateAdded', track.attrib)
-                self.assertRegex(track.attrib['DateAdded'], r"\d{4}-\d{2}-\d{2}")
-                
-                self.assertIn('Location', track.attrib)
-                self.assertRegex(track.attrib['Location'], r'file://localhost/.+')
-            
-            # Assert that the function writes to the given XML file
-            self.assertIn(call().write(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True), mock_xml_tree.mock_calls)
+            self.assertIn('Location', track.attrib)
+            self.assertRegex(track.attrib['Location'], r'^file://localhost/.+$')
+        
+        # Check PLAYLISTS node
+        playlists = cast(ET.Element, actual.find('.//PLAYLISTS'))
+        self.assertIsNotNone(playlists)
+        
+        # CHECK "_pruned" playlist
+        pruned = cast(ET.Element, actual.find('./PLAYLISTS//NODE[@Name="_pruned"]'))
+        self.assertIsNotNone(pruned)
+        self.assertIn('Name', pruned.attrib)
+        self.assertEqual(pruned.attrib['Name'], '_pruned')
+        self.assertEqual(len(pruned), 2)
+        
+        # Check _pruned tracks
+        for track in pruned:
+            self.assertIn("Key", track.attrib)
+            self.assertRegex(track.attrib['Key'], r'\d+')
     
-    @patch('batch_operations_music.ET.ElementTree')
-    @patch('batch_operations_music.ET.parse')
+    @patch.object(ET.ElementTree, "write")
+    @patch('src.batch_operations_music.ET.parse')
     @patch('os.path.exists')
-    @patch('batch_operations_music.read_tags')
+    @patch('src.batch_operations_music.read_tags')
     @patch('os.walk')
     def test_success_no_music_files(self,
                                     mock_walk: MagicMock,
                                     mock_read_tags: MagicMock,
                                     mock_path_exists: MagicMock, # mock in case implementation uses os API
                                     mock_xml_parse: MagicMock,
-                                    mock_xml_tree: MagicMock) -> None:
+                                    mock_xml_write: MagicMock) -> None:
         '''Tests that either no XML is written or XML content contains no Tracks when no music files are present.'''
         # Setup mocks
         mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file.foo'])]
@@ -782,36 +822,135 @@ class TestRecordCollection(unittest.TestCase):
         mock_xml_parse.side_effect = FileNotFoundError() # mock in case implementation catches exception to check for file
         
         # Call target function
-        batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        
+        # Assert call expectations
+        mock_walk.assert_called_once()
+        mock_read_tags.assert_not_called()
+        mock_xml_write.assert_called_once()
+        
+        # Empty playlist still expected to be written
+        # Check root DJ_PLAYLISTS node
+        dj_playlists = cast(ET.Element, actual.getroot())
+        self.assertEqual(len(dj_playlists), 3)
+        self.assertEqual(dj_playlists.tag, 'DJ_PLAYLISTS')
+        self.assertEqual(dj_playlists.attrib, {'Version': '1.0.0'})
+        self.assertEqual(len(dj_playlists), 3)
+        
+        # Check PRODUCT node
+        product = dj_playlists[0]
+        expected_attrib = {'Name': 'rekordbox', 'Version': '6.8.5', 'Company': 'AlphaTheta'}
+        self.assertEqual(product.tag, 'PRODUCT')
+        self.assertEqual(product.attrib, expected_attrib)
+        
+        # Check COLLECTION node
+        collection = dj_playlists[1]
+        self.assertEqual(collection.tag, 'COLLECTION')
+        self.assertEqual(collection.attrib, {'Entries': '0'})
+        self.assertEqual(len(collection), 0)
+            
+class TestUpdateLibrary(unittest.TestCase):
+    @patch('src.sync_media_server.run_sync_mappings')
+    @patch('src.batch_operations_music.sweep')
+    @patch('src.batch_operations_music.record_collection')
+    @patch('src.batch_operations_music.process')
+    def test_success(self,
+                     mock_process: MagicMock,
+                     mock_record_collection: MagicMock,
+                     mock_sweep: MagicMock,
+                     mock_run_sync_mappings: MagicMock) -> None:
+        '''Tests that dependent functions are called in the correct order with expected parameters.'''
+        # Set up mocks
+        mock_call_container = MagicMock()
+        mock_process.side_effect = lambda *_, **__: mock_call_container.process()
+        mock_record_collection.side_effect = lambda *_, **__: mock_call_container.record_collection()
+        mock_sweep.side_effect = lambda *_, **__: mock_call_container.sweep()
+        mock_run_sync_mappings.side_effect = lambda *_, **__: mock_call_container.run_sync_mappings()
+        
+        # Call target function
+        mock_library = '/mock/library'
+        mock_client_mirror = '/mock/client/mirror'
+        mock_interactive = False
+        mock_extensions = {'.mock_ext'}
+        mock_hints = {'mock_hint'}
+        batch_operations_music.update_library(MOCK_INPUT_DIR,
+                                              mock_library,
+                                              mock_client_mirror,
+                                              mock_interactive,
+                                              mock_extensions,
+                                              mock_hints)
         
         # Assert expectations
-        mock_read_tags.assert_not_called()
+        # Assert that the primary dependent functions are called in the correct order
+        self.assertEqual(mock_call_container.mock_calls[0], call.process())
+        self.assertEqual(mock_call_container.mock_calls[1], call.sweep())
+        self.assertEqual(mock_call_container.mock_calls[2], call.record_collection())
+        self.assertEqual(mock_call_container.mock_calls[3], call.run_sync_mappings())
         
-        # Valid implementation may either write an empty XML doc or write no XML
-        if mock_xml_tree.call_count > 0:
-            # Check root
-            xml_root: ET.Element  = mock_xml_tree.call_args[0]
-            self.assertEqual(len(xml_root), 1)
-            
-            # Check DJ_PLAYLISTS node
-            dj_playlists = xml_root[0]
-            self.assertEqual(dj_playlists.tag, 'DJ_PLAYLISTS')
-            self.assertEqual(dj_playlists.attrib, {'Version': '1.0.0'})
-            self.assertEqual(len(dj_playlists), 2)
-            
-            # Check PRODUCT node
-            product = dj_playlists[0]
-            expected_attrib = {'Name': 'rekordbox', 'Version': '6.8.5', 'Company': 'AlphaTheta'}
-            self.assertEqual(product.tag, 'PRODUCT')
-            self.assertEqual(product.attrib, expected_attrib)
-            
-            # Check COLLECTION node
-            collection = dj_playlists[1]
-            self.assertEqual(collection.tag, 'COLLECTION')
-            self.assertEqual(collection.attrib, {'Entries': '0'})
-            self.assertEqual(len(collection), 0)
-        else:
-            mock_xml_tree.assert_not_called()
+        # Assert the primary dependent function call counts
+        mock_process.assert_called_once()
+        mock_sweep.assert_called_once()
+        mock_record_collection.assert_called_once()
+        mock_run_sync_mappings.assert_called_once()
+        
+        # Assert the primary dependent function call parameters
+        # Assert expected call parameters: process
+        self.assertEqual(mock_process.call_args.args[0], MOCK_INPUT_DIR)
+        # Argument 1 depends on implementation (e.g. temp folder path), so skip check
+        self.assertEqual(mock_process.call_args.args[2], mock_interactive)
+        self.assertEqual(mock_process.call_args.args[3], mock_extensions)
+        self.assertEqual(mock_process.call_args.args[4], mock_hints)
+        
+        # Assert expected call parameters: sweep
+        # Argument 0 depends on implementation (e.g. temp folder path), so skip check
+        self.assertEqual(mock_sweep.call_args.args[1], mock_library)
+        self.assertEqual(mock_sweep.call_args.args[2], mock_interactive)
+        self.assertEqual(mock_sweep.call_args.args[3], mock_extensions)
+        self.assertEqual(mock_sweep.call_args.args[4], mock_hints)
+        
+        # Assert expected call parameters: record_collection
+        # Expect the collection to be updated according to the library path
+        self.assertEqual(mock_record_collection.call_args.args, (mock_library, batch_operations_music.COLLECTION_PATH))
+        
+        # Assert expected call parameters: run_sync_mappings
+        # Expect the sync to run with the result of record_collection and client mirror path in full scan mode
+        self.assertEqual(mock_run_sync_mappings.call_args.args, (mock_call_container.record_collection(), mock_client_mirror, True))
+        
+    @patch('src.sync_media_server.run_sync_mappings')
+    @patch('src.batch_operations_music.sweep')
+    @patch('src.batch_operations_music.record_collection')
+    @patch('src.batch_operations_music.process')
+    def test_error_sync(self,
+                        mock_process: MagicMock,
+                        mock_record_collection: MagicMock,
+                        mock_sweep: MagicMock,
+                        mock_run_sync_mappings: MagicMock) -> None:
+        # Set up mocks
+        mock_error = 'Mock error'
+        mock_run_sync_mappings.side_effect = Exception(mock_error)
+        
+        # Call target function
+        mock_library = '/mock/library'
+        mock_client_mirror = '/mock/client/mirror'
+        mock_interactive = False
+        mock_extensions = {'.mock_ext'}
+        mock_hints = {'mock_hint'}
+        
+        # Assert expectations
+        with self.assertRaises(Exception) as e:
+            batch_operations_music.update_library(MOCK_INPUT_DIR,
+                                                  mock_library,
+                                                  mock_client_mirror,
+                                                  mock_interactive,
+                                                  mock_extensions,
+                                                  mock_hints)
+            self.assertEqual(e.msg, 'Mock error')
+        
+        # Functions should be called before exception
+        mock_process.assert_called_once()
+        mock_record_collection.assert_called_once()
+        mock_sweep.assert_called_once()
+        mock_run_sync_mappings.assert_called_once()
 
 if __name__ == "__main__":
     unittest.main()

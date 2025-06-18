@@ -46,4 +46,4 @@ ATTR_TRACK_ID = 'TrackID'
 
 REKORDBOX_ROOT = 'file://localhost'
 XPATH_COLLECTION = './/COLLECTION'
-XPATH_PRUNED = './/NODE[@Name="_pruned"]'
+XPATH_PRUNED = './PLAYLISTS//NODE[@Name="_pruned"]'

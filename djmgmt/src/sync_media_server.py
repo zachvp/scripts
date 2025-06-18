@@ -20,8 +20,9 @@ import argparse
 import os
 import shutil
 import logging
-from typing import Callable
 import time
+import xml.etree.ElementTree as ET
+from typing import Callable
 
 from . import common
 from . import constants
@@ -149,10 +150,10 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tu
         timestamp = time.time()
         process = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
         timestamp = time.time() - timestamp
-        logging.debug(f"time: {format_timing(timestamp)}\n{process.stdout.strip()}")
+        logging.debug(f"time: {format_timing(timestamp)}\n{process.stdout}".strip())
         return (process.returncode, process.stdout)
     except subprocess.CalledProcessError as error:
-        logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
+        logging.error(f"return code '{error.returncode}':\n{error.stderr}".strip())
         return (error.returncode, error.stderr)
 
 # TODO: add error handling for encoding
@@ -297,21 +298,22 @@ def rsync_healthcheck() -> bool:
             logging.info('rsync daemon is running')
             return True
         except subprocess.CalledProcessError as error:
-            logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
+            # TODO: refactor be lambda function in common
+            logging.error(f"return code '{error.returncode}':\n{error.stderr}".strip())
             return False
         
-def create_sync_mappings(collection_path: str, output_dir: str) -> list[tuple[str, str]]:
+def create_sync_mappings(collection: ET.ElementTree, output_dir: str) -> list[tuple[str, str]]:
     # collect input parameters to sync files
     from . import organize_library_dates as library
     
     # collect the target playlist IDs to sync
-    pruned = library.find_node(collection_path, constants.XPATH_PRUNED)
+    pruned = library.find_node(collection, constants.XPATH_PRUNED)
     playlist_ids: set[str] = {
         track.attrib[constants.ATTR_KEY]
         for track in pruned
     }
-    collection = library.find_node(collection_path, constants.XPATH_COLLECTION)
-    mappings = library.generate_date_paths(collection,
+    collection_node = library.find_node(collection, constants.XPATH_COLLECTION)
+    mappings = library.generate_date_paths(collection_node,
                                            output_dir,
                                            playlist_ids=playlist_ids,
                                            metadata_path=True)
@@ -372,7 +374,7 @@ def sync_from_path(args: type[Namespace]):
             os.makedirs(output_parent_path)
         action(input_path_full, output_path_full)
 
-def run_sync_mappings(collection_path: str, output_dir: str, full_scan: bool) -> None:
+def run_sync_mappings(collection: ET.ElementTree, output_dir: str, full_scan: bool) -> None:
     # Only attempt sync if remote is accessible
     if not rsync_healthcheck():
         logging.error("rsync unhealthy, aborting sync")
@@ -380,7 +382,7 @@ def run_sync_mappings(collection_path: str, output_dir: str, full_scan: bool) ->
     
     # Initialize timing and run the sync
     timestamp = time.time()
-    mappings = create_sync_mappings(collection_path, output_dir)
+    mappings = create_sync_mappings(collection, output_dir)
     try:
         sync_from_mappings(mappings, full_scan)
     except Exception as e:
@@ -400,4 +402,6 @@ if __name__ == '__main__':
     if script_args.function in {Namespace.FUNCTION_COPY, Namespace.FUNCTION_MOVE}:
         sync_from_path(script_args)
     elif script_args.function == Namespace.FUNCTION_SYNC:
-        run_sync_mappings(script_args.input, script_args.output, script_args.scan_mode == Namespace.SCAN_FULL)
+        import organize_library_dates as library
+        tree = library.load_collection(script_args.input)
+        run_sync_mappings(tree, script_args.output, script_args.scan_mode == Namespace.SCAN_FULL)

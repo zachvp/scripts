@@ -95,7 +95,7 @@ def read_ffprobe_value(input_path: str, stream_key: str) -> str:
         logging.debug(f"read_ffprobe_value result: {value}")
         return value
     except subprocess.CalledProcessError as error:
-        logging.error(f"fatal: read_ffprobe_value: CalledProcessError:\n{error.stderr.strip()}")
+        logging.error(f"fatal: read_ffprobe_value: CalledProcessError:\n{error.stderr}".strip())
         logging.debug(f"command: {shlex.join(command)}")
         sys.exit()
 
@@ -178,7 +178,7 @@ def run_command(command: list[str]) -> tuple[int, str]:
         logging.debug(f"command success:\n{result.stdout.strip()}")
         return (result.returncode, result.stdout.strip())
     except subprocess.CalledProcessError as error:
-        logging.error(f"return code '{error.returncode}':\n{error.stderr.strip()}")
+        logging.error(f"return code '{error.returncode}':\n{error.stderr}".strip())
         return (error.returncode, error.stderr.strip())
 
 async def run_command_async(command: list[str]) -> tuple[int, str]:
@@ -445,8 +445,9 @@ def run_missing_art_tasks(loop: AbstractEventLoop, tasks: list[tuple[str, Task[t
 def find_missing_art(collection_file_path: str, collection_xpath: str, playlist_xpath: str, threads=24) -> list[str]:
     import organize_library_dates as library
     
-    collection = library.find_node(collection_file_path, collection_xpath)
-    playlist = library.find_node(collection_file_path, playlist_xpath)
+    tree = library.load_collection(collection_file_path)
+    collection = library.find_node(tree, collection_xpath)
+    playlist = library.find_node(tree, playlist_xpath)
     missing: list[str] = []
     
     # collect the playlist IDs

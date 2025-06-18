@@ -5,8 +5,9 @@ Functions to scan and manipulate a batch of music files.
     extract:         Extract files from all archives.
     compress:        Zips the contents of a given directory.
     prune:           Removes all empty folders and non-music files from a directory.
-    prune_non_music: Removes all non-music files from a directory.
+    prune_non_music  Removes all non-music files from a directory.
     process:         Convenience function to run sweep, extract, flatten, and all prune functions in sequence for a directory.
+    update_library   Processes a directory containing music files into a local library folder, then syncs the updated library.
 '''
 
 import argparse
@@ -32,10 +33,14 @@ COLLECTION_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'processed-colle
 # classes
 class Namespace(argparse.Namespace):
     # arguments
+    ## required
     function : str
     input: str
     output: str
-    interactive: bool
+    
+    ## optional
+    interactive: bool    
+    client_mirror_path: str
     
     # primary functions
     FUNCTION_SWEEP = 'sweep'
@@ -45,9 +50,10 @@ class Namespace(argparse.Namespace):
     FUNCTION_PRUNE = 'prune'
     FUNCTION_PROCESS = 'process'
     FUNCTION_PRUNE_NON_MUSIC = 'prune_non_music'
+    FUNCTION_UPDATE_LIBRARY = 'update_library'
     
     FUNCTIONS_SINGLE_ARG = {FUNCTION_COMPRESS, FUNCTION_FLATTEN, FUNCTION_PRUNE, FUNCTION_PRUNE_NON_MUSIC}
-    FUNCTIONS = {FUNCTION_SWEEP, FUNCTION_EXTRACT, FUNCTION_PROCESS}.union(FUNCTIONS_SINGLE_ARG)
+    FUNCTIONS = {FUNCTION_SWEEP, FUNCTION_EXTRACT, FUNCTION_PROCESS, FUNCTION_UPDATE_LIBRARY}.union(FUNCTIONS_SINGLE_ARG)
 
 # Helper functions
 # TODO: include function docstring in help summary (-h)
@@ -57,21 +63,28 @@ def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> typ
         The following functions only require a single argument: '{single_arg_functions}'.")
     parser.add_argument('input', type=str, help='The input directory to sweep.')
     parser.add_argument('output', nargs='?', type=str, help='The output directory to place the swept tracks.')
-    parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode')
+    parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode.')
+    parser.add_argument('--client-mirror-path', '-m', type=str, help='The client mirror path to pass to media sync.')
 
     args = parser.parse_args(namespace=Namespace)
 
     if args.function not in valid_functions:
         parser.error(f"invalid function '{args.function}'")
     if not args.output and args.function not in single_arg_functions:
-        parser.error(f"the 'output' parameter is required for function '{args.function}'")
+        parser.error(f"the 'output' argument is required for function '{args.function}'")
+    if args.function == Namespace.FUNCTION_UPDATE_LIBRARY and not args.client_mirror_path:
+        parser.error(f"the '--client-mirror-path argument' is required for {Namespace.FUNCTION_UPDATE_LIBRARY}")
 
+    # Normalize path arguments
     args.input = os.path.normpath(args.input)
+    if args.client_mirror_path:
+        args.client_mirror_path = os.path.normpath(args.client_mirror_path)
 
+    # Handle input and output for single vs. multiple arg functions
     if args.output:
         args.output = os.path.normpath(args.output)
     else:
-        args.output = os.path.normpath(args.input)
+        args.output = args.input
 
     return args
 
@@ -142,26 +155,40 @@ def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: 
         sweep(temp_dir, source, False, valid_extensions, prefix_hints)
 
 # TODO: extend to save backup of previous X versions
-# TODO: fix XML bug
-def record_collection(source: str, collection_path: str) -> None:
-    TAG_TRACK = 'TRACK'
+def record_collection(source: str, collection_path: str) -> ET.ElementTree:
+    TAG_TRACK     = 'TRACK'
+    TAG_NODE      = 'NODE'
+    TAG_PLAYLISTS = 'PLAYLISTS'
+    TAG_ROOT      = 'DJ_PLAYLISTS'
     
     # Create or load the collection XML
     if os.path.exists(collection_path):
         try:
             tree = ET.parse(collection_path)
             root = tree.getroot()
-            collection = root.find('.//COLLECTION')
+            collection = root.find(constants.XPATH_COLLECTION)
             if collection is None:
                 raise ValueError('Invalid collection file format: missing COLLECTION element')
         except Exception as e:
             logging.error(f"Error loading collection file: {e}")
-            return
+            raise
     else:
         # Create a new collection file with the basic structure
-        root = ET.Element('DJ_PLAYLISTS', {'Version': '1.0.0'})
-        ET.SubElement(root, 'PRODUCT', {'Name': 'rekordbox', 'Version': '6.8.5', 'Company': 'AlphaTheta'})
+        root = ET.Element(TAG_ROOT, {'Version': '1.0.0'})
+        product_attrs = {'Name': 'rekordbox', 'Version': '6.8.5', 'Company': 'AlphaTheta'}
+        ET.SubElement(root, 'PRODUCT', product_attrs)
         collection = ET.SubElement(root, 'COLLECTION', {'Entries': '0'})
+    
+    # Ensure PLAYLISTS structure exists
+    playlists = root.find(f'.//{TAG_PLAYLISTS}')
+    if playlists is None:
+        playlists = ET.SubElement(root, TAG_PLAYLISTS)
+    
+    # Ensure _pruned playlist exists
+    pruned_node = playlists.find('./NODE[@Name="_pruned"]')
+    if pruned_node is None:
+        pruned_attrs = {'Name': '_pruned', 'Type': '1', 'KeyType': '0', 'Entries': '0'}
+        pruned_node = ET.SubElement(playlists, TAG_NODE, pruned_attrs)
     
     # Count existing tracks
     existing_tracks = len(collection.findall(TAG_TRACK))
@@ -205,17 +232,24 @@ def record_collection(source: str, collection_path: str) -> None:
                     constants.ATTR_PATH       : file_url
                 }
                 
+                # Add the track to the collection
                 ET.SubElement(collection, TAG_TRACK, track_attrs)
                 new_tracks += 1
                 logging.info(f"Added track to collection: {file_path}")
+                
+                # Add the track to the _pruned playlist
+                ET.SubElement(pruned_node, TAG_TRACK, {'Key': track_id})
     
-    # Update the Entries attribute
+    # Update the Entries attributes
     collection.set('Entries', str(existing_tracks + new_tracks))
+    pruned_node.set('Entries', str(len(pruned_node.findall(TAG_TRACK))))
     
     # Write the updated XML to file
     tree = ET.ElementTree(root)
     tree.write(collection_path, encoding='UTF-8', xml_declaration=True)
     logging.info(f"Collection updated with {new_tracks} new tracks at {collection_path}")
+    
+    return tree
 
 # Primary functions
 def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> None:
@@ -469,9 +503,9 @@ def update_library(source: str,
     with TemporaryDirectory() as temp_dir:
         process(source, temp_dir, interactive, valid_extensions, prefix_hints)
         sweep(temp_dir, library, interactive, valid_extensions, prefix_hints)
-        record_collection(library, COLLECTION_PATH)
+        collection = record_collection(library, COLLECTION_PATH)
 
-        sync_media_server.run_sync_mappings(COLLECTION_PATH, client_mirror_path, True)
+        sync_media_server.run_sync_mappings(collection, client_mirror_path, True)
 
 if __name__ == '__main__':
     common.configure_log(path=__file__)
@@ -494,3 +528,10 @@ if __name__ == '__main__':
         prune_non_music_cli(script_args, EXTENSIONS)
     elif script_args.function == Namespace.FUNCTION_PROCESS:
         process_cli(script_args, EXTENSIONS, PREFIX_HINTS)
+    elif script_args.function == Namespace.FUNCTION_UPDATE_LIBRARY:
+        update_library(script_args.input,
+                       script_args.output,
+                       script_args.client_mirror_path,
+                       script_args.interactive,
+                       EXTENSIONS,
+                       PREFIX_HINTS)

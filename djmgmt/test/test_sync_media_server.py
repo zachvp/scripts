@@ -3,6 +3,7 @@
 
 import unittest
 import subprocess
+import xml.etree.ElementTree as ET
 from unittest.mock import patch, MagicMock, mock_open, call
 
 # Imports required to call source code
@@ -16,6 +17,27 @@ from src import encode_tracks
 DATE_PROCESSED_PAST     = '2025/05 may/19'
 DATE_PROCESSED_CURRENT  = '2025/05 may/20'
 DATE_PROCESSED_FUTURE   = '2025/05 may/21'
+
+MOCK_INPUT_DIR = '/mock/input'
+MOCK_OUTPUT_DIR = '/mock/output'
+MOCK_XML_FILE_PATH = '/mock/xml/file.xml'
+MOCK_ARTIST = 'mock_artist'
+MOCK_ALBUM = 'mock_album'
+MOCK_TITLE = 'mock_title'
+
+COLLECTION_XML = f'''
+<?xml version="1.0" encoding="UTF-8"?>
+
+<DJ_PLAYLISTS Version="1.0.0">
+    <PRODUCT Name="rekordbox" Version="6.8.5" Company="AlphaTheta"/>
+    <COLLECTION Entries="1">
+    
+    </COLLECTION>
+    <PLAYLISTS>
+
+    </PLAYLISTS>
+</DJ_PLAYLISTS>
+'''.strip()
 
 # Primary test clas
 class TestIsProcessed(unittest.TestCase):
@@ -262,7 +284,8 @@ class TestTransferFiles(unittest.TestCase):
     
 class TestSyncMappings(unittest.TestCase):
     @patch('src.sync_media_server.sync_batch')
-    def test_success_one_context(self: MagicMock, mock_sync_batch: MagicMock) -> None:
+    @patch('builtins.open', new_callable=mock_open, read_data='')
+    def test_success_one_context(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
         '''Tests that a single batch with mappings in the same date context is synced properly.'''
         # Set up call input
         mappings = [
@@ -277,8 +300,12 @@ class TestSyncMappings(unittest.TestCase):
         # Expect that a single batch is synced with the given mappings
         mock_sync_batch.assert_called_once()
         
+        # Expect 1 call after batch is synced
+        mock_sync_state.assert_called_once()
+        
     @patch('src.sync_media_server.sync_batch')
-    def test_success_multiple_contexts(self, mock_sync_batch: MagicMock) -> None:
+    @patch('builtins.open', new_callable=mock_open, read_data='')
+    def test_success_multiple_contexts(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
         '''Tests that two batches with mappings in two date contexts are synced properly.'''
         # Set up call input
         mappings = [
@@ -298,8 +325,12 @@ class TestSyncMappings(unittest.TestCase):
         # Expect that a single batch is synced with the given mappings
         self.assertEqual(mock_sync_batch.call_count, 2)
         
+        # Expect 1 call per batch
+        self.assertEqual(mock_sync_state.call_count, 2)
+        
     @patch('src.sync_media_server.sync_batch')
-    def test_error_empty_mappings(self, mock_sync_batch: MagicMock) -> None:
+    @patch('builtins.open', new_callable=mock_open, read_data='')
+    def test_error_empty_mappings(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
         '''Tests that nothing is synced for an empty mappings list and error is raised.'''
         # Set up call input
         mappings = []
@@ -310,6 +341,7 @@ class TestSyncMappings(unittest.TestCase):
         
         # Assert expectations
         mock_sync_batch.assert_not_called()
+        mock_sync_state.assert_not_called()
     
     @patch('src.sync_media_server.sync_batch')
     @patch('builtins.open', new_callable=mock_open, read_data='')
@@ -332,6 +364,140 @@ class TestSyncMappings(unittest.TestCase):
         # Assert expectations
         # Expect that a single batch is synced with the given mappings
         mock_sync_batch.assert_called_once()
+        
+        # Expect no calls to open sync state file, because no batches completed
+        mock_sync_state.assert_not_called()
+
+class TestRunSyncMappings(unittest.TestCase):
+    @patch('src.sync_media_server.rsync_healthcheck')
+    @patch('src.sync_media_server.sync_from_mappings')
+    @patch('src.sync_media_server.create_sync_mappings')
+    def test_success(self,
+                     mock_create_sync_mappings: MagicMock,
+                     mock_sync_from_mappings: MagicMock,
+                     mock_rsync_healthcheck: MagicMock) -> None:
+        # Set up mocks
+        mock_create_sync_mappings.return_value = ['/mock/mapping/1', '/mock/mapping/2']
+        
+        # Call target function
+        mock_full_scan = True
+        root = ET.ElementTree(ET.fromstring(COLLECTION_XML))
+        sync_media_server.run_sync_mappings(root, MOCK_OUTPUT_DIR, mock_full_scan)
+        
+        # Assert expectations
+        mock_create_sync_mappings.assert_called_once_with(root, MOCK_OUTPUT_DIR)
+        mock_sync_from_mappings.assert_called_once_with(mock_create_sync_mappings.return_value, mock_full_scan)
+        mock_rsync_healthcheck.assert_called_once()
     
+    @patch('src.sync_media_server.rsync_healthcheck')
+    @patch('src.sync_media_server.sync_from_mappings')
+    @patch('src.sync_media_server.create_sync_mappings')
+    def test_exception_sync_from_mappings(self,
+                                          mock_create_sync_mappings: MagicMock,
+                                          mock_sync_from_mappings: MagicMock,
+                                          mock_rsync_healthcheck: MagicMock) -> None:
+        # Set up mocks
+        mock_error = 'Mock error'
+        mock_create_sync_mappings.return_value = ['/mock/mapping/1', '/mock/mapping/2']
+        mock_sync_from_mappings.side_effect = Exception(mock_error)
+        
+        # Call target function
+        mock_full_scan = True
+        root = ET.ElementTree(ET.fromstring(COLLECTION_XML))
+        with self.assertRaises(Exception) as e:
+            sync_media_server.run_sync_mappings(root, MOCK_OUTPUT_DIR, mock_full_scan)
+            self.assertEqual(e.msg, mock_error)
+        
+        # Assert expectations
+        mock_create_sync_mappings.assert_called_once_with(root, MOCK_OUTPUT_DIR)
+        mock_sync_from_mappings.assert_called_once_with(mock_create_sync_mappings.return_value, mock_full_scan)
+        mock_rsync_healthcheck.assert_called_once()
+        
+    @patch('src.sync_media_server.rsync_healthcheck')
+    @patch('src.sync_media_server.sync_from_mappings')
+    @patch('src.sync_media_server.create_sync_mappings')
+    def test_rsync_healthcheck_fail(self,
+                                    mock_create_sync_mappings: MagicMock,
+                                    mock_sync_from_mappings: MagicMock,
+                                    mock_rsync_healthcheck: MagicMock) -> None:
+        # Set up mocks
+        mock_error = 'Mock error'
+        mock_create_sync_mappings.return_value = ['/mock/mapping/1', '/mock/mapping/2']
+        mock_rsync_healthcheck.return_value = False
+        
+        # Call target function
+        mock_full_scan = True
+        with self.assertRaises(Exception) as e:
+            root = ET.ElementTree(ET.fromstring(COLLECTION_XML))
+            sync_media_server.run_sync_mappings(root, MOCK_OUTPUT_DIR, mock_full_scan)
+            self.assertEqual(e.msg, mock_error)
+        
+        # Assert expectations
+        mock_create_sync_mappings.assert_not_called()
+        mock_sync_from_mappings.assert_not_called()
+        mock_rsync_healthcheck.assert_called_once()
+
+class TestCreateSyncMappings(unittest.TestCase):
+    @patch('src.sync_media_server.is_processed')
+    @patch('src.common.find_date_context')
+    @patch('src.organize_library_dates.generate_date_paths')
+    @patch('src.organize_library_dates.find_node')
+    def test_success_nothing_filtered(self,
+                                      mock_find_node: MagicMock,
+                                      mock_generate_date_paths: MagicMock,
+                                      mock_find_date_context: MagicMock,
+                                      mock_is_processed: MagicMock) -> None:
+        # Set up mocks
+        mock_node_pruned = MagicMock()
+        mock_node_pruned = [MagicMock(attrib={ constants.ATTR_KEY : '1' })]
+        mock_node_collection = MagicMock()
+
+        mock_find_node.side_effect = [mock_node_pruned, mock_node_collection]
+        mock_generate_date_paths.return_value = [(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR)]
+        mock_find_date_context.return_value = 'mock_context'        
+        mock_is_processed.return_value = False # mock unprocessed contexts
+        
+        # Call target function
+        root = ET.ElementTree(ET.fromstring(COLLECTION_XML))
+        actual = sync_media_server.create_sync_mappings(root, MOCK_OUTPUT_DIR)
+        
+        # Assert expectations
+        self.assertEqual(actual, [(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR)])
+        mock_generate_date_paths.assert_called_once_with(mock_node_collection,
+                                                         MOCK_OUTPUT_DIR,
+                                                         playlist_ids={'1'},
+                                                         metadata_path=True)
+        
+    @patch('src.sync_media_server.is_processed')
+    @patch('src.common.find_date_context')
+    @patch('src.organize_library_dates.generate_date_paths')
+    @patch('src.organize_library_dates.find_node')
+    def test_success_everything_filtered(self,
+                                         mock_find_node: MagicMock,
+                                         mock_generate_date_paths: MagicMock,
+                                         mock_find_date_context: MagicMock,
+                                         mock_is_processed: MagicMock) -> None:
+        # Set up mocks
+        mock_node_pruned = MagicMock()
+        mock_node_pruned = [MagicMock(attrib={ constants.ATTR_KEY : '1' })]
+        mock_node_collection = MagicMock()
+
+        mock_find_node.side_effect = [mock_node_pruned, mock_node_collection]
+        mock_generate_date_paths.return_value = [(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR)]
+        mock_find_date_context.return_value = 'mock_context'        
+        mock_is_processed.return_value = True # mock all processed contexts
+        
+        # Call target function
+        root = ET.ElementTree(ET.fromstring(COLLECTION_XML))
+        actual = sync_media_server.create_sync_mappings(root, MOCK_OUTPUT_DIR)
+        
+        # Assert expectations
+        self.assertEqual(actual, []) # no mappings should be returned, because everything was processed
+        mock_generate_date_paths.assert_called_once_with(mock_node_collection,
+                                                         MOCK_OUTPUT_DIR,
+                                                         playlist_ids={'1'},
+                                                         metadata_path=True)
+
+
 if __name__ == '__main__':
     unittest.main()

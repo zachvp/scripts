@@ -15,9 +15,10 @@ import sys
 import os
 import shutil
 import xml.etree.ElementTree as ET
-from urllib.parse import unquote
 import argparse
 import logging
+from urllib.parse import unquote
+from typing import cast
 
 from . import constants
 from . import common
@@ -128,16 +129,21 @@ def swap_root(path: str, old_root: str, root: str) -> str:
 
     return root
 
-def find_node(file_path, xpath) -> ET.Element:
+def load_collection(path: str) -> ET.ElementTree:
+    collection = ET.parse(path)
+    assert collection, f"unable to parse collection at '{path}'"
+    return cast(ET.ElementTree, collection)
+
+def find_node(collection: ET.ElementTree, xpath: str) -> ET.Element:
     '''Arguments:
-        file_path -- The XML file path.
-        xpath -- The XPath of the node to find.
+        collection -- The XML collection.
+        xpath      -- The XPath of the node to find.
     Returns:
         The XML node according to the given arguments.
     '''
-    collection = ET.parse(file_path).getroot().find(xpath)
-    assert collection, f"unable to find {xpath} for path '{file_path}'"
-    return collection
+    node = collection.find(xpath)
+    assert node, f"unable to find {xpath} for collection"
+    return node
 
 # Dev functions
 def dev_debug():
@@ -154,7 +160,8 @@ def dev_debug():
 
 # Primary functions
 def generate_date_paths_cli(args: type[Namespace]) -> list[tuple[str, str]]:
-    collection = find_node(args.xml_collection_path, constants.XPATH_COLLECTION)
+    collection = load_collection(args.xml_collection_path)
+    collection = find_node(collection, constants.XPATH_COLLECTION)
     return generate_date_paths(collection, args.root_path, metadata_path=args.metadata_path)
 
 # TODO: update to handle '/' character in metadata path (e.g. a/jus/ted)
@@ -276,8 +283,9 @@ if __name__ == '__main__':
     if script_args.function == Namespace.FUNCTION_DATE_PATHS:
         print(get_pipe_output(generate_date_paths_cli(script_args)))
     elif script_args.function == Namespace.FUNCTION_IDENTIFIERS or script_args.function == Namespace.FUNCTION_FILENAMES:
-        pruned = find_node(script_args.xml_collection_path, constants.XPATH_PRUNED)
-        collection = find_node(script_args.xml_collection_path, constants.XPATH_COLLECTION)
+        tree = load_collection(script_args.xml_collection_path)
+        pruned = find_node(tree, constants.XPATH_PRUNED)
+        collection = find_node(tree, constants.XPATH_COLLECTION)
         
         # collect the playlist IDs
         playlist_ids: set[str] = set()
