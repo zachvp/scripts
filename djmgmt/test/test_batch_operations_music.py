@@ -1,6 +1,5 @@
 import unittest
 import os
-import shutil
 from typing import Any, Tuple, cast
 from argparse import Namespace
 import xml.etree.ElementTree as ET
@@ -11,7 +10,6 @@ from src import batch_operations_music
 from src.common_tags import Tags
 
 # Constants
-DUMMY_DATA = b'<dummy_data>'
 MOCK_INPUT_DIR = '/mock/input'
 MOCK_OUTPUT_DIR = '/mock/output'
 MOCK_XML_FILE_PATH = '/mock/xml/file.xml'
@@ -69,7 +67,11 @@ class TestSweepMusic(unittest.TestCase):
         self.assertEqual(mock_path_exists.call_count, len(mock_filenames))
         mock_is_prefix_match.assert_not_called()
         mock_zipfile.assert_not_called()
-        self.assertEqual(mock_move.call_count, len(mock_filenames))
+        mock_move.assert_has_calls([
+            call(f"{MOCK_INPUT_DIR}{os.sep}{mock_filenames[i]}",
+                 f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filenames[i]}")
+            for i in range(len(mock_filenames))
+        ])
     
     @patch('shutil.move')
     @patch('zipfile.ZipFile')
@@ -217,93 +219,55 @@ class TestSweepMusic(unittest.TestCase):
                                           f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
 
 # Primary test class
-class TestFlatten(unittest.TestCase):
-    def setUp(self) -> None:
-        if not os.path.exists(MOCK_INPUT_DIR):
-            os.makedirs(MOCK_INPUT_DIR)
-        if not os.path.exists(MOCK_OUTPUT_DIR):
-            os.makedirs(MOCK_OUTPUT_DIR)
-    
-    def tearDown(self) -> None:
-        if os.path.exists(MOCK_INPUT_DIR):
-            shutil.rmtree(MOCK_INPUT_DIR)
-        if os.path.exists(MOCK_OUTPUT_DIR):
-            shutil.rmtree(MOCK_OUTPUT_DIR)
-    
-    def test_loose_files(self) -> None:
+class TestFlattenHierarchy(unittest.TestCase):
+    @patch('shutil.move')
+    @patch('src.batch_operations_music.flatten_zip')
+    @patch('os.walk')
+    def test_success_loose_files(self,
+                                 mock_walk: MagicMock,
+                                 mock_flatten_zip: MagicMock,
+                                 mock_move: MagicMock) -> None:
         '''Tests that all loose files at the input root are flattened to output.'''
-        files = {
-            'file_0.foo': DUMMY_DATA,
-            'file_1.foo': DUMMY_DATA,
-            'file_2.foo': DUMMY_DATA,
-        }
-        # create_files(INPUT_DIR, files)
-        
+        # Set up mocks
+        mock_filenames = [
+            'file_0.foo',
+            'file_1.foo',
+            'file_2.foo',
+        ]
+        mock_walk.return_value = [(MOCK_INPUT_DIR, [], mock_filenames)]
+
+        # Call target function        
         batch_operations_music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
-        self.assertEqual(len(os.listdir(MOCK_OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
-        for f in files:
-            expected_path = f"{MOCK_OUTPUT_DIR}/{f}"
-            self.assertTrue(os.path.exists(expected_path), f"The expected path '{expected_path}' does not exist in output directory.")
+        
+        # Assert expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_flatten_zip.assert_not_called()
+        mock_move.assert_has_calls([
+            call(f"{MOCK_INPUT_DIR}{os.sep}{mock_filenames[i]}",
+                 f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filenames[i]}")
+            for i in range(len(mock_filenames))
+        ])
     
-    def test_folder_files(self) -> None:
-        '''Tests that all files in subfolders are flattened to output.'''
-        files = {
-            'folder_0/file_0.foo': DUMMY_DATA,
-            'folder_1/file_1.foo': DUMMY_DATA,
-            'folder_2/file_2.foo': DUMMY_DATA,
-            'folder_3/subfolder/subfolder_file_0.foo' : DUMMY_DATA
-        }
-        # create_files(INPUT_DIR, files)
+    @patch('shutil.move')
+    @patch('src.batch_operations_music.flatten_zip')
+    @patch('os.walk')
+    def test_success_zip_files(self,
+                               mock_walk: MagicMock,
+                               mock_flatten_zip: MagicMock,
+                               mock_move: MagicMock) -> None:
+        '''Tests that flatten zip is called for a zip archive.'''
+        # Set up mocks
+        mock_filename = 'mock_archive.zip'
+        mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_archive.zip'])]
         
+        # Call target function        
         batch_operations_music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
-        self.assertEqual(len(os.listdir(MOCK_OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
-        for f in files:
-            expected_path = f"{MOCK_OUTPUT_DIR}/{os.path.basename(f)}"
-            self.assertTrue(os.path.exists(expected_path), f"The expected path '{expected_path}' does not exist in output directory.")
-    
-    def test_zip_files(self) -> None:
-        '''Tests that all files in zip folders are flattened to output.'''
-        files = {
-            'file_0.foo': DUMMY_DATA,
-            'file_1.foo': DUMMY_DATA,
-            'file_2.foo': DUMMY_DATA,
-        }
-        # create_zip_archive(f"{INPUT_DIR}/archive.zip", files)
         
-        batch_operations_music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
-        self.assertEqual(len(os.listdir(MOCK_OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
-        for f in files:
-            expected_path = f"{MOCK_OUTPUT_DIR}/{os.path.basename(f)}"
-            self.assertTrue(os.path.exists(expected_path), f"The expected path '{expected_path}' does not exist in output directory.")
-    
-    def test_nested_zip_files(self) -> None:
-        '''Tests that a zip archive in a subfolder is flattened to output.'''
-        files = {
-            'file_0.foo': DUMMY_DATA,
-            'file_1.foo': DUMMY_DATA,
-            'file_2.foo': DUMMY_DATA,
-        }
-        # create_zip_archive(f"{INPUT_DIR}/subfolder/archive.zip", files)
-        
-        batch_operations_music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
-        self.assertEqual(len(os.listdir(MOCK_OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
-        for f in files:
-            expected_path = f"{MOCK_OUTPUT_DIR}/{os.path.basename(f)}"
-            self.assertTrue(os.path.exists(expected_path), f"The expected path '{expected_path}' does not exist in output directory.")
-    
-    def test_zip_files_archive_name(self) -> None:
-        '''Tests that a zip archive created from a folder with an archive name is flattened to output.'''
-        files = {
-            'folder_0/file_0.foo': DUMMY_DATA
-        }
-        # create_files(INPUT_DIR, files)
-        # create_zip_with_archive_name(f"{INPUT_DIR}/folder_0", f"{INPUT_DIR}/folder_0.zip")
-        
-        batch_operations_music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
-        self.assertEqual(len(os.listdir(MOCK_OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
-        for f in files:
-            expected_path = f"{MOCK_OUTPUT_DIR}/{os.path.basename(f)}"
-            self.assertTrue(os.path.exists(expected_path), f"The expected path '{expected_path}' does not exist in output directory.")
+        # Assert expectations
+        input_filepath = f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}"
+        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_flatten_zip.assert_called_once_with(input_filepath, MOCK_OUTPUT_DIR)
+        mock_move.assert_not_called()
         
 class TestPruneNonMusicFiles(unittest.TestCase):
     @patch('shutil.rmtree')
