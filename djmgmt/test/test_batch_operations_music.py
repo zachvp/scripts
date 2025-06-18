@@ -27,17 +27,13 @@ COLLECTION_XML = f'''
 <?xml version="1.0" encoding="UTF-8"?>
 
 <DJ_PLAYLISTS Version="1.0.0">
-  <PRODUCT Name="rekordbox" Version="6.8.5" Company="AlphaTheta"/>
-  <COLLECTION Entries="1">
-    <TRACK
-        TrackID="1"
-        Name="{MOCK_TITLE}"
-        Artist="{MOCK_ARTIST}"
-        Album="{MOCK_ALBUM}"
-        DateAdded="2020-02-03"
-        Location="file://localhost/Users/user/Music/DJ/MOCK_FILE.aiff">
-    </TRACK>
-  </COLLECTION>
+    <PRODUCT Name="rekordbox" Version="6.8.5" Company="AlphaTheta"/>
+    <COLLECTION Entries="1">
+    
+    </COLLECTION>
+    <PLAYLISTS>
+
+    </PLAYLISTS>
 </DJ_PLAYLISTS>
 '''.strip()
 
@@ -443,7 +439,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_remove.assert_called_once_with('/mock/source/.mock_hidden_dir/mock.foo')
         mock_rmtree.assert_not_called()
         
-    @patch('batch_operations_music.prune_non_music')
+    @patch('src.batch_operations_music.prune_non_music')
     def test_success_cli(self, mock_prune_non_music: MagicMock) -> None:
         '''Tests that the CLI wrapper function exists and is called properly.'''
         import inspect
@@ -508,21 +504,19 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_rmtree.assert_not_called()
         
 class TestProcess(unittest.TestCase):
-    @patch('batch_operations_music.record_collection')
-    @patch('batch_operations_music.standardize_lossless')
-    @patch('batch_operations_music.prune_non_music')
-    @patch('batch_operations_music.prune_empty')
-    @patch('batch_operations_music.flatten_hierarchy')
-    @patch('batch_operations_music.extract')
-    @patch('batch_operations_music.sweep')
+    @patch('src.batch_operations_music.standardize_lossless')
+    @patch('src.batch_operations_music.prune_non_music')
+    @patch('src.batch_operations_music.prune_empty')
+    @patch('src.batch_operations_music.flatten_hierarchy')
+    @patch('src.batch_operations_music.extract')
+    @patch('src.batch_operations_music.sweep')
     def test_success(self,
                      mock_sweep: MagicMock,
                      mock_extract: MagicMock,
                      mock_flatten: MagicMock,
                      mock_prune_empty: MagicMock,
                      mock_prune_non_music: MagicMock,
-                     mock_standardize_lossless: MagicMock,
-                     mock_record_collection: MagicMock) -> None:
+                     mock_standardize_lossless: MagicMock) -> None:
         '''Tests that the process function calls the expected functions in the the correct order.'''
         # Set up mocks
         mock_call_container = MagicMock()
@@ -532,7 +526,6 @@ class TestProcess(unittest.TestCase):
         mock_prune_empty.side_effect = lambda *_, **__: mock_call_container.prune_empty()
         mock_prune_non_music.side_effect = lambda *_, **__: mock_call_container.prune_non_music()
         mock_standardize_lossless.side_effect = lambda *_, **__: mock_call_container.standardize_lossless()
-        mock_record_collection.side_effect = lambda *_, **__: mock_call_container.record_collection()
         
         # Mock the result of the lossless function
         mock_standardize_lossless.return_value = [
@@ -551,7 +544,6 @@ class TestProcess(unittest.TestCase):
         self.assertEqual(mock_call_container.mock_calls[3], call.standardize_lossless())
         self.assertEqual(mock_call_container.mock_calls[4], call.prune_non_music())
         self.assertEqual(mock_call_container.mock_calls[5], call.prune_empty())
-        self.assertEqual(mock_call_container.mock_calls[6], call.record_collection())
         
         # Assert call counts and parameters
         mock_sweep.assert_called_once()
@@ -560,15 +552,11 @@ class TestProcess(unittest.TestCase):
         
         mock_standardize_lossless.assert_called_once()
         mock_standardize_lossless.assert_called_once_with(args.output, set(), set(), args.interactive)
-        
-        mock_record_collection.assert_called_once()
-        self.assertEqual(mock_record_collection.call_args[0][0], args.output)
-        self.assertRegex(mock_record_collection.call_args[0][1], r'.+\/data\/.+\.xml')
 
 class TestPruneEmpty(unittest.TestCase):
     @patch('shutil.rmtree')
-    @patch('batch_operations_music.is_empty_dir')
-    @patch('batch_operations_music.get_dirs')
+    @patch('src.batch_operations_music.is_empty_dir')
+    @patch('src.batch_operations_music.get_dirs')
     def test_success_remove_empty_dir(self,
                                       mock_get_dirs: MagicMock,
                                       mock_is_empty_dir: MagicMock,
@@ -585,8 +573,8 @@ class TestPruneEmpty(unittest.TestCase):
         mock_rmtree.assert_called_once_with('/mock/source/mock_empty_dir')
         
     @patch('shutil.rmtree')
-    @patch('batch_operations_music.is_empty_dir')
-    @patch('batch_operations_music.get_dirs')
+    @patch('src.batch_operations_music.is_empty_dir')
+    @patch('src.batch_operations_music.get_dirs')
     def test_success_skip_non_empty_dir(self,
                                         mock_get_dirs: MagicMock,
                                         mock_is_empty_dir: MagicMock,
@@ -603,7 +591,7 @@ class TestPruneEmpty(unittest.TestCase):
         mock_is_empty_dir.assert_called()
         mock_rmtree.assert_not_called()
         
-    @patch('batch_operations_music.prune_empty')
+    @patch('src.batch_operations_music.prune_empty')
     def test_success_cli(self, mock_prune_empty: MagicMock) -> None:
         '''Tests that the CLI wrapper calls the correct function.'''
         batch_operations_music.prune_empty('/mock/source/', False)

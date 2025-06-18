@@ -13,12 +13,12 @@ class TestEncodeLossless(unittest.TestCase):
     @patch('os.path.getsize')
     @patch('builtins.open')
     @patch('subprocess.run')
-    @patch('encode_tracks.ffmpeg_standardize')
-    @patch('encode_tracks.check_skip_bit_depth')
-    @patch('encode_tracks.check_skip_sample_rate')
+    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.check_skip_bit_depth')
+    @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
     @patch('builtins.input')
-    @patch('encode_tracks.setup_storage')
+    @patch('src.encode_tracks.setup_storage')
     def test_success_required_arguments(self,
                                         mock_setup_storage: MagicMock,
                                         mock_input: MagicMock,
@@ -70,14 +70,14 @@ class TestEncodeLossless(unittest.TestCase):
         
     @patch('os.path.getsize')
     @patch('builtins.open')
-    @patch('encode_tracks.ffmpeg_standardize')
-    @patch('encode_tracks.check_skip_bit_depth')
-    @patch('encode_tracks.check_skip_sample_rate')
+    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.check_skip_bit_depth')
+    @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
     @patch('builtins.input')
-    @patch('encode_tracks.setup_storage')
-    @patch('encode_tracks.run_command_async')
-    @patch('encode_tracks.collect_tasks')
+    @patch('src.encode_tracks.setup_storage')
+    @patch('src.encode_tracks.run_command_async')
+    @patch('src.encode_tracks.collect_tasks')
     @patch('asyncio.get_event_loop')
     def test_success_async_single_batch(self,
                                         mock_get_event_loop: MagicMock,
@@ -136,14 +136,14 @@ class TestEncodeLossless(unittest.TestCase):
         
     @patch('os.path.getsize')
     @patch('builtins.open')
-    @patch('encode_tracks.ffmpeg_standardize')
-    @patch('encode_tracks.check_skip_bit_depth')
-    @patch('encode_tracks.check_skip_sample_rate')
+    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.check_skip_bit_depth')
+    @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
     @patch('builtins.input')
-    @patch('encode_tracks.setup_storage')
-    @patch('encode_tracks.run_command_async')
-    @patch('encode_tracks.collect_tasks')
+    @patch('src.encode_tracks.setup_storage')
+    @patch('src.encode_tracks.run_command_async')
+    @patch('src.encode_tracks.collect_tasks')
     @patch('asyncio.get_event_loop')
     def test_success_async_multiple_batches(self,
                                             mock_get_event_loop: MagicMock,
@@ -207,12 +207,12 @@ class TestEncodeLossless(unittest.TestCase):
     @patch('os.path.getsize')
     @patch('builtins.open')
     @patch('subprocess.run')
-    @patch('encode_tracks.ffmpeg_standardize')
-    @patch('encode_tracks.check_skip_bit_depth')
-    @patch('encode_tracks.check_skip_sample_rate')
+    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.check_skip_bit_depth')
+    @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
     @patch('builtins.input')
-    @patch('encode_tracks.setup_storage')
+    @patch('src.encode_tracks.setup_storage')
     def test_success_optional_store_path(self,
                                          mock_setup_storage: MagicMock,
                                          mock_input: MagicMock,
@@ -250,12 +250,12 @@ class TestEncodeLossless(unittest.TestCase):
     @patch('os.path.getsize')
     @patch('builtins.open')
     @patch('subprocess.run')
-    @patch('encode_tracks.ffmpeg_standardize')
-    @patch('encode_tracks.check_skip_bit_depth')
-    @patch('encode_tracks.check_skip_sample_rate')
+    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.check_skip_bit_depth')
+    @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
     @patch('builtins.input')
-    @patch('encode_tracks.setup_storage')
+    @patch('src.encode_tracks.setup_storage')
     def test_success_optional_store_skipped(self,
                                             mock_setup_storage: MagicMock,
                                             mock_input: MagicMock,
@@ -294,12 +294,12 @@ class TestEncodeLossless(unittest.TestCase):
     @patch('os.path.getsize')
     @patch('builtins.open')
     @patch('subprocess.run')
-    @patch('encode_tracks.ffmpeg_standardize')
-    @patch('encode_tracks.check_skip_bit_depth')
-    @patch('encode_tracks.check_skip_sample_rate')
+    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.check_skip_bit_depth')
+    @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
     @patch('builtins.input')
-    @patch('encode_tracks.setup_storage')
+    @patch('src.encode_tracks.setup_storage')
     def test_success_optional_interactive(self,
                                           mock_setup_storage: MagicMock,
                                           mock_input: MagicMock,
@@ -338,12 +338,12 @@ class TestEncodeLossless(unittest.TestCase):
     @patch('os.path.getsize')
     @patch('builtins.open')
     @patch('subprocess.run')
-    @patch('encode_tracks.ffmpeg_standardize')
-    @patch('encode_tracks.check_skip_bit_depth')
-    @patch('encode_tracks.check_skip_sample_rate')
+    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.check_skip_bit_depth')
+    @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
     @patch('builtins.input')
-    @patch('encode_tracks.setup_storage')
+    @patch('src.encode_tracks.setup_storage')
     def test_success_unsupported_files(self,
                                       mock_setup_storage: MagicMock,
                                       mock_input: MagicMock,
@@ -379,7 +379,7 @@ class TestEncodeLossless(unittest.TestCase):
         # Assert the expected function output result -- should be empty for unsupported files
         self.assertEqual(actual, [])
     
-    @patch('encode_tracks.encode_lossless')
+    @patch('src.encode_tracks.encode_lossless')
     def test_success_cli(self, mock_encode: MagicMock) -> None:
         '''Tests that the CLI wrapper function calls the expected core function with appropriate arguments.'''
         # Call target function
@@ -400,11 +400,11 @@ class TestEncodeLossless(unittest.TestCase):
         self.assertEqual(mock_encode.call_args[0][:6], expected_args)
 
 class TestEncodeLossy(unittest.TestCase):
-    @patch('encode_tracks.run_command_async')
-    @patch('encode_tracks.collect_tasks')
-    @patch('encode_tracks.ffmpeg_mp3')
-    @patch('encode_tracks.guess_cover_stream_specifier')
-    @patch('encode_tracks.read_ffprobe_json')
+    @patch('src.encode_tracks.run_command_async')
+    @patch('src.encode_tracks.collect_tasks')
+    @patch('src.encode_tracks.ffmpeg_mp3')
+    @patch('src.encode_tracks.guess_cover_stream_specifier')
+    @patch('src.encode_tracks.read_ffprobe_json')
     @patch('os.path.exists')
     @patch('os.makedirs')
     @patch('asyncio.get_event_loop')
@@ -446,9 +446,9 @@ class TestEncodeLossy(unittest.TestCase):
         mock_loop.run_until_complete.assert_called_once()
     
     
-    @patch('encode_tracks.encode_lossy')
-    @patch('common.add_output_path')
-    @patch('common.collect_paths')
+    @patch('src.encode_tracks.encode_lossy')
+    @patch('src.common.add_output_path')
+    @patch('src.common.collect_paths')
     def test_success_cli(self,
                          mock_collect_paths: MagicMock,
                          mock_add_output_path: MagicMock,

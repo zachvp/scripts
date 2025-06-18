@@ -26,11 +26,11 @@ COLLECTION_XML = f'''
 
 # Test classes
 class TestGenerateDatePaths(unittest.TestCase):
-    @patch('common.remove_subpath')
-    @patch('common.find_date_context')
-    @patch('organize_library_dates.full_path')
-    @patch('organize_library_dates.swap_root')
-    @patch('organize_library_dates.collection_path_to_syspath')
+    @patch('src.common.remove_subpath')
+    @patch('src.common.find_date_context')
+    @patch('src.organize_library_dates.full_path')
+    @patch('src.organize_library_dates.swap_root')
+    @patch('src.organize_library_dates.collection_path_to_syspath')
     def test_success_default_parameters(self,
                                         mock_collection_path_to_syspath: MagicMock,
                                         mock_swap_root: MagicMock,
@@ -65,11 +65,11 @@ class TestGenerateDatePaths(unittest.TestCase):
         mock_date_context.assert_called_once()
         mock_remove_subpath.assert_called_once()
     
-    @patch('common.remove_subpath')
-    @patch('common.find_date_context')
-    @patch('organize_library_dates.full_path')
-    @patch('organize_library_dates.swap_root')
-    @patch('organize_library_dates.collection_path_to_syspath')
+    @patch('src.common.remove_subpath')
+    @patch('src.common.find_date_context')
+    @patch('src.organize_library_dates.full_path')
+    @patch('src.organize_library_dates.swap_root')
+    @patch('src.organize_library_dates.collection_path_to_syspath')
     def test_success_metadata_path(self,
                                    mock_collection_path_to_syspath: MagicMock,
                                    mock_swap_root: MagicMock,
@@ -104,11 +104,11 @@ class TestGenerateDatePaths(unittest.TestCase):
         mock_date_context.assert_called_once()
         mock_remove_subpath.assert_called_once()
         
-    @patch('common.remove_subpath')
-    @patch('common.find_date_context')
-    @patch('organize_library_dates.full_path')
-    @patch('organize_library_dates.swap_root')
-    @patch('organize_library_dates.collection_path_to_syspath')
+    @patch('src.common.remove_subpath')
+    @patch('src.common.find_date_context')
+    @patch('src.organize_library_dates.full_path')
+    @patch('src.organize_library_dates.swap_root')
+    @patch('src.organize_library_dates.collection_path_to_syspath')
     def test_success_playlist_ids_include(self,
                                           mock_collection_path_to_syspath: MagicMock,
                                           mock_swap_root: MagicMock,
@@ -143,11 +143,11 @@ class TestGenerateDatePaths(unittest.TestCase):
         mock_date_context.assert_called_once()
         mock_remove_subpath.assert_called_once()
         
-    @patch('common.remove_subpath')
-    @patch('common.find_date_context')
-    @patch('organize_library_dates.full_path')
-    @patch('organize_library_dates.swap_root')
-    @patch('organize_library_dates.collection_path_to_syspath')
+    @patch('src.common.remove_subpath')
+    @patch('src.common.find_date_context')
+    @patch('src.organize_library_dates.full_path')
+    @patch('src.organize_library_dates.swap_root')
+    @patch('src.organize_library_dates.collection_path_to_syspath')
     def test_success_playlist_ids_exclude(self,
                                           mock_collection_path_to_syspath: MagicMock,
                                           mock_swap_root: MagicMock,
@@ -178,7 +178,7 @@ class TestGenerateDatePaths(unittest.TestCase):
         mock_remove_subpath.assert_not_called()
 
 class TestFullPath(unittest.TestCase):
-    @patch('organize_library_dates.date_path')
+    @patch('src.organize_library_dates.date_path')
     def test_success_default_parameters(self, mock_date_path: MagicMock) -> None:
         '''Tests for expected output with only required positional arguments provided.'''
         # Set up input
@@ -194,7 +194,7 @@ class TestFullPath(unittest.TestCase):
         expected = '/Users/user/Music/DJ/2020/02 february/03/MOCK_FILE.aiff'
         self.assertEqual(actual, expected)
         
-    @patch('organize_library_dates.date_path')
+    @patch('src.organize_library_dates.date_path')
     def test_success_include_metadata(self, mock_date_path: MagicMock) -> None:
         '''Tests for expected output with metadata included paramter.'''
         # Set up input
