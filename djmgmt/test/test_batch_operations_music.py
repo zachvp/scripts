@@ -1,5 +1,4 @@
 import unittest
-import zipfile
 import os
 import shutil
 from typing import Any, Tuple, cast
@@ -12,12 +11,9 @@ from src import batch_operations_music
 from src.common_tags import Tags
 
 # Constants
-INPUT_DIR = 'test_input'
-OUTPUT_DIR = 'test_output'
 DUMMY_DATA = b'<dummy_data>'
-
-
 MOCK_INPUT_DIR = '/mock/input'
+MOCK_OUTPUT_DIR = '/mock/output'
 MOCK_XML_FILE_PATH = '/mock/xml/file.xml'
 MOCK_ARTIST = 'mock_artist'
 MOCK_ALBUM = 'mock_album'
@@ -38,137 +34,201 @@ COLLECTION_XML = f'''
 '''.strip()
 
 # Helpers
-def create_zip_archive(path: str, files: dict[str, Any]) -> None:
-    '''Simulates how an automated script typically compresses a zip: writing to the archive root.'''
-    dir_path = os.path.dirname(path)
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-    
-    with zipfile.ZipFile(path, 'w') as archive:
-        for name, content in files.items():
-            archive.writestr(name, content)
-
-def create_zip_with_archive_name(folder_path, zip_path):
-    '''Simulates how an OS typically compresses a zip.
-    E.g. A MacOS User right-clicks a folder in Finder and selects the 'Compress' action.'''
-    with zipfile.ZipFile(zip_path, 'w') as archive:
-        for root, _, files in os.walk(folder_path):
-            for file in files:
-                full_path = os.path.join(root, file)
-                rel_path = os.path.relpath(full_path, os.path.dirname(folder_path))
-                archive.write(full_path, arcname=rel_path) # Use folder name as archive name
-    # For testing purposes, the original folder should always be deleted.
-    shutil.rmtree(folder_path)
-
-def create_files(dir_path: str, files: dict[str, Any]) -> None:
-    for file, content in files.items():
-        full_path = os.path.join(dir_path, file)
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        with open(full_path, 'wb') as f:
-            f.write(content)
-            
 def get_input_output_paths(filename: str) -> Tuple[str, str]:
     '''Returns tuple of input, output paths.'''
-    return f"{INPUT_DIR}/{filename}", f"{OUTPUT_DIR}/{filename}"
-
-def clear_directory(path):
-    for entry in os.listdir(path):
-        full_path = os.path.join(path, entry)
-        if os.path.isdir(full_path):
-            shutil.rmtree(full_path)
-        else:
-            os.remove(full_path)
+    return f"{MOCK_INPUT_DIR}/{filename}", f"{MOCK_OUTPUT_DIR}/{filename}"
 
 # Primary test class
 class TestSweepMusic(unittest.TestCase):
-    def setUp(self) -> None:
-        if not os.path.exists(INPUT_DIR):
-            os.makedirs(INPUT_DIR)
-        if not os.path.exists(OUTPUT_DIR):
-            os.makedirs(OUTPUT_DIR)
-    
-    def tearDown(self) -> None:
-        if os.path.exists(INPUT_DIR):
-            shutil.rmtree(INPUT_DIR)
-        if os.path.exists(OUTPUT_DIR):
-            shutil.rmtree(OUTPUT_DIR)
-    
-    def test_sweep_beatport_archive(self) -> None:
-        '''Test that a Beatport zip archive is swept to the output directory.'''
-        input_path, output_path = get_input_output_paths('beatport_tracks.zip')
-        create_zip_archive(input_path, { 'file_0.aiff': DUMMY_DATA })
-        
-        batch_operations_music.sweep(INPUT_DIR, OUTPUT_DIR, False, batch_operations_music.EXTENSIONS, batch_operations_music.PREFIX_HINTS)
-        self.assertTrue(os.path.exists(output_path), 'Beatport archive not present in output directory.')
-        
-    def test_sweep_juno_archive(self) -> None:
-        '''Test that a Juno zip archive is swept to the output directory.'''
-        input_path, output_path = get_input_output_paths('juno_download.zip')
-        create_zip_archive(input_path, { 'file_0.aiff': DUMMY_DATA })
-        
-        batch_operations_music.sweep(INPUT_DIR, OUTPUT_DIR, False, batch_operations_music.EXTENSIONS, batch_operations_music.PREFIX_HINTS)
-        self.assertTrue(os.path.exists(output_path), 'Juno archive not present in output directory.')
-    
-    def test_sweep_music_archive(self) -> None:
-        '''Test that a zip containing only music files is swept to the output directory.'''
-        input_path, output_path = get_input_output_paths('music_archive.zip')
-        create_zip_archive(input_path, { 'file_0.aiff': DUMMY_DATA })
-        
-        batch_operations_music.sweep(INPUT_DIR, OUTPUT_DIR, False, batch_operations_music.EXTENSIONS, batch_operations_music.PREFIX_HINTS)
-        self.assertTrue(os.path.exists(output_path), 'Music archive not present in output directory.')
-    
-    def test_sweep_album_archive(self) -> None:
-        '''Test that a zip containing music files and a cover photo is swept to the output directory.'''
-        input_path, output_path = get_input_output_paths('album.zip')
-        create_zip_archive(input_path, { 'cover.jpg': DUMMY_DATA, 'file_0.aiff': DUMMY_DATA })
-        
-        batch_operations_music.sweep(INPUT_DIR, OUTPUT_DIR, False, batch_operations_music.EXTENSIONS, batch_operations_music.PREFIX_HINTS)
-        self.assertTrue(os.path.exists(output_path), 'Album archive not present in output directory.')
-    
-    def test_sweep_music_files(self) -> None:
+    @patch('shutil.move')
+    @patch('zipfile.ZipFile')
+    @patch('src.batch_operations_music.is_prefix_match')
+    @patch('os.path.exists')
+    @patch('os.walk')
+    def test_sweep_music_files(self,
+                                  mock_walk: MagicMock,
+                                  mock_path_exists: MagicMock,
+                                  mock_is_prefix_match: MagicMock,
+                                  mock_zipfile: MagicMock,
+                                  mock_move: MagicMock) -> None:
         '''Test that loose music files are swept.'''
-        files = {
-            'track_0.mp3'  : DUMMY_DATA,
-            'track_1.wav'  : DUMMY_DATA,
-            'track_2.aif'  : DUMMY_DATA,
-            'track_3.aiff' : DUMMY_DATA,
-            'track_4.flac' : DUMMY_DATA,
-        }
-        create_files(INPUT_DIR, files)
+        # Set up mocks
+        mock_filenames = [f"mock_file{ext}" for ext in batch_operations_music.EXTENSIONS]
+        mock_walk.return_value = [(MOCK_INPUT_DIR, [], mock_filenames)]
+        mock_path_exists.return_value = False
+        mock_is_prefix_match.return_value = False
         
-        batch_operations_music.sweep(INPUT_DIR, OUTPUT_DIR, False, batch_operations_music.EXTENSIONS, batch_operations_music.PREFIX_HINTS)
-        for f in files:
-            expected_path = f"{OUTPUT_DIR}/{f}"
-            self.assertTrue(os.path.exists(expected_path), f"The expected path '{expected_path}' does not exist in output directory.")
+        # Call target function
+        batch_operations_music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
+                                     False,
+                                     batch_operations_music.EXTENSIONS,
+                                     batch_operations_music.PREFIX_HINTS)
+        
+        # Assert expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        self.assertEqual(mock_path_exists.call_count, len(mock_filenames))
+        mock_is_prefix_match.assert_not_called()
+        mock_zipfile.assert_not_called()
+        self.assertEqual(mock_move.call_count, len(mock_filenames))
     
-    def test_no_sweep_non_music_files(self) -> None:
+    @patch('shutil.move')
+    @patch('zipfile.ZipFile')
+    @patch('src.batch_operations_music.is_prefix_match')
+    @patch('os.path.exists')
+    @patch('os.walk')
+    def test_no_sweep_non_music_files(self,
+                                  mock_walk: MagicMock,
+                                  mock_path_exists: MagicMock,
+                                  mock_is_prefix_match: MagicMock,
+                                  mock_zipfile: MagicMock,
+                                  mock_move: MagicMock) -> None:
         '''Test that loose, non-music files are not swept.'''
-        files = {
-            'track_0.foo' : DUMMY_DATA,
-            'img_0.jpg'   : DUMMY_DATA,
-            'img_1.jpeg'  : DUMMY_DATA,
-            'img_2.png'   : DUMMY_DATA,
-        }
-        create_files(INPUT_DIR, files)
+        mock_filenames = [
+            'track_0.foo',
+            'img_0.jpg'  ,
+            'img_1.jpeg' ,
+            'img_2.png'  ,
+        ]
+        # Set up mocks
+        mock_walk.return_value = [(MOCK_INPUT_DIR, [], mock_filenames)]
+        mock_path_exists.return_value = False
+        mock_is_prefix_match.return_value = False
         
-        batch_operations_music.sweep(INPUT_DIR, OUTPUT_DIR, False, batch_operations_music.EXTENSIONS, batch_operations_music.PREFIX_HINTS)
-        for f in files:
-            unexpected_path = f"{OUTPUT_DIR}/{f}"
-            self.assertFalse(os.path.exists(unexpected_path), f"The unexpected path '{unexpected_path}' should not exist in output directory.")
+        # Call target function
+        batch_operations_music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
+                                     False,
+                                     batch_operations_music.EXTENSIONS,
+                                     batch_operations_music.PREFIX_HINTS)
+        
+        # Assert expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        self.assertEqual(mock_path_exists.call_count, len(mock_filenames))
+        mock_is_prefix_match.assert_not_called()
+        mock_zipfile.assert_not_called()
+        mock_move.assert_not_called()
+    
+    @patch('shutil.move')
+    @patch('zipfile.ZipFile')
+    @patch('src.batch_operations_music.is_prefix_match')
+    @patch('os.path.exists')
+    @patch('os.walk')
+    def test_sweep_prefix_archive(self,
+                                  mock_walk: MagicMock,
+                                  mock_path_exists: MagicMock,
+                                  mock_is_prefix_match: MagicMock,
+                                  mock_zipfile: MagicMock,
+                                  mock_move: MagicMock) -> None:
+        '''Test that a prefix zip archive is swept to the output directory.'''
+        # Set up mocks
+        mock_filename = 'mock_valid_prefix.zip'
+        mock_walk.return_value = [(MOCK_INPUT_DIR, [], [mock_filename])]
+        mock_path_exists.return_value = False
+        mock_is_prefix_match.return_value = True
+        
+        # Call target function
+        batch_operations_music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
+                                     False,
+                                     batch_operations_music.EXTENSIONS,
+                                     batch_operations_music.PREFIX_HINTS)
+        
+        # Assert expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_path_exists.assert_called_once_with(f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
+        mock_is_prefix_match.assert_called_once_with(mock_filename, batch_operations_music.PREFIX_HINTS)
+        mock_zipfile.assert_not_called()
+        mock_move.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}",
+                                          f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
+
+    @patch('shutil.move')
+    @patch('zipfile.ZipFile')
+    @patch('src.batch_operations_music.is_prefix_match')
+    @patch('os.path.exists')
+    @patch('os.walk')
+    def test_sweep_music_archive(self,
+                                 mock_walk: MagicMock,
+                                 mock_path_exists: MagicMock,
+                                 mock_is_prefix_match: MagicMock,
+                                 mock_zipfile: MagicMock,
+                                 mock_move: MagicMock) -> None:
+        '''Test that a zip containing only music files is swept to the output directory.'''
+        # Set up mocks
+        mock_filename = 'mock_music_archive.zip'
+        mock_walk.return_value = [(MOCK_INPUT_DIR, [], [mock_filename])]
+        mock_path_exists.return_value = False
+        mock_is_prefix_match.return_value = False
+        
+        # Mock archive content
+        mock_archive = MagicMock()
+        mock_archive.namelist.return_value = [f"mock_file{ext}" for ext in batch_operations_music.EXTENSIONS]
+        mock_zipfile.return_value.__enter__.return_value = mock_archive
+
+        # Call target function        
+        batch_operations_music.sweep(MOCK_INPUT_DIR,
+                                     MOCK_OUTPUT_DIR,
+                                     False,
+                                     batch_operations_music.EXTENSIONS,
+                                     batch_operations_music.PREFIX_HINTS)
+        
+        # Assert expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_path_exists.assert_called_once_with(f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
+        mock_is_prefix_match.assert_called_once_with(mock_filename, batch_operations_music.PREFIX_HINTS)
+        mock_zipfile.assert_called_once()
+        mock_move.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}",
+                                          f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
+    
+    @patch('shutil.move')
+    @patch('zipfile.ZipFile')
+    @patch('src.batch_operations_music.is_prefix_match')
+    @patch('os.path.exists')
+    @patch('os.walk')
+    def test_sweep_album_archive(self,
+                                 mock_walk: MagicMock,
+                                 mock_path_exists: MagicMock,
+                                 mock_is_prefix_match: MagicMock,
+                                 mock_zipfile: MagicMock,
+                                 mock_move: MagicMock) -> None:
+        '''Test that a zip containing music files and a cover photo is swept to the output directory.'''
+        # Set up mocks
+        mock_filename = 'mock_album_archive.zip'
+        mock_walk.return_value = [(MOCK_INPUT_DIR, [], [mock_filename])]
+        mock_path_exists.return_value = False
+        mock_is_prefix_match.return_value = False
+        
+        # Mock archive content
+        mock_archive = MagicMock()
+        mock_archive.namelist.return_value =  [f"mock_file{ext}" for ext in batch_operations_music.EXTENSIONS]
+        mock_archive.namelist.return_value += ['mock_cover.jpg']
+        mock_zipfile.return_value.__enter__.return_value = mock_archive
+
+        # Call target function        
+        batch_operations_music.sweep(MOCK_INPUT_DIR,
+                                     MOCK_OUTPUT_DIR,
+                                     False,
+                                     batch_operations_music.EXTENSIONS,
+                                     batch_operations_music.PREFIX_HINTS)
+        
+        # Assert expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_path_exists.assert_called_once_with(f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
+        mock_is_prefix_match.assert_called_once_with(mock_filename, batch_operations_music.PREFIX_HINTS)
+        mock_zipfile.assert_called_once()
+        mock_move.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}",
+                                          f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
 
 # Primary test class
 class TestFlatten(unittest.TestCase):
     def setUp(self) -> None:
-        if not os.path.exists(INPUT_DIR):
-            os.makedirs(INPUT_DIR)
-        if not os.path.exists(OUTPUT_DIR):
-            os.makedirs(OUTPUT_DIR)
+        if not os.path.exists(MOCK_INPUT_DIR):
+            os.makedirs(MOCK_INPUT_DIR)
+        if not os.path.exists(MOCK_OUTPUT_DIR):
+            os.makedirs(MOCK_OUTPUT_DIR)
     
     def tearDown(self) -> None:
-        if os.path.exists(INPUT_DIR):
-            shutil.rmtree(INPUT_DIR)
-        if os.path.exists(OUTPUT_DIR):
-            shutil.rmtree(OUTPUT_DIR)
+        if os.path.exists(MOCK_INPUT_DIR):
+            shutil.rmtree(MOCK_INPUT_DIR)
+        if os.path.exists(MOCK_OUTPUT_DIR):
+            shutil.rmtree(MOCK_OUTPUT_DIR)
     
     def test_loose_files(self) -> None:
         '''Tests that all loose files at the input root are flattened to output.'''
@@ -177,12 +237,12 @@ class TestFlatten(unittest.TestCase):
             'file_1.foo': DUMMY_DATA,
             'file_2.foo': DUMMY_DATA,
         }
-        create_files(INPUT_DIR, files)
+        # create_files(INPUT_DIR, files)
         
-        batch_operations_music.flatten_hierarchy(INPUT_DIR, OUTPUT_DIR, False)
-        self.assertEqual(len(os.listdir(OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
+        batch_operations_music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
+        self.assertEqual(len(os.listdir(MOCK_OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
         for f in files:
-            expected_path = f"{OUTPUT_DIR}/{f}"
+            expected_path = f"{MOCK_OUTPUT_DIR}/{f}"
             self.assertTrue(os.path.exists(expected_path), f"The expected path '{expected_path}' does not exist in output directory.")
     
     def test_folder_files(self) -> None:
@@ -193,12 +253,12 @@ class TestFlatten(unittest.TestCase):
             'folder_2/file_2.foo': DUMMY_DATA,
             'folder_3/subfolder/subfolder_file_0.foo' : DUMMY_DATA
         }
-        create_files(INPUT_DIR, files)
+        # create_files(INPUT_DIR, files)
         
-        batch_operations_music.flatten_hierarchy(INPUT_DIR, OUTPUT_DIR, False)
-        self.assertEqual(len(os.listdir(OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
+        batch_operations_music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
+        self.assertEqual(len(os.listdir(MOCK_OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
         for f in files:
-            expected_path = f"{OUTPUT_DIR}/{os.path.basename(f)}"
+            expected_path = f"{MOCK_OUTPUT_DIR}/{os.path.basename(f)}"
             self.assertTrue(os.path.exists(expected_path), f"The expected path '{expected_path}' does not exist in output directory.")
     
     def test_zip_files(self) -> None:
@@ -208,12 +268,12 @@ class TestFlatten(unittest.TestCase):
             'file_1.foo': DUMMY_DATA,
             'file_2.foo': DUMMY_DATA,
         }
-        create_zip_archive(f"{INPUT_DIR}/archive.zip", files)
+        # create_zip_archive(f"{INPUT_DIR}/archive.zip", files)
         
-        batch_operations_music.flatten_hierarchy(INPUT_DIR, OUTPUT_DIR, False)
-        self.assertEqual(len(os.listdir(OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
+        batch_operations_music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
+        self.assertEqual(len(os.listdir(MOCK_OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
         for f in files:
-            expected_path = f"{OUTPUT_DIR}/{os.path.basename(f)}"
+            expected_path = f"{MOCK_OUTPUT_DIR}/{os.path.basename(f)}"
             self.assertTrue(os.path.exists(expected_path), f"The expected path '{expected_path}' does not exist in output directory.")
     
     def test_nested_zip_files(self) -> None:
@@ -223,12 +283,12 @@ class TestFlatten(unittest.TestCase):
             'file_1.foo': DUMMY_DATA,
             'file_2.foo': DUMMY_DATA,
         }
-        create_zip_archive(f"{INPUT_DIR}/subfolder/archive.zip", files)
+        # create_zip_archive(f"{INPUT_DIR}/subfolder/archive.zip", files)
         
-        batch_operations_music.flatten_hierarchy(INPUT_DIR, OUTPUT_DIR, False)
-        self.assertEqual(len(os.listdir(OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
+        batch_operations_music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
+        self.assertEqual(len(os.listdir(MOCK_OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
         for f in files:
-            expected_path = f"{OUTPUT_DIR}/{os.path.basename(f)}"
+            expected_path = f"{MOCK_OUTPUT_DIR}/{os.path.basename(f)}"
             self.assertTrue(os.path.exists(expected_path), f"The expected path '{expected_path}' does not exist in output directory.")
     
     def test_zip_files_archive_name(self) -> None:
@@ -236,13 +296,13 @@ class TestFlatten(unittest.TestCase):
         files = {
             'folder_0/file_0.foo': DUMMY_DATA
         }
-        create_files(INPUT_DIR, files)
-        create_zip_with_archive_name(f"{INPUT_DIR}/folder_0", f"{INPUT_DIR}/folder_0.zip")
+        # create_files(INPUT_DIR, files)
+        # create_zip_with_archive_name(f"{INPUT_DIR}/folder_0", f"{INPUT_DIR}/folder_0.zip")
         
-        batch_operations_music.flatten_hierarchy(INPUT_DIR, OUTPUT_DIR, False)
-        self.assertEqual(len(os.listdir(OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
+        batch_operations_music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
+        self.assertEqual(len(os.listdir(MOCK_OUTPUT_DIR)), len(files), "Unexpected number of files in output directory.")
         for f in files:
-            expected_path = f"{OUTPUT_DIR}/{os.path.basename(f)}"
+            expected_path = f"{MOCK_OUTPUT_DIR}/{os.path.basename(f)}"
             self.assertTrue(os.path.exists(expected_path), f"The expected path '{expected_path}' does not exist in output directory.")
         
 class TestPruneNonMusicFiles(unittest.TestCase):

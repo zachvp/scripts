@@ -26,7 +26,7 @@ from . import encode_tracks
 from .common_tags import read_tags 
 
 # constants
-EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'}
+EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'} # TODO: move to constants
 PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
 COLLECTION_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'processed-collection.xml')
 
