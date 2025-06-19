@@ -4,6 +4,7 @@
 *.swp
 sftp-config.json
 __sublime*
+.coverage
 
 # auto-generated directories
 .vscode/
