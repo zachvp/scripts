@@ -1,6 +1,6 @@
 import unittest
 import os
-from typing import Any, Tuple, cast
+from typing import Tuple, cast
 from argparse import Namespace
 import xml.etree.ElementTree as ET
 from unittest.mock import patch, MagicMock, call
