@@ -1,5 +1,4 @@
 # TODO: add coverage for rsync_healthcheck
-# TODO: add coverage for create_sync_mappings
 
 import unittest
 import subprocess
@@ -34,7 +33,11 @@ COLLECTION_XML = f'''
     
     </COLLECTION>
     <PLAYLISTS>
-
+        <NODE Type="0" Name="ROOT" Count="2">
+            <NODE Name="CUE Analysis Playlist" Type="1" KeyType="0" Entries="0"/>
+            <NODE Name="_pruned" Type="1" KeyType="0" Entries="0">
+            </NODE>
+        </NODE>
     </PLAYLISTS>
 </DJ_PLAYLISTS>
 '''.strip()

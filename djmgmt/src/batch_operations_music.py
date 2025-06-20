@@ -16,9 +16,10 @@ import shutil
 import zipfile
 import logging
 
-from datetime import datetime
 import uuid
 import xml.etree.ElementTree as ET
+from datetime import datetime
+from urllib.parse import quote
 
 from . import constants
 from . import common
@@ -165,13 +166,15 @@ def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: 
         sweep(temp_dir, source, False, valid_extensions, prefix_hints)
 
 # TODO: extend to save backup of previous X versions
+# TODO: include key, genre
 def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     TAG_TRACK     = 'TRACK'
     TAG_NODE      = 'NODE'
     TAG_PLAYLISTS = 'PLAYLISTS'
     TAG_ROOT      = 'DJ_PLAYLISTS'
     
-    # Create or load the collection XML
+    NAME_PLAYLIST_ROOT = 'ROOT'
+    
     if os.path.exists(collection_path):
         try:
             tree = ET.parse(collection_path)
@@ -189,16 +192,36 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
         ET.SubElement(root, 'PRODUCT', product_attrs)
         collection = ET.SubElement(root, 'COLLECTION', {'Entries': '0'})
     
-    # Ensure PLAYLISTS structure exists
-    playlists = root.find(f'.//{TAG_PLAYLISTS}')
+    # Ensure PLAYLISTS structure exists with ROOT node child
+    playlists = root.find(TAG_PLAYLISTS)
     if playlists is None:
         playlists = ET.SubElement(root, TAG_PLAYLISTS)
     
-    # Ensure _pruned playlist exists
-    pruned_node = playlists.find('./NODE[@Name="_pruned"]')
+    # Find or create the ROOT node under PLAYLISTS
+    root_node = playlists.find(f"./{TAG_NODE}[@Name=\"{NAME_PLAYLIST_ROOT}\"]")
+    
+    if root_node is None:
+        root_node = ET.SubElement(playlists, TAG_NODE, {
+            'Type' : '0',
+            'Name' : NAME_PLAYLIST_ROOT,
+            'Count': '0'  # Init to 0, update later
+        })
+    
+    # Ensure a default 'CUE Analysis Playlist' exists
+    cue_playlist = root_node.find(f"./{TAG_NODE}[@Name=\"CUE Analysis Playlist\"]")
+    if cue_playlist is None:
+        ET.SubElement(root_node, TAG_NODE, {
+            'Name'   : 'CUE Analysis Playlist',
+            'Type'   : '1',
+            'KeyType': '0',
+            'Entries': '0'
+        })
+    
+    # Ensure _pruned playlist exists under ROOT
+    pruned_node = root_node.find(f"./{TAG_NODE}[@Name=\"_pruned\"]")
     if pruned_node is None:
         pruned_attrs = {'Name': '_pruned', 'Type': '1', 'KeyType': '0', 'Entries': '0'}
-        pruned_node = ET.SubElement(playlists, TAG_NODE, pruned_attrs)
+        pruned_node = ET.SubElement(root_node, TAG_NODE, pruned_attrs)
     
     # Count existing tracks
     existing_tracks = len(collection.findall(TAG_TRACK))
@@ -213,11 +236,12 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
             
             # Only process music files
             if name_split[1] in EXTENSIONS:
+                # Construct the absolute system filepath and escaped collection path
+                file_url = f"file://localhost{quote(file_path, safe='()/')}"
+                
                 # Check if file is already in collection
                 # TODO: improve uniqueness check (use sys filename)
-                # TODO: URL encode 'file_url'
-                file_url = f"file://localhost{file_path}"
-                existing = collection.find(f"./TRACK[@Location=\"{file_url}\"]")
+                existing = collection.find(f"./{TAG_TRACK}[@Location=\"{file_url}\"]")
                 if existing is not None:
                     # TODO: if exists, update with new information
                     logging.debug(f"Skip: track already in collection: {file_path}")
@@ -250,11 +274,15 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
                 # Add the track to the _pruned playlist
                 ET.SubElement(pruned_node, TAG_TRACK, {'Key': track_id})
     
-    # Update the Entries attributes
+    # Update the 'Entries' attributes
     collection.set('Entries', str(existing_tracks + new_tracks))
     pruned_node.set('Entries', str(len(pruned_node.findall(TAG_TRACK))))
     
-    # Write the updated XML to file
+    # Update ROOT node's Count based on its child nodes
+    root_node_children = len(root_node.findall(TAG_NODE))
+    root_node.set('Count', str(root_node_children))
+    
+    # Write the tree to the XML file
     tree = ET.ElementTree(root)
     tree.write(collection_path, encoding='UTF-8', xml_declaration=True)
     logging.info(f"Collection updated with {new_tracks} new tracks at {collection_path}")
