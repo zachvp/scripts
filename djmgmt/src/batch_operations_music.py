@@ -257,6 +257,7 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
                 track_id = str(uuid.uuid4().int)[:9]  # Generate a unique ID
                 today = datetime.now().strftime('%Y-%m-%d')
                 
+                # TODO: add test coverage for fallback info
                 track_attrs = {
                     constants.ATTR_TRACK_ID   : track_id,
                     constants.ATTR_TITLE      : tags.title or name_split[0],
@@ -336,7 +337,7 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
 
             # move input file if it has a supported extension or is a valid archive
             if name_split[1] in valid_extensions or is_valid_archive:
-                logging.info(f"filter matched file '{input_path}'")
+                logging.debug(f"filter matched file '{input_path}'")
                 if interactive:
                     logging.info(f"move from '{input_path}' to '{output_path}'")
                     choice = input('Continue? [y/N/q]')
@@ -394,7 +395,7 @@ def flatten_hierarchy(source: str, output: str, interactive: bool) -> None:
                         logging.info(f"skip: encountered ghost file: '{input_path}'")
                         continue
             else:
-                logging.info(f"skip: {input_path}")
+                logging.debug(f"skip: {input_path}")
 
 def flatten_hierarchy_cli(args: type[Namespace]) -> None:
     flatten_hierarchy(args.input, args.output, args.interactive)
@@ -424,7 +425,7 @@ def extract(source: str, output: str, interactive: bool) -> None:
                 with zipfile.ZipFile(zip_input_path, 'r') as file:
                     file.extractall(os.path.normpath(output))
             else:
-                logging.info(f"skip: non-zip file '{input_path}'")
+                logging.debug(f"skip: non-zip file '{input_path}'")
 
 def extract_cli(args: type[Namespace]) -> None:
     extract(args.input, args.output, args.interactive)

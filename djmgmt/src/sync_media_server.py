@@ -150,7 +150,7 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tu
         timestamp = time.time()
         process = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
         timestamp = time.time() - timestamp
-        logging.debug(f"time: {format_timing(timestamp)}\n{process.stdout}".strip())
+        logging.debug(f"duration: {format_timing(timestamp)}\n{process.stdout}".strip())
         return (process.returncode, process.stdout)
     except subprocess.CalledProcessError as error:
         logging.error(f"return code '{error.returncode}':\n{error.stderr}".strip())
@@ -172,6 +172,8 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, ful
     logging.info(f"encoding batch in date context {date_context}:\n{batch}")
     encode_tracks.encode_lossy(batch, '.mp3', threads=28)
     logging.info(f"finished encoding batch in date context {date_context}")
+    
+    return False
     
     # transfer batch to the media server
     transfer_path = transform_implied_path(source)
@@ -294,7 +296,7 @@ def rsync_healthcheck() -> bool:
         # check that rsync is running
         command = shlex.split(f"rsync {constants.RSYNC_URL}")
         try:
-            subprocess.run(command, check=True)
+            subprocess.run(command, check=True, capture_output=True)
             logging.info('rsync daemon is running')
             return True
         except subprocess.CalledProcessError as error:
@@ -389,7 +391,7 @@ def run_sync_mappings(collection: ET.ElementTree, output_dir: str, full_scan: bo
         logging.error(e)
         raise
     timestamp = time.time() - timestamp
-    logging.info(f"sync time: {format_timing(timestamp)}")
+    logging.info(f"sync duration: {format_timing(timestamp)}")
 
 # TODO add interactive mode to confirm sync state before any sync batch is possible
 if __name__ == '__main__':
