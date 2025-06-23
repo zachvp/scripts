@@ -165,6 +165,7 @@ def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: 
         # Sweep all the encoded files from the temporary directory to the original source directory
         sweep(temp_dir, source, False, valid_extensions, prefix_hints)
 
+# TODO: refactor to use template file as foundation for new file
 # TODO: extend to save backup of previous X versions
 # TODO: include key, genre
 def record_collection(source: str, collection_path: str) -> ET.ElementTree:

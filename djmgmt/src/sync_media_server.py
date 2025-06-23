@@ -379,8 +379,7 @@ def sync_from_path(args: type[Namespace]):
 def run_sync_mappings(collection: ET.ElementTree, output_dir: str, full_scan: bool) -> None:
     # Only attempt sync if remote is accessible
     if not rsync_healthcheck():
-        logging.error("rsync unhealthy, aborting sync")
-        return
+        raise RuntimeError("rsync unhealthy, abort sync")
     
     # Initialize timing and run the sync
     timestamp = time.time()
