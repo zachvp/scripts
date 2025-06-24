@@ -201,8 +201,8 @@ def script(args: type[Namespace]) -> None:
     for track in source:
         if constants.ATTR_TRACK_ID in track.attrib:
             playlist_ids.add(track.attrib[constants.ATTR_TRACK_ID])
-        elif constants.ATTR_KEY in track.attrib:
-            playlist_ids.add(track.attrib[constants.ATTR_KEY])
+        elif constants.ATTR_TRACK_KEY in track.attrib:
+            playlist_ids.add(track.attrib[constants.ATTR_TRACK_KEY])
         
 
     # call requested script mode

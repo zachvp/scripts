@@ -452,7 +452,7 @@ def find_missing_art(collection_file_path: str, collection_xpath: str, playlist_
     
     # collect the playlist IDs
     tasks: list[tuple[str, Task[tuple[int, str]]]] = []
-    playlist_ids: set[str] = set(track.attrib[constants.ATTR_KEY] for track in playlist)
+    playlist_ids: set[str] = set(track.attrib[constants.ATTR_TRACK_KEY] for track in playlist)
     
     loop = asyncio.get_event_loop()
     for node in collection:

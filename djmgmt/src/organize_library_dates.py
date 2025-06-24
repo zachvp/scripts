@@ -290,7 +290,7 @@ if __name__ == '__main__':
         # collect the playlist IDs
         playlist_ids: set[str] = set()
         for track in pruned:
-            playlist_ids.add(track.attrib[constants.ATTR_KEY])
+            playlist_ids.add(track.attrib[constants.ATTR_TRACK_KEY])
         if script_args.function == Namespace.FUNCTION_IDENTIFIERS:
             items = collect_identifiers(collection, playlist_ids)
         else:

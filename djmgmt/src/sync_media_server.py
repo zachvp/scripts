@@ -173,8 +173,6 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, ful
     encode_tracks.encode_lossy(batch, '.mp3', threads=28)
     logging.info(f"finished encoding batch in date context {date_context}")
     
-    return False
-    
     # transfer batch to the media server
     transfer_path = transform_implied_path(source)
     success = bool(transfer_path)
@@ -311,7 +309,7 @@ def create_sync_mappings(collection: ET.ElementTree, output_dir: str) -> list[tu
     # collect the target playlist IDs to sync
     pruned = library.find_node(collection, constants.XPATH_PRUNED)
     playlist_ids: set[str] = {
-        track.attrib[constants.ATTR_KEY]
+        track.attrib[constants.ATTR_TRACK_KEY]
         for track in pruned
     }
     collection_node = library.find_node(collection, constants.XPATH_COLLECTION)

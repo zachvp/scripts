@@ -20,11 +20,12 @@ import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from urllib.parse import quote
+from typing import cast
 
 from . import constants
 from . import common
 from . import encode_tracks
-from .common_tags import read_tags 
+from .common_tags import read_tags, basic_identifier
 
 # constants
 EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'} # TODO: move to constants
@@ -167,7 +168,6 @@ def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: 
 
 # TODO: refactor to use template file as foundation for new file
 # TODO: extend to save backup of previous X versions
-# TODO: include key, genre
 def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     TAG_TRACK     = 'TRACK'
     TAG_NODE      = 'NODE'
@@ -227,6 +227,7 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     # Count existing tracks
     existing_tracks = len(collection.findall(TAG_TRACK))
     new_tracks = 0
+    updated_tracks = 0
     
     # Process all music files in the source directory
     # TODO: refactor to use common.collect_paths
@@ -237,44 +238,56 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
             
             # Only process music files
             if name_split[1] in EXTENSIONS:
-                # Construct the absolute system filepath and escaped collection path
                 file_url = f"file://localhost{quote(file_path, safe='()/')}"
                 
-                # Check if file is already in collection
-                # TODO: improve uniqueness check (use sys filename)
-                existing = collection.find(f"./{TAG_TRACK}[@Location=\"{file_url}\"]")
-                if existing is not None:
-                    # TODO: if exists, update with new information
-                    logging.debug(f"Skip: track already in collection: {file_path}")
-                    continue
+                # Check if track already exists
+                existing_track = collection.find(f"./{TAG_TRACK}[@Location=\"{file_url}\"]")
                 
-                # Get track metadata
                 tags = read_tags(file_path)
                 if not tags:
-                    logging.warning(f"Skip: could not read tags for {file_path}")
                     continue
                 
-                # Create track element with required attributes
-                track_id = str(uuid.uuid4().int)[:9]  # Generate a unique ID
                 today = datetime.now().strftime('%Y-%m-%d')
+                fallback_value = ''
                 
-                # TODO: add test coverage for fallback info
                 track_attrs = {
-                    constants.ATTR_TRACK_ID   : track_id,
-                    constants.ATTR_TITLE      : tags.title or name_split[0],
-                    constants.ATTR_ARTIST     : tags.artist or constants.UNKNOWN_ARTIST,
-                    constants.ATTR_ALBUM      : tags.album or constants.UNKNOWN_ALBUM,
-                    constants.ATTR_DATE_ADDED : today,
+                    constants.ATTR_TITLE      : tags.title or fallback_value,
+                    constants.ATTR_ARTIST     : tags.artist or fallback_value,
+                    constants.ATTR_ALBUM      : tags.album or fallback_value,
+                    constants.ATTR_GENRE      : tags.genre or fallback_value,
+                    constants.ATTR_KEY        : tags.key or fallback_value,
                     constants.ATTR_PATH       : file_url
                 }
                 
-                # Add the track to the collection
-                ET.SubElement(collection, TAG_TRACK, track_attrs)
-                new_tracks += 1
-                logging.info(f"Added track to collection: {file_path}")
-                
-                # Add the track to the _pruned playlist
-                ET.SubElement(pruned_node, TAG_TRACK, {'Key': track_id})
+                if existing_track is not None:
+                    # Update existing track with latest metadata
+                    track_id = cast(str, existing_track.get(constants.ATTR_TRACK_ID)) 
+                    track_attrs[constants.ATTR_TRACK_ID] = track_id
+                    # Keep original date added if it exists
+                    original_date = existing_track.get(constants.ATTR_DATE_ADDED)
+                    if original_date:
+                        track_attrs[constants.ATTR_DATE_ADDED] = original_date
+                    else:
+                        track_attrs[constants.ATTR_DATE_ADDED] = today
+                    
+                    # Update all attributes
+                    for attr_name, attr_value in track_attrs.items():
+                        existing_track.set(attr_name, attr_value)
+                    
+                    updated_tracks += 1
+                    logging.debug(f"Updated existing track: {basic_identifier(cast(str, tags.title), cast(str, tags.artist))}")
+                else:
+                    # Create new track
+                    track_id = str(uuid.uuid4().int)[:9]
+                    track_attrs[constants.ATTR_TRACK_ID] = track_id
+                    track_attrs[constants.ATTR_DATE_ADDED] = today
+                    
+                    ET.SubElement(collection, TAG_TRACK, track_attrs)
+                    new_tracks += 1
+                    logging.debug(f"Added new track: {basic_identifier(cast(str, tags.title), cast(str, tags.artist))}")
+                    
+                    # Add to pruned playlist
+                    ET.SubElement(pruned_node, TAG_TRACK, {'Key': track_id})
     
     # Update the 'Entries' attributes
     collection.set('Entries', str(existing_tracks + new_tracks))
@@ -287,7 +300,7 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     # Write the tree to the XML file
     tree = ET.ElementTree(root)
     tree.write(collection_path, encoding='UTF-8', xml_declaration=True)
-    logging.info(f"Collection updated with {new_tracks} new tracks at {collection_path}")
+    logging.info(f"Collection updated: {new_tracks} new tracks, {updated_tracks} updated tracks at {collection_path}")
     
     return tree
 
