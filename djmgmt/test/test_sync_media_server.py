@@ -452,7 +452,7 @@ class TestCreateSyncMappings(unittest.TestCase):
                                       mock_is_processed: MagicMock) -> None:
         # Set up mocks
         mock_node_pruned = MagicMock()
-        mock_node_pruned = [MagicMock(attrib={ constants.ATTR_KEY : '1' })]
+        mock_node_pruned = [MagicMock(attrib={ constants.ATTR_TRACK_KEY : '1' })]
         mock_node_collection = MagicMock()
 
         mock_find_node.side_effect = [mock_node_pruned, mock_node_collection]
@@ -482,7 +482,7 @@ class TestCreateSyncMappings(unittest.TestCase):
                                          mock_is_processed: MagicMock) -> None:
         # Set up mocks
         mock_node_pruned = MagicMock()
-        mock_node_pruned = [MagicMock(attrib={ constants.ATTR_KEY : '1' })]
+        mock_node_pruned = [MagicMock(attrib={ constants.ATTR_TRACK_KEY : '1' })]
         mock_node_collection = MagicMock()
 
         mock_find_node.side_effect = [mock_node_pruned, mock_node_collection]

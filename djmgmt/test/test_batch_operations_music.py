@@ -7,6 +7,7 @@ from unittest.mock import patch, MagicMock, call
 
 from src import batch_operations_music
 from src import batch_operations_music
+from src import constants
 from src.common_tags import Tags
 
 # Constants
@@ -16,6 +17,9 @@ MOCK_XML_FILE_PATH = '/mock/xml/file.xml'
 MOCK_ARTIST = 'mock_artist'
 MOCK_ALBUM = 'mock_album'
 MOCK_TITLE = 'mock_title'
+MOCK_GENRE = 'mock_genre'
+MOCK_TONALITY = 'mock_tonality'
+MOCK_DATE_ADDED = 'mock_date_added'
 
 COLLECTION_XML = f'''
 <?xml version="1.0" encoding="UTF-8"?>
@@ -643,7 +647,7 @@ class TestRecordCollection(unittest.TestCase):
         '''Tests that a single music file is correctly written to a non-existent XML collection.'''
         # Set up mocks
         mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file.aiff', '03 - 暴風一族 (Remix).mp3'])]
-        mock_read_tags.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE)
+        mock_read_tags.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
         mock_path_exists.return_value = False
         
         # Call the target function
@@ -687,32 +691,39 @@ class TestRecordCollection(unittest.TestCase):
             self.assertEqual(track.tag, 'TRACK')
             self.assertEqual(len(track), 0)
             
-            self.assertIn('TrackID', track.attrib)
-            self.assertRegex(track.attrib['TrackID'], r'\d+')
+            self.assertIn(constants.ATTR_TRACK_ID, track.attrib)
+            self.assertRegex(track.attrib[constants.ATTR_TRACK_ID], r'\d+')
             
-            self.assertIn('Name', track.attrib)
-            self.assertEqual(track.attrib['Name'], MOCK_TITLE)
+            self.assertIn(constants.ATTR_TITLE, track.attrib)
+            self.assertEqual(track.attrib[constants.ATTR_TITLE], MOCK_TITLE)
             
-            self.assertIn('Artist', track.attrib)
-            self.assertEqual(track.attrib['Artist'], MOCK_ARTIST)
+            self.assertIn(constants.ATTR_ARTIST, track.attrib)
+            self.assertEqual(track.attrib[constants.ATTR_ARTIST], MOCK_ARTIST)
             
-            self.assertIn('Album', track.attrib)
-            self.assertEqual(track.attrib['Album'], MOCK_ALBUM)
+            self.assertIn(constants.ATTR_ALBUM, track.attrib)
+            self.assertEqual(track.attrib[constants.ATTR_ALBUM], MOCK_ALBUM)
             
-            self.assertIn('DateAdded', track.attrib)
-            self.assertRegex(track.attrib['DateAdded'], r"\d{4}-\d{2}-\d{2}")
+            self.assertIn(constants.ATTR_DATE_ADDED, track.attrib)
+            self.assertRegex(track.attrib[constants.ATTR_DATE_ADDED], r"\d{4}-\d{2}-\d{2}")
             
-            self.assertIn('Location', track.attrib)
-        
-        # Check URL encoded paths
+            self.assertIn(constants.ATTR_GENRE, track.attrib)
+            self.assertEqual(track.attrib[constants.ATTR_GENRE], MOCK_GENRE)
+            
+            self.assertIn('Tonality', track.attrib)
+            self.assertEqual(track.attrib['Tonality'], MOCK_TONALITY)
+            
+            self.assertIn(constants.ATTR_PATH, track.attrib)
+            # Path content will be different per track, so check outside the loop
+            
+        # Check URL-encoded paths
         # Check track 0 path: no URL encoding required
         track_0 = collection[0]
-        self.assertEqual(track_0.attrib['Location'], f"file://localhost{MOCK_INPUT_DIR}/mock_file.aiff")
+        self.assertEqual(track_0.attrib[constants.ATTR_PATH], f"file://localhost{MOCK_INPUT_DIR}/mock_file.aiff")
         
         # Check track 1 path: URL encoding required
         track_1 = collection[1]
-        self.assertIn('Location', track_1.attrib)
-        self.assertEqual(track_1.attrib['Location'].lower(),
+        self.assertIn(constants.ATTR_PATH, track_1.attrib)
+        self.assertEqual(track_1.attrib[constants.ATTR_PATH].lower(),
                          f"file://localhost{MOCK_INPUT_DIR}/03%20-%20%E6%9A%B4%E9%A2%A8%E4%B8%80%E6%97%8F%20(Remix).mp3".lower())
         
         # Check PLAYLISTS node
@@ -748,15 +759,15 @@ class TestRecordCollection(unittest.TestCase):
         pruned = playlist_root[1]
         self.assertEqual(pruned.tag, 'NODE')
         self.assertIsNotNone(pruned)
-        self.assertIn('Name', pruned.attrib)
-        self.assertEqual(pruned.attrib['Name'], '_pruned')
+        self.assertIn(constants.ATTR_TITLE, pruned.attrib)
+        self.assertEqual(pruned.attrib[constants.ATTR_TITLE], '_pruned')
         self.assertEqual(len(pruned), 2)
         
         # Check '_pruned' track
         track = pruned[0]
         self.assertEqual(track.tag, 'TRACK')
-        self.assertIn("Key", track.attrib)
-        self.assertRegex(track.attrib['Key'], r'\d+')
+        self.assertIn(constants.ATTR_TRACK_KEY, track.attrib)
+        self.assertRegex(track.attrib[constants.ATTR_TRACK_KEY], r'\d+')
 
     @patch.object(ET.ElementTree, 'write')
     @patch('src.batch_operations_music.ET.parse')
@@ -773,7 +784,7 @@ class TestRecordCollection(unittest.TestCase):
         # Set up mocks
         mock_path_exists.return_value = True
         mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file_0.aiff'])]
-        mock_read_tags.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE)
+        mock_read_tags.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
         mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(COLLECTION_XML))
         
         # Insert the first track
@@ -789,7 +800,7 @@ class TestRecordCollection(unittest.TestCase):
         # Set up mocks for second call
         mock_path_exists.return_value = True
         mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file_1.aiff', '03 - 暴風一族 (Remix).mp3'])]
-        mock_read_tags.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE)
+        mock_read_tags.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
         mock_xml_parse.return_value = first_call
         
         # Call the target function to check that 'mock_file_1' was inserted
@@ -832,31 +843,40 @@ class TestRecordCollection(unittest.TestCase):
             self.assertEqual(track.tag, 'TRACK')
             self.assertEqual(len(track), 0)
             
-            self.assertIn('TrackID', track.attrib)
-            self.assertRegex(track.attrib['TrackID'], r'\d+')
+            self.assertIn(constants.ATTR_TRACK_ID, track.attrib)
+            self.assertRegex(track.attrib[constants.ATTR_TRACK_ID], r'\d+')
             
-            self.assertIn('Name', track.attrib)
-            self.assertEqual(track.attrib['Name'], MOCK_TITLE)
+            self.assertIn(constants.ATTR_TITLE, track.attrib)
+            self.assertEqual(track.attrib[constants.ATTR_TITLE], MOCK_TITLE)
             
-            self.assertIn('Artist', track.attrib)
-            self.assertEqual(track.attrib['Artist'], MOCK_ARTIST)
+            self.assertIn(constants.ATTR_ARTIST, track.attrib)
+            self.assertEqual(track.attrib[constants.ATTR_ARTIST], MOCK_ARTIST)
             
-            self.assertIn('Album', track.attrib)
-            self.assertEqual(track.attrib['Album'], MOCK_ALBUM)
+            self.assertIn(constants.ATTR_ALBUM, track.attrib)
+            self.assertEqual(track.attrib[constants.ATTR_ALBUM], MOCK_ALBUM)
             
-            self.assertIn('DateAdded', track.attrib)
-            self.assertRegex(track.attrib['DateAdded'], r"\d{4}-\d{2}-\d{2}")
+            self.assertIn(constants.ATTR_DATE_ADDED, track.attrib)
+            self.assertRegex(track.attrib[constants.ATTR_DATE_ADDED], r"\d{4}-\d{2}-\d{2}")
+            
+            self.assertIn(constants.ATTR_GENRE, track.attrib)
+            self.assertEqual(track.attrib[constants.ATTR_GENRE], MOCK_GENRE)
+            
+            self.assertIn('Tonality', track.attrib)
+            self.assertEqual(track.attrib['Tonality'], MOCK_TONALITY)
+            
+            self.assertIn(constants.ATTR_PATH, track.attrib)
+            # Path content will be different per track, so check outside the loop
             
         # Check URL encoded paths
         # Track 0 is skipped, covered in new_file unit test
         # Check track 1 path: no URL encoding required
         track_1 = collection[1]
-        self.assertEqual(track_1.attrib['Location'], f"file://localhost{MOCK_INPUT_DIR}/mock_file_1.aiff")
+        self.assertEqual(track_1.attrib[constants.ATTR_PATH], f"file://localhost{MOCK_INPUT_DIR}/mock_file_1.aiff")
         
         # Check track 2 path: URL encoding required
         track_2 = collection[2]
-        self.assertIn('Location', track_2.attrib)
-        self.assertEqual(track_2.attrib['Location'].lower(),
+        self.assertIn(constants.ATTR_PATH, track_2.attrib)
+        self.assertEqual(track_2.attrib[constants.ATTR_PATH].lower(),
                          f"file://localhost{MOCK_INPUT_DIR}/03%20-%20%E6%9A%B4%E9%A2%A8%E4%B8%80%E6%97%8F%20(Remix).mp3".lower())
         
         # Check PLAYLISTS node
@@ -893,16 +913,251 @@ class TestRecordCollection(unittest.TestCase):
         pruned = playlist_root[1]
         self.assertEqual(pruned.tag, 'NODE')
         self.assertIsNotNone(pruned)
-        self.assertIn('Name', pruned.attrib)
-        self.assertEqual(pruned.attrib['Name'], '_pruned')
+        self.assertIn(constants.ATTR_TITLE, pruned.attrib)
+        self.assertEqual(pruned.attrib[constants.ATTR_TITLE], '_pruned')
         self.assertEqual(len(pruned), 3)
         
         # Check '_pruned' tracks
         for track in pruned:
             self.assertEqual(track.tag, 'TRACK')
-            self.assertIn("Key", track.attrib)
-            self.assertRegex(track.attrib['Key'], r'\d+')
-    
+            self.assertIn(constants.ATTR_TRACK_KEY, track.attrib)
+            self.assertRegex(track.attrib[constants.ATTR_TRACK_KEY], r'\d+')
+            
+    @patch.object(ET.ElementTree, 'write')
+    @patch('src.batch_operations_music.ET.parse')
+    @patch('os.path.exists')
+    @patch('src.batch_operations_music.read_tags')
+    @patch('os.walk')
+    def test_success_track_exists_same_metadata(self,
+                                                mock_walk: MagicMock,
+                                                mock_read_tags: MagicMock,
+                                                mock_path_exists: MagicMock,
+                                                mock_xml_parse: MagicMock,
+                                                mock_xml_write: MagicMock) -> None:
+        '''Tests that a track is not added to the collection XML if it already exists and the metadata is the same.'''
+        # Setup mocks
+        mock_file = 'mock_file.mp3'
+        existing_track_xml = f'''
+        <?xml version="1.0" encoding="UTF-8"?>
+
+        <DJ_PLAYLISTS Version="1.0.0">
+            <PRODUCT Name="rekordbox" Version="6.8.5" Company="AlphaTheta"/>
+            <COLLECTION Entries="1">
+                <TRACK {constants.ATTR_TRACK_ID}="1"
+                {constants.ATTR_TITLE}="{MOCK_TITLE}"
+                {constants.ATTR_ARTIST}="{MOCK_ARTIST}"
+                {constants.ATTR_ALBUM}="{MOCK_ALBUM}"
+                {constants.ATTR_GENRE}="{MOCK_GENRE}"
+                {'Tonality'}="{MOCK_TONALITY}"
+                {constants.ATTR_DATE_ADDED}="{MOCK_DATE_ADDED}"
+                {constants.ATTR_PATH}="file://localhost{MOCK_INPUT_DIR}/{mock_file}" />
+            </COLLECTION>
+            <PLAYLISTS>
+                <NODE Type="0" Name="ROOT" Count="2">
+                    <NODE Name="CUE Analysis Playlist" Type="1" KeyType="0" Entries="0"/>
+                    <NODE Name="_pruned" Type="1" KeyType="0" Entries="1">
+                        <TRACK Key="1" />
+                    </NODE>
+                </NODE>
+            </PLAYLISTS>
+        </DJ_PLAYLISTS>
+        '''.strip()
+        
+        mock_walk.return_value = [(MOCK_INPUT_DIR, [], [mock_file])]
+        mock_path_exists.return_value = True
+        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(existing_track_xml))
+        
+        # Call target function
+        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        
+        # Assert call expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_read_tags.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_file}")
+        mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
+        mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
+        
+        # Assert that the XML contents are the same as before attempting to add the track.
+        self.assertEqual(ET.tostring(cast(ET.Element, actual.getroot()), encoding="UTF-8"),
+                         ET.tostring(cast(ET.Element, mock_xml_parse.return_value.getroot()), encoding="UTF-8"))
+            
+    @patch.object(ET.ElementTree, 'write')
+    @patch('src.batch_operations_music.ET.parse')
+    @patch('os.path.exists')
+    @patch('src.batch_operations_music.read_tags')
+    @patch('os.walk')
+    def test_success_track_exists_update_metadata(self,
+                                                  mock_walk: MagicMock,
+                                                  mock_read_tags: MagicMock,
+                                                  mock_path_exists: MagicMock,
+                                                  mock_xml_parse: MagicMock,
+                                                  mock_xml_write: MagicMock) -> None:
+        '''Tests that the tag metadata is updated for an existing track.'''
+        # Setup mocks
+        mock_file = 'mock_file.mp3'
+        existing_track_xml = f'''
+        <?xml version="1.0" encoding="UTF-8"?>
+
+        <DJ_PLAYLISTS Version="1.0.0">
+            <PRODUCT Name="rekordbox" Version="6.8.5" Company="AlphaTheta"/>
+            <COLLECTION Entries="1">
+                <TRACK {constants.ATTR_TRACK_ID}="1"
+                {constants.ATTR_TITLE}="{MOCK_TITLE}"
+                {constants.ATTR_ARTIST}="{MOCK_ARTIST}"
+                {constants.ATTR_ALBUM}="{MOCK_ALBUM}"
+                {constants.ATTR_GENRE}="{MOCK_GENRE}"
+                {'Tonality'}="{MOCK_TONALITY}"
+                {constants.ATTR_DATE_ADDED}="{MOCK_DATE_ADDED}"
+                {constants.ATTR_PATH}="file://localhost{MOCK_INPUT_DIR}/{mock_file}" />
+            </COLLECTION>
+            <PLAYLISTS>
+                <NODE Type="0" Name="ROOT" Count="2">
+                    <NODE Name="CUE Analysis Playlist" Type="1" KeyType="0" Entries="0"/>
+                    <NODE Name="_pruned" Type="1" KeyType="0" Entries="1">
+                        <TRACK Key="1" />
+                    </NODE>
+                </NODE>
+            </PLAYLISTS>
+        </DJ_PLAYLISTS>
+        '''.strip()
+        
+        mock_walk.return_value = [(MOCK_INPUT_DIR, [], [mock_file])]
+        mock_path_exists.return_value = True
+        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(existing_track_xml))
+        
+        # Mock updated tag metadata
+        mock_read_tags.side_effect = [Tags(f"{MOCK_ARTIST}_update",
+                                           f"{MOCK_ALBUM}_update",
+                                           f"{MOCK_TITLE}_update",
+                                           f"{MOCK_GENRE}_update",
+                                           f"{MOCK_TONALITY}_update")]
+        
+        # Call target function
+        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        
+        # Assert call expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_read_tags.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_file}")
+        mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
+        mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
+        
+        # Assert the expected XML contents
+        # Check DJ_PLAYLISTS root node
+        dj_playlists: ET.Element  = cast(ET.Element, actual.getroot()) 
+        self.assertEqual(len(dj_playlists), 3)
+        self.assertEqual(dj_playlists.tag, 'DJ_PLAYLISTS')
+        self.assertEqual(dj_playlists.attrib, {'Version': '1.0.0'})
+        
+        # Check PRODUCT node
+        product = dj_playlists[0]
+        self.assertEqual(len(product), 0)
+        expected_attrib = {'Name': 'rekordbox', 'Version': '6.8.5', 'Company': 'AlphaTheta'}
+        self.assertEqual(product.tag, 'PRODUCT')
+        self.assertEqual(product.attrib, expected_attrib)
+        
+        # Check COLLECTION node
+        collection = dj_playlists[1]
+        self.assertEqual(collection.tag, 'COLLECTION')
+        self.assertEqual(collection.attrib, {'Entries': '1'})
+        self.assertEqual(len(collection), 1)
+        
+        # Check the TRACK node
+        track = collection[0]
+        
+        # Check data that should not change
+        self.assertEqual(track.get(constants.ATTR_TRACK_ID), '1')
+        self.assertEqual(track.get(constants.ATTR_DATE_ADDED), MOCK_DATE_ADDED)
+        self.assertEqual(track.get(constants.ATTR_PATH), f"file://localhost{MOCK_INPUT_DIR}/{mock_file}")
+        
+        # Check the expected new data
+        self.assertEqual(track.get(constants.ATTR_ARTIST), f"{MOCK_ARTIST}_update")
+        self.assertEqual(track.get(constants.ATTR_ALBUM), f"{MOCK_ALBUM}_update")
+        self.assertEqual(track.get(constants.ATTR_TITLE), f"{MOCK_TITLE}_update")
+        self.assertEqual(track.get(constants.ATTR_GENRE), f"{MOCK_GENRE}_update")
+        self.assertEqual(track.get('Tonality'), f"{MOCK_TONALITY}_update")
+        
+    @patch.object(ET.ElementTree, 'write')
+    @patch('src.batch_operations_music.ET.parse')
+    @patch('os.path.exists')
+    @patch('src.batch_operations_music.read_tags')
+    @patch('os.walk')
+    def test_success_missing_metadata(self,
+                                      mock_walk: MagicMock,
+                                      mock_read_tags: MagicMock,
+                                      mock_path_exists: MagicMock,
+                                      mock_xml_parse: MagicMock,
+                                      mock_xml_write: MagicMock) -> None:
+        '''Tests that a single music file is correctly written to a non-existent XML collection.'''
+        # Set up mocks
+        mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file.aiff'])]
+        mock_read_tags.return_value = Tags() # mock empty tag data
+        mock_path_exists.return_value = False
+        
+        # Call the target function
+        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        
+        # Assert call expectations
+        mock_path_exists.assert_called_once_with(MOCK_XML_FILE_PATH)
+        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_xml_parse.assert_not_called()
+        mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
+        
+        # Assert that the function reads the file tags
+        FILE_PATH_MUSIC = f"{MOCK_INPUT_DIR}{os.sep}"
+        mock_read_tags.assert_has_calls([
+            call(f"{FILE_PATH_MUSIC}mock_file.aiff"),
+        ])
+        
+        # Assert that the XML contents are expected
+        # Check DJ_PLAYLISTS root node
+        dj_playlists: ET.Element  = cast(ET.Element, actual.getroot()) 
+        self.assertEqual(len(dj_playlists), 3)
+        self.assertEqual(dj_playlists.tag, 'DJ_PLAYLISTS')
+        self.assertEqual(dj_playlists.attrib, {'Version': '1.0.0'})
+        
+        # Check PRODUCT node
+        product = dj_playlists[0]
+        self.assertEqual(len(product), 0)
+        expected_attrib = {'Name': 'rekordbox', 'Version': '6.8.5', 'Company': 'AlphaTheta'}
+        self.assertEqual(product.tag, 'PRODUCT')
+        self.assertEqual(product.attrib, expected_attrib)
+        
+        # Check COLLECTION node
+        collection = dj_playlists[1]
+        self.assertEqual(collection.tag, 'COLLECTION')
+        self.assertEqual(collection.attrib, {'Entries': '1'})
+        self.assertEqual(len(collection), 1)
+        
+        # Check TRACK node base attributes
+        ## Expect empty string values for tag metadata
+        track = collection[0]
+        self.assertEqual(track.tag, 'TRACK')
+        self.assertEqual(len(track), 0)
+        
+        self.assertIn(constants.ATTR_TRACK_ID, track.attrib)
+        self.assertRegex(track.attrib[constants.ATTR_TRACK_ID], r'\d+')
+        
+        self.assertIn(constants.ATTR_TITLE, track.attrib)
+        self.assertEqual(track.attrib[constants.ATTR_TITLE], '')
+        
+        self.assertIn(constants.ATTR_ARTIST, track.attrib)
+        self.assertEqual(track.attrib[constants.ATTR_ARTIST], '')
+        
+        self.assertIn(constants.ATTR_ALBUM, track.attrib)
+        self.assertEqual(track.attrib[constants.ATTR_ALBUM], '')
+        
+        self.assertIn(constants.ATTR_DATE_ADDED, track.attrib)
+        self.assertRegex(track.attrib[constants.ATTR_DATE_ADDED], r"\d{4}-\d{2}-\d{2}")
+        
+        self.assertIn(constants.ATTR_PATH, track.attrib)
+        self.assertEqual(track.attrib[constants.ATTR_PATH], f"file://localhost{MOCK_INPUT_DIR}/mock_file.aiff")
+        
+        # Prompt target: check new expected attributes
+        self.assertIn(constants.ATTR_GENRE, track.attrib)
+        self.assertEqual(track.attrib[constants.ATTR_GENRE], '')
+        
+        self.assertIn('Tonality', track.attrib)
+        self.assertEqual(track.attrib['Tonality'], '')
+
     # ----------------
     # Begin edge cases
     # ----------------
@@ -984,66 +1239,11 @@ class TestRecordCollection(unittest.TestCase):
         pruned = playlist_root[1]
         self.assertEqual(pruned.tag, 'NODE')
         self.assertIsNotNone(pruned)
-        self.assertIn('Name', pruned.attrib)
-        self.assertEqual(pruned.attrib['Name'], '_pruned')
+        self.assertIn(constants.ATTR_TITLE, pruned.attrib)
+        self.assertEqual(pruned.attrib[constants.ATTR_TITLE], '_pruned')
         
         # Check that '_pruned' contains no tracks
         self.assertEqual(len(pruned), 0)
-    
-    @patch.object(ET.ElementTree, 'write')
-    @patch('src.batch_operations_music.ET.parse')
-    @patch('os.path.exists')
-    @patch('src.batch_operations_music.read_tags')
-    @patch('os.walk')
-    def test_success_track_exists(self,
-                                  mock_walk: MagicMock,
-                                  mock_read_tags: MagicMock,
-                                  mock_path_exists: MagicMock,
-                                  mock_xml_parse: MagicMock,
-                                  mock_xml_write: MagicMock) -> None:
-        '''Tests that a track is not added to the collection XML if it already exists.'''
-        # Setup mocks
-        mock_file = 'mock_file.mp3'
-        existing_track_xml = f'''
-        <?xml version="1.0" encoding="UTF-8"?>
-
-        <DJ_PLAYLISTS Version="1.0.0">
-            <PRODUCT Name="rekordbox" Version="6.8.5" Company="AlphaTheta"/>
-            <COLLECTION Entries="1">
-                <TRACK TrackID="1"
-                Name="{MOCK_TITLE}"
-                Artist="{MOCK_ARTIST}"
-                Album="{MOCK_ALBUM}"
-                DateAdded="2025-06-19"
-                Location="file://localhost{MOCK_INPUT_DIR}/{mock_file}" />
-            </COLLECTION>
-            <PLAYLISTS>
-                <NODE Type="0" Name="ROOT" Count="2">
-                    <NODE Name="CUE Analysis Playlist" Type="1" KeyType="0" Entries="0"/>
-                    <NODE Name="_pruned" Type="1" KeyType="0" Entries="1">
-                        <TRACK Key="1" />
-                    </NODE>
-                </NODE>
-            </PLAYLISTS>
-        </DJ_PLAYLISTS>
-        '''.strip()
-        
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], [mock_file])]
-        mock_path_exists.return_value = True
-        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(existing_track_xml))
-        
-        # Call target function
-        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
-        
-        # Assert call expectations
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        mock_read_tags.assert_not_called()
-        mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
-        mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
-        
-        # Assert that the XML contents are the same as before attempting to add the track.
-        self.assertEqual(ET.tostring(cast(ET.Element, actual.getroot()), encoding="UTF-8"),
-                         ET.tostring(cast(ET.Element, mock_xml_parse.return_value.getroot()), encoding="UTF-8"))
         
     @patch.object(ET.ElementTree, 'write')
     @patch('src.batch_operations_music.ET.parse')
@@ -1161,7 +1361,7 @@ class TestRecordCollection(unittest.TestCase):
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
         mock_xml_write.assert_not_called()
         self.assertRegex(mock_log_error.call_args.args[0], r'^Error loading collection file.+$')
-            
+
 class TestUpdateLibrary(unittest.TestCase):
     @patch('src.sync_media_server.run_sync_mappings')
     @patch('src.batch_operations_music.sweep')
