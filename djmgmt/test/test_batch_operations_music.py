@@ -1151,7 +1151,6 @@ class TestRecordCollection(unittest.TestCase):
         self.assertIn(constants.ATTR_PATH, track.attrib)
         self.assertEqual(track.attrib[constants.ATTR_PATH], f"file://localhost{MOCK_INPUT_DIR}/mock_file.aiff")
         
-        # Prompt target: check new expected attributes
         self.assertIn(constants.ATTR_GENRE, track.attrib)
         self.assertEqual(track.attrib[constants.ATTR_GENRE], '')
         

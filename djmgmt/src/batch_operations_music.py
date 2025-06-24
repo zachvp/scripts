@@ -176,6 +176,7 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     
     NAME_PLAYLIST_ROOT = 'ROOT'
     
+    # Create or read the collection path
     if os.path.exists(collection_path):
         try:
             tree = ET.parse(collection_path)
@@ -269,13 +270,14 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
                         track_attrs[constants.ATTR_DATE_ADDED] = original_date
                     else:
                         track_attrs[constants.ATTR_DATE_ADDED] = today
+                        logging.warning(f"No date present for existing track: '{file_path}', using '{today}'")
                     
                     # Update all attributes
                     for attr_name, attr_value in track_attrs.items():
                         existing_track.set(attr_name, attr_value)
                     
                     updated_tracks += 1
-                    logging.debug(f"Updated existing track: {basic_identifier(cast(str, tags.title), cast(str, tags.artist))}")
+                    logging.debug(f"Updated existing track: '{file_path}'")
                 else:
                     # Create new track
                     track_id = str(uuid.uuid4().int)[:9]
@@ -284,7 +286,7 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
                     
                     ET.SubElement(collection, TAG_TRACK, track_attrs)
                     new_tracks += 1
-                    logging.debug(f"Added new track: {basic_identifier(cast(str, tags.title), cast(str, tags.artist))}")
+                    logging.debug(f"Added new track: '{file_path}'")
                     
                     # Add to pruned playlist
                     ET.SubElement(pruned_node, TAG_TRACK, {'Key': track_id})
