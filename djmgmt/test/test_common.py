@@ -1,7 +1,8 @@
 import unittest
-from unittest.mock import patch, MagicMock
 import logging
 import os
+from unittest.mock import patch, MagicMock
+from typing import cast
 
 # Constants
 PROJECT_ROOT = os.path.abspath(f"{os.path.dirname(__file__)}/{os.path.pardir}")
@@ -51,6 +52,7 @@ class TestFindDateContext(unittest.TestCase):
         actual = common.find_date_context(path)
         
         self.assertIsNotNone(actual)
+        actual = cast(tuple[str, int], actual)
         self.assertEqual(len(actual), 2)
         self.assertEqual(actual, ('2022/04 april/24', 3))
     
@@ -59,6 +61,7 @@ class TestFindDateContext(unittest.TestCase):
         actual = common.find_date_context(path)
         
         self.assertIsNotNone(actual)
+        actual = cast(tuple[str, int], actual)
         self.assertEqual(len(actual), 2)
         self.assertEqual(actual, ('2024/08 august/18', 7))
     
