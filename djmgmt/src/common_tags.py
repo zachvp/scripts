@@ -1,9 +1,14 @@
-from typing import Optional
 import mutagen
 import logging
+from typing import Optional, Callable
 
 class Tags:
-    def __init__(self, artist: Optional[str]=None, album: Optional[str]=None, title: Optional[str]=None, genre: Optional[str]=None, key: Optional[str]=None):
+    def __init__(self,
+                 artist: Optional[str]=None,
+                 album : Optional[str]=None,
+                 title : Optional[str]=None,
+                 genre : Optional[str]=None,
+                 key   : Optional[str]=None):
         self.artist = artist
         self.album = album
         self.title = title
@@ -77,12 +82,19 @@ def get_track_key(track: mutagen.FileType, options: set[str]) -> Optional[str]:
 
     return None
 
+def extract_tag_value(track: mutagen.FileType, tag_keys: set[str]) -> Optional[str]:
+    key = get_track_key(track, tag_keys)
+    value = str(track[key]) if key in track else None
+
+    return value
+
 def read_tags(path: str) -> Optional[Tags]:
-    artist_keys = {'TPE1', 'TPE2', 'TPE4', '©ART', 'Author', 'artist', 'TOPE'}
-    album_keys = {'TALB', 'TOAL', 'album'}
-    title_keys = {'TIT2', '©nam', 'Title', 'title'}
-    genre_keys = {'TCON', 'genre'}
-    key_keys = {'TKEY', 'initialkey', 'key'}
+    # define possible tag keys
+    artist_keys    = {'TPE1', 'TPE2', 'TPE4', '©ART', 'Author', 'artist', 'TOPE'}
+    album_keys     = {'TALB', 'TOAL', 'album'}
+    title_keys     = {'TIT2', '©nam', 'Title', 'title'}
+    genre_keys     = {'TCON', 'genre'}
+    music_key_keys = {'TKEY', 'initialkey', 'key'}
 
     # load track tags, check for errors
     try:
@@ -90,57 +102,21 @@ def read_tags(path: str) -> Optional[Tags]:
     except mutagen.MutagenError as e:
         logging.error(f"mutagen.MutagenError:\n{e}\npath: '{path}'")
         return None
-
     if track is None or track.tags is None:
         logging.error(f"unable to read '{path}'")
         return None
 
-    # pull keys based on what's present in each track
-    title_key = get_track_key(track, title_keys)
-    artist_key = get_track_key(track, artist_keys)
-    album_key = get_track_key(track, album_keys)
-    genre_key = get_track_key(track, genre_keys)
-    key_key = get_track_key(track, key_keys)
-
-    if title_key is None and artist_key is None:
-        logging.error(f"unable to find any valid tags for '{path}'")
-        return None
-
-    # skip 'tracks' that don't contain both an artist and title
-    if title_key not in track and artist_key not in track:
-        logging.error(f"unable to read any valid tags for '{path}'")
-        return None
-
-    # pull base tag info
-    title = track[title_key] if title_key in track else None
-    artist = track[artist_key] if artist_key in track else None
-    album = track[album_key] if album_key in track else None
-    genre = track[genre_key] if genre_key in track else None
-    key = track[key_key] if key_key in track else None
-
-    # some tags are stored as a list
-    if isinstance(title, list):
-        title = title[0]
-    if isinstance(artist, list):
-        artist = artist[0]
-    if isinstance(album, list):
-        album = album[0]
-    if isinstance(genre, list):
-        genre = genre[0]
-    if isinstance(key, list):
-        key = key[0]
+    # extract tag values
+    title = extract_tag_value(track, title_keys)
+    artist = extract_tag_value(track, artist_keys)
+    album = extract_tag_value(track, album_keys)
+    genre = extract_tag_value(track, genre_keys)
+    key = extract_tag_value(track, music_key_keys)
     
-    # convert to string or leave as None
-    if title is not None:
-        title = str(title)
-    if artist is not None:
-        artist = str(artist)
-    if album is not None:
-        album = str(album)
-    if genre is not None:
-        genre = str(genre)
-    if key is not None:
-        key = str(key)
+    # failure if title and artist not present
+    if title is None and artist is None:
+        logging.error(f"unable to find title and artist tags for '{path}'")
+        return None
     
     # log warning if critical tags are absent
     if artist is None or title is None:
