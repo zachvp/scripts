@@ -182,15 +182,6 @@ def run_command(command: list[str]) -> tuple[int, str]:
         logging.error(f"return code '{error.returncode}':\n{error.stderr}".strip())
         return (error.returncode, error.stderr.strip())
 
-def get_event_loop() -> AbstractEventLoop:
-    '''Get or create the current async event loop.'''
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError as e:
-        loop = asyncio.new_event_loop()
-        logging.info('no running loop, created new one')
-    return loop
-
 async def run_command_async(command: list[str]) -> tuple[int, str]:
     '''Run the given command asynchronously as a subprocess. Returns subprocess return code and stdout/stderr.'''
     # create the async shell process
@@ -220,24 +211,21 @@ async def run_command_async(command: list[str]) -> tuple[int, str]:
         logging.error(f"return code '{process.returncode}':\n{stderr}")
         return (process.returncode, stderr)
 
-async def collect_tasks(tasks: list[Task]) -> list[Future]:
-    '''Gathers the given tasks for async processing.'''
-    return await asyncio.gather(*tasks)
-
 # primary functions
-def encode_lossless_cli(args: type[Namespace]) -> list[tuple[str, str]]:
-    return encode_lossless(args.input, args.output, args.extension, args.store_path, args.store_skipped, args.interactive)
+async def encode_lossless_cli(args: type[Namespace]) -> list[tuple[str, str]]:
+    result = await encode_lossless(args.input, args.output, args.extension, args.store_path, args.store_skipped, args.interactive)
+    return result
 
 # TODO: add support for FLAC
 # TODO: extend so that output extension can be passed as a parameter
 # TODO: extend to preserve input extension
-def encode_lossless(input_dir: str,
-                    output_dir: str,
-                    extension: str,
-                    store_path: str | None = None,
-                    store_skipped: bool = False,
-                    interactive: bool = False,
-                    threads: int = 4) -> list[tuple[str, str]]:
+async def encode_lossless(input_dir: str,
+                          output_dir: str,
+                          extension: str,
+                          store_path: str | None = None,
+                          store_skipped: bool = False,
+                          interactive: bool = False,
+                          threads: int = 4) -> list[tuple[str, str]]:
     '''Primary script function. Recursively walks the input path specified in `args` to re-encode each eligible file.
     Returns a list of the processed (input_file_path, output_file_path) tuples.
     A file is eligible if all conditions are met:
@@ -258,7 +246,6 @@ def encode_lossless(input_dir: str,
     processed_files: list[tuple[str, str]] = []
     size_diff_sum = 0.0
     tasks: list[tuple[str, str, Task[tuple[int, str]]]] = []
-    loop = get_event_loop()
 
     # set up storage
     store_path_size_diff: str | None = None
@@ -326,13 +313,13 @@ def encode_lossless(input_dir: str,
 
             # -- build and run the ffmpeg encode command
             command = ffmpeg_standardize(input_path, output_path)
-            task = loop.create_task(run_command_async(command))
+            task = asyncio.create_task(run_command_async(command))
             tasks.append((input_path, output_path, task))
             
             # Run task batch
             if len(tasks) > threads - 1:
                 run_tasks = [t[2] for t in tasks]
-                loop.run_until_complete(collect_tasks(run_tasks))
+                await asyncio.gather(*run_tasks)
                 for src_path, dest_path, _ in tasks:
                     processed_files.append((src_path, dest_path))
                     
@@ -353,7 +340,7 @@ def encode_lossless(input_dir: str,
     # Run final batch
     if tasks:
         run_tasks = [t[2] for t in tasks]
-        loop.run_until_complete(collect_tasks(run_tasks))
+        await asyncio.gather(*run_tasks)
         for src_path, dest_path, _ in tasks:
             processed_files.append((src_path, dest_path))
             
@@ -392,7 +379,6 @@ async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, thr
     '''Encodes the given input, output mappings in lossy format with the given extension. Uses FFMPEG as backend.
     Encoding operations are parallelized.'''
     tasks: list[Task[tuple[int, str]]] = []
-    # loop = get_event_loop()
     
     # loop through the input/output mappings
     for mapping in path_mappings:
@@ -422,7 +408,6 @@ async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, thr
         
         # construct the command and add it to the task batch
         command = ffmpeg_mp3(source, dest, map_options=map_options)
-        # task = loop.create_task(run_command_async(command))
         task = asyncio.create_task(run_command_async(command))
         tasks.append(task)
         logging.debug(f"add task: {len(tasks)}")
@@ -430,7 +415,6 @@ async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, thr
         # run the full task batch
         if len(tasks) == threads:
             run_tasks = tasks.copy()
-            # loop.run_until_complete(collect_tasks(run_tasks))
             await asyncio.gather(*run_tasks)
             logging.debug(f"ran {len(run_tasks)} tasks")
             tasks.clear()
@@ -438,7 +422,6 @@ async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, thr
     # run any remaining tasks in the batch
     if tasks:
         run_tasks = tasks.copy()
-        # loop.run_until_complete(collect_tasks(run_tasks))
         await asyncio.gather(*run_tasks)
         logging.debug(f"ran {len(tasks)} tasks")
         tasks.clear()
@@ -450,6 +433,7 @@ def run_missing_art_tasks(loop: AbstractEventLoop, tasks: list[tuple[str, Task[t
     results: list[str] = []
     run_tasks = [task[1] for task in tasks]
     loop.run_until_complete(collect_tasks(run_tasks))
+    # await asyncio.gather(*run_tasks)
     logging.debug(f"ran {len(run_tasks)} tasks")
     
     for i, task in enumerate(run_tasks):
@@ -503,7 +487,7 @@ if __name__ == '__main__':
     script_args = parse_args(Namespace.FUNCTIONS)
     
     if script_args.function == Namespace.FUNCTION_LOSSLESS:
-        encode_lossless_cli(script_args)
+        asyncio.run(encode_lossless_cli(script_args))
     elif script_args.function == Namespace.FUNCTION_LOSSY:
         asyncio.run(encode_lossy_cli(script_args))
     elif script_args.function == Namespace.FUNCTION_MISSING_ART:

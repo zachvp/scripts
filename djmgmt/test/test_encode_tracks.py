@@ -10,26 +10,24 @@ from src import encode_tracks
 MOCK_INPUT = '/mock/input'
 MOCK_OUTPUT = '/mock/output'
 
-class TestEncodeLossless(unittest.TestCase):    
+class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):    
     @patch('os.path.getsize')
     @patch('builtins.open')
-    @patch('subprocess.run')
     @patch('src.encode_tracks.ffmpeg_standardize')
     @patch('src.encode_tracks.check_skip_bit_depth')
     @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
     @patch('builtins.input')
     @patch('src.encode_tracks.setup_storage')
-    def test_success_required_arguments(self,
-                                        mock_setup_storage: MagicMock,
-                                        mock_input: MagicMock,
-                                        mock_walk: MagicMock,
-                                        mock_skip_sample_rate: MagicMock,
-                                        mock_skip_bit_depth: MagicMock,
-                                        mock_standardize: MagicMock,
-                                        mock_run: MagicMock,
-                                        mock_open: MagicMock,
-                                        mock_get_size: MagicMock) -> None:
+    async def test_success_required_arguments(self,
+                                              mock_setup_storage: MagicMock,
+                                              mock_input: MagicMock,
+                                              mock_walk: MagicMock,
+                                              mock_skip_sample_rate: MagicMock,
+                                              mock_skip_bit_depth: MagicMock,
+                                              mock_standardize: MagicMock,
+                                              mock_open: MagicMock,
+                                              mock_get_size: MagicMock) -> None:
         '''Tests that core dependent calls are made with expected parameters with only positional arguments given.'''
         # Setup mocks
         mock_walk.return_value = [(MOCK_INPUT, [], ['file_0.aif', 'file_1.wav'])]
@@ -37,7 +35,7 @@ class TestEncodeLossless(unittest.TestCase):
         mock_skip_sample_rate.return_value = False
         
         # Call target function, encoding to AIFF
-        actual = encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff')
+        actual = await encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff')
         
         # Assert that methods depending on optional arguments are not called.
         mock_setup_storage.assert_not_called()
@@ -78,30 +76,24 @@ class TestEncodeLossless(unittest.TestCase):
     @patch('builtins.input')
     @patch('src.encode_tracks.setup_storage')
     @patch('src.encode_tracks.run_command_async')
-    @patch('src.encode_tracks.collect_tasks')
-    @patch('src.encode_tracks.get_event_loop')
-    def test_success_async_single_batch(self,
-                                        mock_get_event_loop: MagicMock,
-                                        mock_collect_tasks: AsyncMock,
-                                        mock_run_command_async: AsyncMock,
-                                        mock_setup_storage: MagicMock,
-                                        mock_input: MagicMock,
-                                        mock_walk: MagicMock,
-                                        mock_skip_sample_rate: MagicMock,
-                                        mock_skip_bit_depth: MagicMock,
-                                        mock_standardize: MagicMock,
-                                        mock_open: MagicMock,
-                                        mock_get_size: MagicMock) -> None:
+    async def test_success_async_single_batch(self,
+                                              mock_run_command_async: AsyncMock,
+                                              mock_setup_storage: MagicMock,
+                                              mock_input: MagicMock,
+                                              mock_walk: MagicMock,
+                                              mock_skip_sample_rate: MagicMock,
+                                              mock_skip_bit_depth: MagicMock,
+                                              mock_standardize: MagicMock,
+                                              mock_open: MagicMock,
+                                              mock_get_size: MagicMock) -> None:
         '''Tests that a single file can be processed asynchrounously.'''
         # Set up mocks
         mock_walk.return_value = [(MOCK_INPUT, [], ['file_0.aif'])]
         mock_skip_bit_depth.return_value = False
         mock_skip_sample_rate.return_value = False
-        mock_loop = MagicMock()
-        mock_get_event_loop.return_value = mock_loop
         
         # Call target function, encoding to AIFF
-        actual = encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff')
+        actual = await encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff')
         
         # Assert that methods depending on optional arguments are not called.
         mock_setup_storage.assert_not_called()
@@ -129,10 +121,6 @@ class TestEncodeLossless(unittest.TestCase):
         ])
         
         # Async expectations
-        mock_get_event_loop.assert_called_once()
-        mock_loop.create_task.assert_called_once()
-        mock_loop.run_until_complete.assert_called_once()
-        mock_collect_tasks.assert_called_once()
         mock_run_command_async.assert_called_once()
         
     @patch('os.path.getsize')
@@ -144,30 +132,24 @@ class TestEncodeLossless(unittest.TestCase):
     @patch('builtins.input')
     @patch('src.encode_tracks.setup_storage')
     @patch('src.encode_tracks.run_command_async')
-    @patch('src.encode_tracks.collect_tasks')
-    @patch('src.encode_tracks.get_event_loop')
-    def test_success_async_multiple_batches(self,
-                                            mock_get_event_loop: MagicMock,
-                                            mock_collect_tasks: AsyncMock,
-                                            mock_run_command_async: AsyncMock,
-                                            mock_setup_storage: MagicMock,
-                                            mock_input: MagicMock,
-                                            mock_walk: MagicMock,
-                                            mock_skip_sample_rate: MagicMock,
-                                            mock_skip_bit_depth: MagicMock,
-                                            mock_standardize: MagicMock,
-                                            mock_open: MagicMock,
-                                            mock_get_size: MagicMock) -> None:
+    async def test_success_async_multiple_batches(self,
+                                                  mock_run_command_async: AsyncMock,
+                                                  mock_setup_storage: MagicMock,
+                                                  mock_input: MagicMock,
+                                                  mock_walk: MagicMock,
+                                                  mock_skip_sample_rate: MagicMock,
+                                                  mock_skip_bit_depth: MagicMock,
+                                                  mock_standardize: MagicMock,
+                                                  mock_open: MagicMock,
+                                                  mock_get_size: MagicMock) -> None:
         '''Test that an amount of files exceeding the expected thread count (4) processes all files.'''
         # Set up mocks
         mock_walk.return_value = [(MOCK_INPUT, [], [f"file_{i}.aif" for i in range(5)])]
         mock_skip_bit_depth.return_value = False
         mock_skip_sample_rate.return_value = False
-        mock_loop = MagicMock()
-        mock_get_event_loop.return_value = mock_loop
         
         # Call target function, encoding to AIFF
-        actual = encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff')
+        actual = await encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff')
         
         # Assert that methods depending on optional arguments are not called.
         mock_setup_storage.assert_not_called()
@@ -195,35 +177,26 @@ class TestEncodeLossless(unittest.TestCase):
         ])
         
         # Async expectations
-        mock_get_event_loop.assert_called_once()
-        
         # One task and command should be created for each file
-        self.assertEqual(mock_loop.create_task.call_count, 5)
         self.assertEqual(mock_run_command_async.call_count, 5)
-        
-        # Two batches are expected to run
-        self.assertEqual(mock_loop.run_until_complete.call_count, 2)
-        self.assertEqual(mock_collect_tasks.call_count, 2)
     
     @patch('os.path.getsize')
     @patch('builtins.open')
-    @patch('subprocess.run')
     @patch('src.encode_tracks.ffmpeg_standardize')
     @patch('src.encode_tracks.check_skip_bit_depth')
     @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
     @patch('builtins.input')
     @patch('src.encode_tracks.setup_storage')
-    def test_success_optional_store_path(self,
-                                         mock_setup_storage: MagicMock,
-                                         mock_input: MagicMock,
-                                         mock_walk: MagicMock,
-                                         mock_skip_sample_rate: MagicMock,
-                                         mock_skip_bit_depth: MagicMock,
-                                         mock_standardize: MagicMock,
-                                         mock_run: MagicMock,
-                                         mock_open: MagicMock,
-                                         mock_get_size: MagicMock) -> None:
+    async def test_success_optional_store_path(self,
+                                               mock_setup_storage: MagicMock,
+                                               mock_input: MagicMock,
+                                               mock_walk: MagicMock,
+                                               mock_skip_sample_rate: MagicMock,
+                                               mock_skip_bit_depth: MagicMock,
+                                               mock_standardize: MagicMock,
+                                               mock_open: MagicMock,
+                                               mock_get_size: MagicMock) -> None:
         '''Tests that passing the optional store_path argument succeeds.'''
         # Setup mocks
         mock_walk.return_value = [(MOCK_INPUT, [], ['file_0.aif', 'file_1.wav'])]
@@ -231,7 +204,7 @@ class TestEncodeLossless(unittest.TestCase):
         mock_skip_sample_rate.return_value = False
         
         # Call target function, encoding to AIFF
-        actual = encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff', store_path='/mock/store/path')
+        actual = await encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff', store_path='/mock/store/path')
         
         # Assert that storage is set up once and opened to write each file and the cumulative file size.
         mock_setup_storage.assert_called_once()
@@ -250,23 +223,21 @@ class TestEncodeLossless(unittest.TestCase):
         
     @patch('os.path.getsize')
     @patch('builtins.open')
-    @patch('subprocess.run')
     @patch('src.encode_tracks.ffmpeg_standardize')
     @patch('src.encode_tracks.check_skip_bit_depth')
     @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
     @patch('builtins.input')
     @patch('src.encode_tracks.setup_storage')
-    def test_success_optional_store_skipped(self,
-                                            mock_setup_storage: MagicMock,
-                                            mock_input: MagicMock,
-                                            mock_walk: MagicMock,
-                                            mock_skip_sample_rate: MagicMock,
-                                            mock_skip_bit_depth: MagicMock,
-                                            mock_standardize: MagicMock,
-                                            mock_run: MagicMock,
-                                            mock_open: MagicMock,
-                                            mock_get_size: MagicMock) -> None:
+    async def test_success_optional_store_skipped(self,
+                                                  mock_setup_storage: MagicMock,
+                                                  mock_input: MagicMock,
+                                                  mock_walk: MagicMock,
+                                                  mock_skip_sample_rate: MagicMock,
+                                                  mock_skip_bit_depth: MagicMock,
+                                                  mock_standardize: MagicMock,
+                                                  mock_open: MagicMock,
+                                                  mock_get_size: MagicMock) -> None:
         '''Tests that passing the optional store_skipped argument succeeds.'''
         # Setup mocks
         mock_walk.return_value = [(MOCK_INPUT, [], ['file_0.aif', 'file_1.aiff'])]
@@ -276,7 +247,7 @@ class TestEncodeLossless(unittest.TestCase):
         mock_skip_sample_rate.return_value = [False, True]
         
         # Call target function, encoding to AIFF
-        actual = encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff', store_path='/mock/store/path', store_skipped=True)
+        actual = await encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff', store_path='/mock/store/path', store_skipped=True)
         
         # Assert that storage is set up twice and opened to write each file and the cumulative file size.
         self.assertEqual(mock_setup_storage.call_count, 2)
@@ -294,23 +265,21 @@ class TestEncodeLossless(unittest.TestCase):
         
     @patch('os.path.getsize')
     @patch('builtins.open')
-    @patch('subprocess.run')
     @patch('src.encode_tracks.ffmpeg_standardize')
     @patch('src.encode_tracks.check_skip_bit_depth')
     @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
     @patch('builtins.input')
     @patch('src.encode_tracks.setup_storage')
-    def test_success_optional_interactive(self,
-                                          mock_setup_storage: MagicMock,
-                                          mock_input: MagicMock,
-                                          mock_walk: MagicMock,
-                                          mock_skip_sample_rate: MagicMock,
-                                          mock_skip_bit_depth: MagicMock,
-                                          mock_standardize: MagicMock,
-                                          mock_run: MagicMock,
-                                          mock_open: MagicMock,
-                                          mock_get_size: MagicMock) -> None:
+    async def test_success_optional_interactive(self,
+                                                mock_setup_storage: MagicMock,
+                                                mock_input: MagicMock,
+                                                mock_walk: MagicMock,
+                                                mock_skip_sample_rate: MagicMock,
+                                                mock_skip_bit_depth: MagicMock,
+                                                mock_standardize: MagicMock,
+                                                mock_open: MagicMock,
+                                                mock_get_size: MagicMock) -> None:
         '''Tests that passing the optional interactive argument suceeds.'''
         # Setup mocks
         mock_walk.return_value = [(MOCK_INPUT, [], ['file_0.aif', 'file_1.wav'])]
@@ -319,7 +288,7 @@ class TestEncodeLossless(unittest.TestCase):
         mock_input.return_value = 'y' # Mock user confirmation
         
         # Call target function, encoding to AIFF
-        actual = encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff', interactive=True)
+        actual = await encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff', interactive=True)
         
         # Ensure the argument does not disrupt other expected/unexpected calls
         mock_setup_storage.assert_not_called
@@ -345,16 +314,16 @@ class TestEncodeLossless(unittest.TestCase):
     @patch('os.walk')
     @patch('builtins.input')
     @patch('src.encode_tracks.setup_storage')
-    def test_success_unsupported_files(self,
-                                      mock_setup_storage: MagicMock,
-                                      mock_input: MagicMock,
-                                      mock_walk: MagicMock,
-                                      mock_skip_sample_rate: MagicMock,
-                                      mock_skip_bit_depth: MagicMock,
-                                      mock_standardize: MagicMock,
-                                      mock_run: MagicMock,
-                                      mock_open: MagicMock,
-                                      mock_get_size: MagicMock) -> None:
+    async def test_success_unsupported_files(self,
+                                             mock_setup_storage: MagicMock,
+                                             mock_input: MagicMock,
+                                             mock_walk: MagicMock,
+                                             mock_skip_sample_rate: MagicMock,
+                                             mock_skip_bit_depth: MagicMock,
+                                             mock_standardize: MagicMock,
+                                             mock_run: MagicMock,
+                                             mock_open: MagicMock,
+                                             mock_get_size: MagicMock) -> None:
         '''Tests that unsupported files are not processed.'''
         # Setup mocks
         mock_walk.return_value = [(MOCK_INPUT, [], ['file_0.foo', 'file_1.flac', 'file_2.jpg'])]
@@ -362,7 +331,7 @@ class TestEncodeLossless(unittest.TestCase):
         mock_skip_sample_rate.return_value = False
         
         # Call target function, encoding to AIFF
-        actual = encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff')
+        actual = await encode_tracks.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff')
         
         # Assert expected calls
         mock_walk.assert_called_once_with(MOCK_INPUT)
@@ -381,16 +350,18 @@ class TestEncodeLossless(unittest.TestCase):
         self.assertEqual(actual, [])
     
     @patch('src.encode_tracks.encode_lossless')
-    def test_success_cli(self, mock_encode: MagicMock) -> None:
+    async def test_success_cli(self, mock_encode: MagicMock) -> None:
         '''Tests that the CLI wrapper function calls the expected core function with appropriate arguments.'''
         # Call target function
-        args = Namespace(input='/mock/input',
-                         output='/mock/output',
-                         extension='mock_ext',
-                         store_path='/mock/store/path',
-                         store_skipped=True,
-                         interactive=False)
-        encode_tracks.encode_lossless_cli(args) # type: ignore
+        args = encode_tracks.Namespace(input='/mock/input',
+                                       output='/mock/output',
+                                       extension='mock_ext',
+                                       store_path='/mock/store/path',
+                                       store_skipped=True,
+                                       interactive=False)
+        args = cast(type[encode_tracks.Namespace], args)
+        await encode_tracks.encode_lossless_cli(args)
+        
         # Assert that the existing arguments are passed properly
         expected_args = (args.input,
                          args.output,
