@@ -1,4 +1,5 @@
 # Next steps
+## Development
 1. Re-sync outdated files:
     * determine file path pairs with changed metadata (DJ lib path, lossy lib path)
     * extract all date contexts from lossy lib paths
@@ -9,3 +10,6 @@
 5. Check if existing playlist has any previously played tracks
 6. Read Rekordbox DB for unassigned Tags in _pruned
 7. Use GitHub for project management
+
+## Library remediation
+1. Refactor genres: Move House/Techno to Techno/
