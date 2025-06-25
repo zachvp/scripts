@@ -172,6 +172,7 @@ def setup_storage(dir_path: str, filename: str) -> str:
     return store_path
 
 def run_command(command: list[str]) -> tuple[int, str]:
+    '''Run the given command synchronously as a subprocess. Returns subprocess return code and stdout/stderr.'''
     try:
         logging.debug(f"run command: {shlex.join(command)}")
         result = subprocess.run(command, check=True, capture_output=True, encoding='utf-8')
@@ -182,17 +183,16 @@ def run_command(command: list[str]) -> tuple[int, str]:
         return (error.returncode, error.stderr.strip())
 
 def get_event_loop() -> AbstractEventLoop:
-    # Get or create the current loop
+    '''Get or create the current async event loop.'''
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError as e:
-        logging.info(f"no running loop, creating new one\n{e}")
         loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
+        logging.info('no running loop, created new one')
     return loop
 
 async def run_command_async(command: list[str]) -> tuple[int, str]:
+    '''Run the given command asynchronously as a subprocess. Returns subprocess return code and stdout/stderr.'''
     logging.debug(f"run command: {shlex.join(command)}")
     process = await asyncio.create_subprocess_shell(
         shlex.join(command),

@@ -78,7 +78,7 @@ class TestEncodeLossless(unittest.TestCase):
     @patch('src.encode_tracks.setup_storage')
     @patch('src.encode_tracks.run_command_async')
     @patch('src.encode_tracks.collect_tasks')
-    @patch('asyncio.get_event_loop')
+    @patch('src.encode_tracks.get_event_loop')
     def test_success_async_single_batch(self,
                                         mock_get_event_loop: MagicMock,
                                         mock_collect_tasks: AsyncMock,
@@ -144,7 +144,7 @@ class TestEncodeLossless(unittest.TestCase):
     @patch('src.encode_tracks.setup_storage')
     @patch('src.encode_tracks.run_command_async')
     @patch('src.encode_tracks.collect_tasks')
-    @patch('asyncio.get_event_loop')
+    @patch('src.encode_tracks.get_event_loop')
     def test_success_async_multiple_batches(self,
                                             mock_get_event_loop: MagicMock,
                                             mock_collect_tasks: AsyncMock,
@@ -407,7 +407,7 @@ class TestEncodeLossy(unittest.TestCase):
     @patch('src.encode_tracks.read_ffprobe_json')
     @patch('os.path.exists')
     @patch('os.makedirs')
-    @patch('asyncio.get_event_loop')
+    @patch('src.encode_tracks.get_event_loop')
     def test_success_required_arguments(self,
                                         mock_get_event_loop: MagicMock,
                                         mock_makedirs: MagicMock,
