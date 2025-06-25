@@ -134,11 +134,13 @@ class TestReadTags(unittest.TestCase):
         # Assert the image type was extracted to Tags instance
         self.assertIn(str(MOCK_IMAGE_TYPE), vars(actual).values())
         
-    def create_mock_tags(self, mock_data: bytes) -> MagicMock:
+    def create_mock_tags(self, mock_data: bytes, include_tags: bool = True) -> MagicMock:
         mock_tags = MagicMock()
         tags_data = {
             'mock_id3_apic': mutagen.id3.APIC(data=mock_data, type=MOCK_IMAGE_TYPE),
         }
+        if not include_tags:
+            tags_data = {}
         mock_tags.__contains__.side_effect = tags_data.__contains__
         mock_tags.__getitem__.side_effect = tags_data.__getitem__
         mock_tags.values.side_effect = tags_data.values
@@ -292,15 +294,18 @@ class TestReadTags(unittest.TestCase):
         mock_path = f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}"
 
         ## Mock the track file contents
-        mock_track = MockFLAC()
+        mock_track = MockFLAC(spec=mutagen.flac.FLAC)
         self.configure_mock_track(mock_track)
-        # Additional mock config for FLAC
+        
+        # Additional mock config for FLAC picture
         picture = mutagen.flac.Picture()
+        picture.data = mock_data
         picture.type = MOCK_IMAGE_TYPE
+        mock_track.metadata_blocks = []
         mock_track.add_picture(picture)
         
         ## Configure the mock mutagen tags
-        mock_tags = self.create_mock_tags(mock_data)
+        mock_tags = self.create_mock_tags(mock_data, include_tags=False)
         
         # Set the mock attributes
         mock_track.tags = mock_tags

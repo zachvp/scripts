@@ -112,10 +112,10 @@ def extract_cover_image(track: mutagen.FileType) -> Tuple[Optional[Image.Image],
     # extract image for FLAC files
     if image is None and isinstance(track, mutagen.flac.FLAC): # type: ignore
         if track.pictures:  # type: ignore
-            pic = track.pictures[0] # type: ignore
-            data = pic.data
+            picture = track.pictures[0] # type: ignore
+            data = picture.data
             # standardize the type
-            image_type = str(mutagen.id3.PictureType(pic.type))
+            image_type = str(mutagen.id3.PictureType(picture.type))
     
     # Load the image data
     if data:     
