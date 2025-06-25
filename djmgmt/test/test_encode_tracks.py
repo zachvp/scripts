@@ -1,5 +1,6 @@
 import unittest
 import os
+import asyncio
 from unittest.mock import patch, MagicMock, call, AsyncMock
 from argparse import Namespace
 from typing import cast
@@ -350,7 +351,7 @@ class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(actual, [])
     
     @patch('src.encode_tracks.encode_lossless')
-    async def test_success_cli(self, mock_encode: MagicMock) -> None:
+    def test_success_cli(self, mock_encode: MagicMock) -> None:
         '''Tests that the CLI wrapper function calls the expected core function with appropriate arguments.'''
         # Call target function
         args = encode_tracks.Namespace(input='/mock/input',
@@ -360,7 +361,7 @@ class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):
                                        store_skipped=True,
                                        interactive=False)
         args = cast(type[encode_tracks.Namespace], args)
-        await encode_tracks.encode_lossless_cli(args)
+        encode_tracks.encode_lossless_cli(args)
         
         # Assert that the existing arguments are passed properly
         expected_args = (args.input,
@@ -407,7 +408,7 @@ class TestEncodeLossy(unittest.IsolatedAsyncioTestCase):
     @patch('src.encode_tracks.encode_lossy')
     @patch('src.common.add_output_path')
     @patch('src.common.collect_paths')
-    async def test_success_cli(self,
+    def test_success_cli(self,
                          mock_collect_paths: MagicMock,
                          mock_add_output_path: MagicMock,
                          mock_encode_lossy: MagicMock) -> None:
@@ -416,7 +417,7 @@ class TestEncodeLossy(unittest.IsolatedAsyncioTestCase):
         args = encode_tracks.Namespace(input=MOCK_INPUT, output=MOCK_OUTPUT, extension='.mp3')
         args = cast(type[encode_tracks.Namespace], args)
         
-        await encode_tracks.encode_lossy_cli(args)
+        encode_tracks.encode_lossy_cli(args)
         
         # Assert expectations
         mock_collect_paths.assert_called_once_with(args.input)

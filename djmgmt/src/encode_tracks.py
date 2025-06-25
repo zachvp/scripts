@@ -212,8 +212,13 @@ async def run_command_async(command: list[str]) -> tuple[int, str]:
         return (process.returncode, stderr)
 
 # primary functions
-async def encode_lossless_cli(args: type[Namespace]) -> list[tuple[str, str]]:
-    result = await encode_lossless(args.input, args.output, args.extension, args.store_path, args.store_skipped, args.interactive)
+def encode_lossless_cli(args: type[Namespace]) -> list[tuple[str, str]]:
+    result = asyncio.run(encode_lossless(args.input,
+                                         args.output,
+                                         args.extension,
+                                         args.store_path,
+                                         args.store_skipped,
+                                         args.interactive))
     return result
 
 # TODO: add support for FLAC
@@ -369,11 +374,11 @@ async def encode_lossless(input_dir: str,
     
     return processed_files
 
-async def encode_lossy_cli(args: type[Namespace]) -> None:
+def encode_lossy_cli(args: type[Namespace]) -> None:
     '''Parse each path mapping entry into an encoding operation.'''
     path_mappings = common.collect_paths(args.input)
     path_mappings = common.add_output_path(args.output, path_mappings, args.input)
-    await encode_lossy(path_mappings, args.extension)
+    asyncio.run(encode_lossy(path_mappings, args.extension))
 
 async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4) -> None:
     '''Encodes the given input, output mappings in lossy format with the given extension. Uses FFMPEG as backend.
@@ -488,9 +493,9 @@ if __name__ == '__main__':
     script_args = parse_args(Namespace.FUNCTIONS)
     
     if script_args.function == Namespace.FUNCTION_LOSSLESS:
-        asyncio.run(encode_lossless_cli(script_args))
+        encode_lossless_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_LOSSY:
-        asyncio.run(encode_lossy_cli(script_args))
+        encode_lossy_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_MISSING_ART:
         # TODO: add timing
         coroutine = find_missing_art(script_args.input, constants.XPATH_COLLECTION, constants.XPATH_PRUNED, threads=72)
