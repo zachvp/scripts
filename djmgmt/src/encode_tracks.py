@@ -181,6 +181,17 @@ def run_command(command: list[str]) -> tuple[int, str]:
         logging.error(f"return code '{error.returncode}':\n{error.stderr}".strip())
         return (error.returncode, error.stderr.strip())
 
+def get_event_loop() -> AbstractEventLoop:
+    # Get or create the current loop
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError as e:
+        logging.info(f"no running loop, creating new one\n{e}")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop
+
 async def run_command_async(command: list[str]) -> tuple[int, str]:
     logging.debug(f"run command: {shlex.join(command)}")
     process = await asyncio.create_subprocess_shell(
@@ -245,7 +256,7 @@ def encode_lossless(input_dir: str,
     processed_files: list[tuple[str, str]] = []
     size_diff_sum = 0.0
     tasks: list[tuple[str, str, Task[tuple[int, str]]]] = []
-    loop = asyncio.get_event_loop()
+    loop = get_event_loop()
 
     # set up storage
     store_path_size_diff: str | None = None
@@ -377,7 +388,7 @@ def encode_lossy_cli(args: type[Namespace]) -> None:
 
 def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4) -> None:
     tasks: list[Task[tuple[int, str]]] = []
-    loop = asyncio.get_event_loop()
+    loop = get_event_loop()
     
     for mapping in path_mappings:
         source, dest = mapping[0], mapping[1]
@@ -454,7 +465,7 @@ def find_missing_art(collection_file_path: str, collection_xpath: str, playlist_
     tasks: list[tuple[str, Task[tuple[int, str]]]] = []
     playlist_ids: set[str] = { track.attrib[constants.ATTR_TRACK_KEY] for track in playlist }
     
-    loop = asyncio.get_event_loop()
+    loop = get_event_loop()
     for node in collection:
         # check if node is in playlist
         source = library.collection_path_to_syspath(node.attrib[constants.ATTR_PATH])
