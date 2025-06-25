@@ -335,35 +335,18 @@ class TestReadTags(unittest.TestCase):
 
     @patch('src.common_tags.get_track_key')
     @patch('mutagen.File')
-    def test_success(self,
-                     mock_file_constructor: MagicMock,
-                     mock_get_track_key: MagicMock) -> None:
+    def test_success_no_cover_image(self,
+                                    mock_file_constructor: MagicMock,
+                                    mock_get_track_key: MagicMock) -> None:
         '''Tests that the existing and new tags are properly read from a track when they're all present.'''
         # Set up mocks
-        ## Mock the file contents
-        mock_title_key = 'mock_title_key'
-        mock_artist_key = 'mock_artist_key'
-        mock_album_key = 'mock_album_key'
-        mock_genre_key = 'mock_genre_key'
-        mock_music_key = 'mock_music_key'
-        
         mock_filename = 'mock_file.mp3'
-
         mock_file = MagicMock()
-        data = {
-            mock_title_key: MOCK_TITLE,
-            mock_artist_key: MOCK_ARTIST,
-            mock_album_key: MOCK_ALBUM,
-            mock_genre_key: MOCK_GENRE,
-            mock_music_key: MOCK_MUSIC_KEY,
-        }
-        mock_file.__contains__.side_effect = data.__contains__
-        mock_file.__getitem__.side_effect = data.__getitem__
-        mock_file.tags = MagicMock()
+        self.configure_mock_track(mock_file)
         mock_file_constructor.return_value = mock_file
         
         ## Mock get track key
-        mock_get_track_key.side_effect = [ mock_title_key, mock_artist_key, mock_album_key, mock_genre_key, mock_music_key]
+        mock_get_track_key.side_effect = [ MOCK_TITLE_KEY, MOCK_ARTIST_KEY, MOCK_ALBUM_KEY, MOCK_GENRE_KEY, MOCK_MUSIC_KEY]
         
         # Call target function
         actual = common_tags.read_tags(f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}")
