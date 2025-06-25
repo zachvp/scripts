@@ -193,13 +193,14 @@ def get_event_loop() -> AbstractEventLoop:
 
 async def run_command_async(command: list[str]) -> tuple[int, str]:
     '''Run the given command asynchronously as a subprocess. Returns subprocess return code and stdout/stderr.'''
-    logging.debug(f"run command: {shlex.join(command)}")
+    # create the async shell process
+    logging.debug(f"run async command: {shlex.join(command)}")
     process = await asyncio.create_subprocess_shell(
         shlex.join(command),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE)
     
-    # wait for process to finish
+    # wait for process to finish and handle result
     stdout, stderr = await process.communicate()
     if process.returncode is None:
         raise RuntimeError(f"process has return code 'None'.")
@@ -220,6 +221,7 @@ async def run_command_async(command: list[str]) -> tuple[int, str]:
         return (process.returncode, stderr)
 
 async def collect_tasks(tasks: list[Task]) -> list[Future]:
+    '''Gathers the given tasks for async processing.'''
     return await asyncio.gather(*tasks)
 
 # primary functions
@@ -387,6 +389,8 @@ def encode_lossy_cli(args: type[Namespace]) -> None:
     return encode_lossy(path_mappings, args.extension)
 
 def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4) -> None:
+    '''Encodes the given source, output mappings in lossy format with the given extension. Uses FFMPEG as backend.
+    Encoding operations are parallelized.'''
     tasks: list[Task[tuple[int, str]]] = []
     loop = get_event_loop()
     
@@ -413,10 +417,6 @@ def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: 
             logging.info(f"no cover image found for '{source}'")
             
         command = ffmpeg_mp3(source, dest, map_options=map_options)
-        
-        # run synchronous 
-        # run_command(command)
-        
         task = loop.create_task(run_command_async(command))
         tasks.append(task)
         logging.debug(f"add task: {len(tasks)}")
