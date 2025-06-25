@@ -59,7 +59,7 @@ class TestSweepMusic(unittest.TestCase):
                                   mock_move: MagicMock) -> None:
         '''Test that loose music files are swept.'''
         # Set up mocks
-        mock_filenames = [f"mock_file{ext}" for ext in batch_operations_music.EXTENSIONS]
+        mock_filenames = [f"mock_file{ext}" for ext in constants.EXTENSIONS]
         mock_walk.return_value = [(MOCK_INPUT_DIR, [], mock_filenames)]
         mock_path_exists.return_value = False
         mock_is_prefix_match.return_value = False
@@ -67,7 +67,7 @@ class TestSweepMusic(unittest.TestCase):
         # Call target function
         batch_operations_music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
                                      False,
-                                     batch_operations_music.EXTENSIONS,
+                                     constants.EXTENSIONS,
                                      batch_operations_music.PREFIX_HINTS)
         
         # Assert expectations
@@ -107,7 +107,7 @@ class TestSweepMusic(unittest.TestCase):
         # Call target function
         batch_operations_music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
                                      False,
-                                     batch_operations_music.EXTENSIONS,
+                                     constants.EXTENSIONS,
                                      batch_operations_music.PREFIX_HINTS)
         
         # Assert expectations
@@ -138,7 +138,7 @@ class TestSweepMusic(unittest.TestCase):
         # Call target function
         batch_operations_music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
                                      False,
-                                     batch_operations_music.EXTENSIONS,
+                                     constants.EXTENSIONS,
                                      batch_operations_music.PREFIX_HINTS)
         
         # Assert expectations
@@ -169,14 +169,14 @@ class TestSweepMusic(unittest.TestCase):
         
         # Mock archive content
         mock_archive = MagicMock()
-        mock_archive.namelist.return_value = [f"mock_file{ext}" for ext in batch_operations_music.EXTENSIONS]
+        mock_archive.namelist.return_value = [f"mock_file{ext}" for ext in constants.EXTENSIONS]
         mock_zipfile.return_value.__enter__.return_value = mock_archive
 
         # Call target function        
         batch_operations_music.sweep(MOCK_INPUT_DIR,
                                      MOCK_OUTPUT_DIR,
                                      False,
-                                     batch_operations_music.EXTENSIONS,
+                                     constants.EXTENSIONS,
                                      batch_operations_music.PREFIX_HINTS)
         
         # Assert expectations
@@ -207,7 +207,7 @@ class TestSweepMusic(unittest.TestCase):
         
         # Mock archive content
         mock_archive = MagicMock()
-        mock_archive.namelist.return_value =  [f"mock_file{ext}" for ext in batch_operations_music.EXTENSIONS]
+        mock_archive.namelist.return_value =  [f"mock_file{ext}" for ext in constants.EXTENSIONS]
         mock_archive.namelist.return_value += ['mock_cover.jpg']
         mock_zipfile.return_value.__enter__.return_value = mock_archive
 
@@ -215,7 +215,7 @@ class TestSweepMusic(unittest.TestCase):
         batch_operations_music.sweep(MOCK_INPUT_DIR,
                                      MOCK_OUTPUT_DIR,
                                      False,
-                                     batch_operations_music.EXTENSIONS,
+                                     constants.EXTENSIONS,
                                      batch_operations_music.PREFIX_HINTS)
         
         # Assert expectations
@@ -293,7 +293,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', batch_operations_music.EXTENSIONS, False)
+        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_called_once_with('/mock/source/mock_file.foo')
@@ -314,7 +314,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', batch_operations_music.EXTENSIONS, False)
+        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_not_called()
@@ -336,7 +336,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', batch_operations_music.EXTENSIONS, False)
+        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_not_called()
@@ -358,7 +358,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', batch_operations_music.EXTENSIONS, False)
+        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_called_once_with('/mock/source/mock/dir/0/mock_music.foo')
@@ -379,7 +379,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', batch_operations_music.EXTENSIONS, False)
+        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_called_once_with('/mock/source/.mock_hidden')
@@ -400,7 +400,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', batch_operations_music.EXTENSIONS, False)
+        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_called_once_with('/mock/source/mock.zip')
@@ -421,7 +421,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', batch_operations_music.EXTENSIONS, False)
+        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_not_called()
@@ -443,7 +443,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', batch_operations_music.EXTENSIONS, False)
+        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_not_called()
@@ -465,7 +465,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', batch_operations_music.EXTENSIONS, False)
+        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_called_once_with('/mock/source/.mock_hidden_dir/mock.foo')
@@ -503,7 +503,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_input.return_value = 'N'
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', batch_operations_music.EXTENSIONS, True)
+        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, True)
         
         mock_os_walk.assert_called()
         mock_input.assert_called()
@@ -528,7 +528,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_input.return_value = 'y'
         
         # Call target function and assert expectations        
-        batch_operations_music.prune_non_music('/mock/source/', batch_operations_music.EXTENSIONS, True)
+        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, True)
         
         mock_os_walk.assert_called()
         mock_input.assert_called()
