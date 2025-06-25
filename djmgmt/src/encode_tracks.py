@@ -10,7 +10,7 @@ import shlex
 import logging
 import sys
 import asyncio
-from asyncio import Task, Future, AbstractEventLoop
+from asyncio import Task
 from typing import Any
 
 from . import common
@@ -427,31 +427,33 @@ async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, thr
         tasks.clear()
     logging.info('finished lossy encoding')
 
-def run_missing_art_tasks(loop: AbstractEventLoop, tasks: list[tuple[str, Task[tuple[int, str]]]]) -> list[str]:
+async def run_missing_art_tasks(tasks: list[tuple[str, Task[tuple[int, str]]]]) -> list[str]:
     import json
     
     results: list[str] = []
     run_tasks = [task[1] for task in tasks]
-    loop.run_until_complete(collect_tasks(run_tasks))
-    # await asyncio.gather(*run_tasks)
+    await asyncio.gather(*run_tasks)
     logging.debug(f"ran {len(run_tasks)} tasks")
     
     for i, task in enumerate(run_tasks):
         source = tasks[i][0]
-        output = json.loads(task.result()[1])['streams']    
-        cover_stream = guess_cover_stream_specifier(output)
-    
-        if cover_stream > -1:
-            logging.info(f"guessed cover image in stream: {cover_stream}")
-        elif cover_stream == -2:
-            logging.info(f"found potential placeholder cover for '{source}'")
+        code, output = task.result()
+        if code == 0:
+            output = json.loads(output)['streams']
+            cover_stream = guess_cover_stream_specifier(output)
+            if cover_stream > -1:
+                logging.info(f"guessed cover image in stream: {cover_stream}")
+            elif cover_stream == -2:
+                logging.info(f"found potential placeholder cover for '{source}'")
+            else:
+                logging.info(f"no cover image found for '{source}'")
+                results.append(source)
         else:
-            logging.info(f"no cover image found for '{source}'")
-            results.append(source)
+            logging.error(f"unable to determine missing art for '{source}':\n{output}")
     return results
 
-def find_missing_art(collection_file_path: str, collection_xpath: str, playlist_xpath: str, threads=24) -> list[str]:
-    import organize_library_dates as library
+async def find_missing_art(collection_file_path: str, collection_xpath: str, playlist_xpath: str, threads=24) -> list[str]:
+    from . import organize_library_dates as library
     
     tree = library.load_collection(collection_file_path)
     collection = library.find_node(tree, collection_xpath)
@@ -462,7 +464,6 @@ def find_missing_art(collection_file_path: str, collection_xpath: str, playlist_
     tasks: list[tuple[str, Task[tuple[int, str]]]] = []
     playlist_ids: set[str] = { track.attrib[constants.ATTR_TRACK_KEY] for track in playlist }
     
-    loop = get_event_loop()
     for node in collection:
         # check if node is in playlist
         source = library.collection_path_to_syspath(node.attrib[constants.ATTR_PATH])
@@ -470,15 +471,15 @@ def find_missing_art(collection_file_path: str, collection_xpath: str, playlist_
             logging.info(f"skip non-playlist track: '{source}'")
             continue
         
-        task = loop.create_task(run_command_async(command_ffprobe_json(source)))
+        task = asyncio.create_task(run_command_async(command_ffprobe_json(source)))
         tasks.append((source, task))
         logging.debug(f"add task: {len(tasks)}")
-        if len(tasks) > threads - 1:
-            missing += run_missing_art_tasks(loop, tasks)
+        if len(tasks) == threads:
+            missing += await run_missing_art_tasks(tasks)
             tasks.clear()
     
     # run remaining tasks
-    missing += run_missing_art_tasks(loop, tasks)
+    missing += await run_missing_art_tasks(tasks)
     return missing
 
 # Main
@@ -492,9 +493,8 @@ if __name__ == '__main__':
         asyncio.run(encode_lossy_cli(script_args))
     elif script_args.function == Namespace.FUNCTION_MISSING_ART:
         # TODO: add timing
-        # clear the output file
-        missing = find_missing_art(script_args.input, constants.XPATH_COLLECTION, constants.XPATH_PRUNED, threads=72)
-        missing = [f"{os.path.splitext(os.path.basename(m))[0]}\n" for m in missing]
-        missing.sort()
+        coroutine = find_missing_art(script_args.input, constants.XPATH_COLLECTION, constants.XPATH_PRUNED, threads=72)
+        missing = asyncio.run(coroutine)
+        missing = sorted([f"{os.path.splitext(os.path.basename(m))[0]}\n" for m in missing])
         with open(script_args.output, 'w', encoding='utf-8') as file:
             file.writelines(missing)
