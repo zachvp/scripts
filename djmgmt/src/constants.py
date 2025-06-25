@@ -48,3 +48,6 @@ ATTR_TRACK_ID = 'TrackID'
 REKORDBOX_ROOT = 'file://localhost'
 XPATH_COLLECTION = './/COLLECTION'
 XPATH_PRUNED = './PLAYLISTS//NODE[@Name="_pruned"]'
+
+# file information
+EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'}

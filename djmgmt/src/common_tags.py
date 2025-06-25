@@ -1,27 +1,37 @@
 import mutagen
 import logging
-from typing import Optional, Callable
+import io
+from PIL import Image
+from typing import Optional, Tuple
+
+import mutagen.flac
+import mutagen.id3
 
 class Tags:
     def __init__(self,
-                 artist: Optional[str]=None,
-                 album : Optional[str]=None,
-                 title : Optional[str]=None,
-                 genre : Optional[str]=None,
-                 key   : Optional[str]=None):
+                 artist          : Optional[str]=None,
+                 album           : Optional[str]=None,
+                 title           : Optional[str]=None,
+                 genre           : Optional[str]=None,
+                 key             : Optional[str]=None,
+                 cover_image     : Optional[Image.Image] = None,
+                 cover_image_str : Optional[str]=None):
         self.artist = artist
         self.album = album
         self.title = title
         self.genre = genre
         self.key = key
+        self.cover_image = cover_image
+        self.cover_image_str = cover_image_str
     
     def __str__(self) -> str:
         output = {
-            'artist': self.artist,
-            'album' : self.album,
-            'title' : self.title,
-            'genre' : self.genre,
-            'key'   : self.key
+            'artist'      : self.artist,
+            'album'       : self.album,
+            'title'       : self.title,
+            'genre'       : self.genre,
+            'key'         : self.key,
+            'cover_image' : self.cover_image_str
         }
         return str(output)
 
@@ -84,9 +94,38 @@ def get_track_key(track: mutagen.FileType, options: set[str]) -> Optional[str]:
 
 def extract_tag_value(track: mutagen.FileType, tag_keys: set[str]) -> Optional[str]:
     key = get_track_key(track, tag_keys)
-    value = str(track[key]) if key in track else None
+    value = str(track[key]) if key and key in track else None
 
     return value
+
+def extract_cover_image(track: mutagen.FileType) -> Tuple[Optional[Image.Image], Optional[str]]:
+    image: Optional[Image.Image] = None
+    image_type: Optional[str] = None
+    data = None
+    
+    # extract image for files with ID3 tags (MP3, AIFF, WAV)
+    for tag in track.tags.values(): # type: ignore
+        if isinstance(tag, mutagen.id3.APIC):
+            data = tag.data # type: ignore
+            image_type = str(tag.type) # type: ignore
+    
+    # extract image for FLAC files
+    if image is None and isinstance(track, mutagen.flac.FLAC): # type: ignore
+        if track.pictures:  # type: ignore
+            pic = track.pictures[0] # type: ignore
+            data = pic.data
+            # standardize the type
+            image_type = str(mutagen.id3.PictureType(pic.type))
+    
+    # Load the image data
+    if data:     
+        try:
+            image = Image.open(io.BytesIO(data))
+            image.load()
+        except Exception as e:
+            logging.warning(f"Invalid image data:\n{e}")
+    
+    return image, image_type
 
 def read_tags(path: str) -> Optional[Tags]:
     # define possible tag keys
@@ -112,6 +151,7 @@ def read_tags(path: str) -> Optional[Tags]:
     album = extract_tag_value(track, album_keys)
     genre = extract_tag_value(track, genre_keys)
     key = extract_tag_value(track, music_key_keys)
+    cover_image, cover_string = extract_cover_image(track)
     
     # failure if title and artist not present
     if title is None and artist is None:
@@ -122,7 +162,7 @@ def read_tags(path: str) -> Optional[Tags]:
     if artist is None or title is None:
         logging.warning(f"missing title or artist for '{path}'")
 
-    return Tags(artist, album, title, genre, key)
+    return Tags(artist, album, title, genre, key, cover_image, cover_string)
 
 def basic_identifier(title: str, artist: str) -> str:
     if not title:

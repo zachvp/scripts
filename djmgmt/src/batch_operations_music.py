@@ -25,10 +25,9 @@ from typing import cast
 from . import constants
 from . import common
 from . import encode_tracks
-from .common_tags import read_tags, basic_identifier
+from .common_tags import read_tags
 
 # constants
-EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'} # TODO: move to constants
 PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
 COLLECTION_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'processed-collection.xml')
 
@@ -238,7 +237,7 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
             name_split = os.path.splitext(name)
             
             # Only process music files
-            if name_split[1] in EXTENSIONS:
+            if name_split[1] in constants.EXTENSIONS:
                 file_url = f"file://localhost{quote(file_path, safe='()/')}"
                 
                 # Check if track already exists
@@ -570,7 +569,7 @@ if __name__ == '__main__':
     logging.info(f"will execute: '{script_args.function}'")
 
     if script_args.function == Namespace.FUNCTION_SWEEP:
-        sweep_cli(script_args, EXTENSIONS, PREFIX_HINTS)
+        sweep_cli(script_args, constants.EXTENSIONS, PREFIX_HINTS)
     elif script_args.function == Namespace.FUNCTION_FLATTEN:
         flatten_hierarchy_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_EXTRACT:
@@ -580,13 +579,13 @@ if __name__ == '__main__':
     elif script_args.function == Namespace.FUNCTION_PRUNE:
         prune_empty_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_PRUNE_NON_MUSIC:
-        prune_non_music_cli(script_args, EXTENSIONS)
+        prune_non_music_cli(script_args, constants.EXTENSIONS)
     elif script_args.function == Namespace.FUNCTION_PROCESS:
-        process_cli(script_args, EXTENSIONS, PREFIX_HINTS)
+        process_cli(script_args, constants.EXTENSIONS, PREFIX_HINTS)
     elif script_args.function == Namespace.FUNCTION_UPDATE_LIBRARY:
         update_library(script_args.input,
                        script_args.output,
                        script_args.client_mirror_path,
                        script_args.interactive,
-                       EXTENSIONS,
+                       constants.EXTENSIONS,
                        PREFIX_HINTS)

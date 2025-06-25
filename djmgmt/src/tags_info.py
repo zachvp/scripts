@@ -4,9 +4,10 @@ Uses a combination of audio file metadata to determine duplicates
 
 import os
 import argparse
-import common_tags
 import logging
 from typing import Callable
+
+from . import common_tags
 
 # command support
 class Namespace(argparse.Namespace):
