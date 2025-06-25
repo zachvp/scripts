@@ -382,31 +382,35 @@ def encode_lossless(input_dir: str,
     
     return processed_files
 
-def encode_lossy_cli(args: type[Namespace]) -> None:
+async def encode_lossy_cli(args: type[Namespace]) -> None:
     '''Parse each path mapping entry into an encoding operation.'''
     path_mappings = common.collect_paths(args.input)
     path_mappings = common.add_output_path(args.output, path_mappings, args.input)
-    return encode_lossy(path_mappings, args.extension)
+    await encode_lossy(path_mappings, args.extension)
 
-def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4) -> None:
-    '''Encodes the given source, output mappings in lossy format with the given extension. Uses FFMPEG as backend.
+async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4) -> None:
+    '''Encodes the given input, output mappings in lossy format with the given extension. Uses FFMPEG as backend.
     Encoding operations are parallelized.'''
     tasks: list[Task[tuple[int, str]]] = []
-    loop = get_event_loop()
+    # loop = get_event_loop()
     
+    # loop through the input/output mappings
     for mapping in path_mappings:
         source, dest = mapping[0], mapping[1]
         dest = os.path.splitext(dest)[0] + extension
         
+        # create the destination folders if needed
         dest_dir = os.path.dirname(dest)
         if not os.path.exists(dest_dir):
             logging.debug(f"create path: '{dest_dir}'")
             os.makedirs(dest_dir)
         
+        # skip existing files
         if os.path.exists(dest):
             logging.debug(f"path exists, skipping: '{dest}'")
             continue
         
+        # determine if the source file has a cover image
         ffprobe_data = read_ffprobe_json(source)
         cover_stream = guess_cover_stream_specifier(ffprobe_data)
         map_options = f"-map 0:0"
@@ -415,21 +419,30 @@ def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: 
             map_options += f" -map 0:{cover_stream}"
         else:
             logging.info(f"no cover image found for '{source}'")
-            
+        
+        # construct the command and add it to the task batch
         command = ffmpeg_mp3(source, dest, map_options=map_options)
-        task = loop.create_task(run_command_async(command))
+        # task = loop.create_task(run_command_async(command))
+        task = asyncio.create_task(run_command_async(command))
         tasks.append(task)
         logging.debug(f"add task: {len(tasks)}")
-        if len(tasks) > threads - 1:
+        
+        # run the full task batch
+        if len(tasks) == threads:
             run_tasks = tasks.copy()
-            loop.run_until_complete(collect_tasks(run_tasks))
+            # loop.run_until_complete(collect_tasks(run_tasks))
+            await asyncio.gather(*run_tasks)
             logging.debug(f"ran {len(run_tasks)} tasks")
             tasks.clear()
+    
+    # run any remaining tasks in the batch
     if tasks:
         run_tasks = tasks.copy()
-        loop.run_until_complete(collect_tasks(run_tasks))
+        # loop.run_until_complete(collect_tasks(run_tasks))
+        await asyncio.gather(*run_tasks)
         logging.debug(f"ran {len(tasks)} tasks")
         tasks.clear()
+    logging.info('finished lossy encoding')
 
 def run_missing_art_tasks(loop: AbstractEventLoop, tasks: list[tuple[str, Task[tuple[int, str]]]]) -> list[str]:
     import json
@@ -492,7 +505,7 @@ if __name__ == '__main__':
     if script_args.function == Namespace.FUNCTION_LOSSLESS:
         encode_lossless_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_LOSSY:
-        encode_lossy_cli(script_args)
+        asyncio.run(encode_lossy_cli(script_args))
     elif script_args.function == Namespace.FUNCTION_MISSING_ART:
         # TODO: add timing
         # clear the output file

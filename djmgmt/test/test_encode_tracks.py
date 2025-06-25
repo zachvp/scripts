@@ -2,6 +2,7 @@ import unittest
 import os
 from unittest.mock import patch, MagicMock, call, AsyncMock
 from argparse import Namespace
+from typing import cast
 
 from src import encode_tracks
 
@@ -399,64 +400,52 @@ class TestEncodeLossless(unittest.TestCase):
                          args.interactive)
         self.assertEqual(mock_encode.call_args[0][:6], expected_args)
 
-class TestEncodeLossy(unittest.TestCase):
+class TestEncodeLossy(unittest.IsolatedAsyncioTestCase):
     @patch('src.encode_tracks.run_command_async')
-    @patch('src.encode_tracks.collect_tasks')
     @patch('src.encode_tracks.ffmpeg_mp3')
     @patch('src.encode_tracks.guess_cover_stream_specifier')
     @patch('src.encode_tracks.read_ffprobe_json')
     @patch('os.path.exists')
     @patch('os.makedirs')
-    @patch('src.encode_tracks.get_event_loop')
-    def test_success_required_arguments(self,
-                                        mock_get_event_loop: MagicMock,
-                                        mock_makedirs: MagicMock,
-                                        mock_path_exists: MagicMock,
-                                        mock_read_ffprobe_json: MagicMock,
-                                        mock_guess_cover: MagicMock,
-                                        mock_ffmpeg_mp3: MagicMock,
-                                        mock_collect_tasks: AsyncMock,
-                                        mock_run_command_async: AsyncMock) -> None:
+    async def test_success_required_arguments(self,
+                                              mock_makedirs: MagicMock,
+                                              mock_path_exists: MagicMock,
+                                              mock_read_ffprobe_json: MagicMock,
+                                              mock_guess_cover: MagicMock,
+                                              mock_ffmpeg_mp3: MagicMock,
+                                              mock_run_command_async: AsyncMock) -> None:
         # Set up mocks
         mock_path_exists.return_value = False
         mock_guess_cover.return_value = -1
-        mock_loop = MagicMock()
-        mock_get_event_loop.return_value = mock_loop
         
         # Call target function
         SOURCE_FILE = f"{MOCK_INPUT}{os.sep}file_0.aiff"
         mappings = [(SOURCE_FILE, f"{MOCK_OUTPUT}{os.sep}file_0.aiff")]
-        encode_tracks.encode_lossy(mappings, '.mp3')
+        await encode_tracks.encode_lossy(mappings, '.mp3')
         
         # Assert expectations
-        mock_get_event_loop.assert_called_once()
-        
-        # Path does not exist, so expect makedirs to be called
+        ## Path does not exist, so expect makedirs to be called
         mock_makedirs.assert_called_once_with(MOCK_OUTPUT)
         
-        # Expect these calls once for the single mapping
+        ## Expect these calls once for the single mapping
         mock_read_ffprobe_json.assert_called_once_with(SOURCE_FILE)
         mock_guess_cover.assert_called_once_with(mock_read_ffprobe_json.return_value)
         mock_ffmpeg_mp3.assert_called_once_with(SOURCE_FILE, f"{MOCK_OUTPUT}{os.sep}file_0.mp3", map_options=f"-map 0:0")
-        mock_collect_tasks.assert_called_once()
         mock_run_command_async.assert_called_once()
-        
-        # Expect one task to be created and run
-        mock_loop.create_task.assert_called_once()
-        mock_loop.run_until_complete.assert_called_once()
-    
     
     @patch('src.encode_tracks.encode_lossy')
     @patch('src.common.add_output_path')
     @patch('src.common.collect_paths')
-    def test_success_cli(self,
+    async def test_success_cli(self,
                          mock_collect_paths: MagicMock,
                          mock_add_output_path: MagicMock,
                          mock_encode_lossy: MagicMock) -> None:
         
         # Call target function
-        args = Namespace(input=MOCK_INPUT, output=MOCK_OUTPUT, extension='.mp3')
-        encode_tracks.encode_lossy_cli(args) # type: ignore
+        args = encode_tracks.Namespace(input=MOCK_INPUT, output=MOCK_OUTPUT, extension='.mp3')
+        args = cast(type[encode_tracks.Namespace], args)
+        
+        await encode_tracks.encode_lossy_cli(args)
         
         # Assert expectations
         mock_collect_paths.assert_called_once_with(args.input)
