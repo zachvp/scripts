@@ -14,7 +14,7 @@ from src import common_tags
 from src.common_tags import Tags
 
 # Constants
-## Mock input arguments
+## Mock input arguments and values
 MOCK_INPUT_PATH = '/mock/input'
 MOCK_ARTIST = 'mock_artist'
 MOCK_ALBUM = 'mock_album'
@@ -23,6 +23,7 @@ MOCK_GENRE = 'mock_genre'
 MOCK_MUSIC_KEY = 'mock_music_key'
 MOCK_IMAGE = Image.new('RGB', (1, 1), color='white')
 MOCK_IMAGE_DESCRIPTION = 'mock_image_description'
+MOCK_DIFF = 'mock_diff'
 
 ## Mock tag data keys
 MOCK_TITLE_KEY = 'mock_title_key'
@@ -110,6 +111,72 @@ class TestTags(unittest.TestCase):
         self.assertIn(MOCK_GENRE, actual)
         self.assertIn(MOCK_MUSIC_KEY, actual)
         self.assertIn(MOCK_IMAGE_DESCRIPTION, actual)
+    
+    def test_success_eq(self) -> None:
+        '''Tests that two Tags instances with identical attributes are considered equal.'''
+        lhs = create_full_mock_tags()
+        rhs = create_full_mock_tags()
+        
+        self.assertEqual(lhs, rhs)
+        
+    def test_success_not_eq_artist(self) -> None:
+        '''Tests that two Tags instances with different artist attributes are considered unequal.'''
+        lhs = create_full_mock_tags()
+        rhs = create_full_mock_tags()
+        
+        rhs.artist = cast(str, rhs.artist)
+        rhs.artist += MOCK_DIFF
+        
+        self.assertNotEqual(lhs, rhs)
+        
+    def test_success_not_eq_album(self) -> None:
+        '''Tests that two Tags instances with different album attributes are considered unequal.'''
+        lhs = create_full_mock_tags()
+        rhs = create_full_mock_tags()
+        
+        rhs.album = cast(str, rhs.album)
+        rhs.album += MOCK_DIFF
+        
+        self.assertNotEqual(lhs, rhs)
+        
+    def test_success_not_eq_title(self) -> None:
+        '''Tests that two Tags instances with different title attributes are considered unequal.'''
+        lhs = create_full_mock_tags()
+        rhs = create_full_mock_tags()
+        
+        rhs.title = cast(str, rhs.title)
+        rhs.title += MOCK_DIFF
+        
+        self.assertNotEqual(lhs, rhs)
+        
+    def test_success_not_eq_genre(self) -> None:
+        '''Tests that two Tags instances with different genre attributes are considered unequal.'''
+        lhs = create_full_mock_tags()
+        rhs = create_full_mock_tags()
+        
+        rhs.genre = cast(str, rhs.genre)
+        rhs.genre += MOCK_DIFF
+        
+        self.assertNotEqual(lhs, rhs)
+    
+    def test_success_not_eq_key(self) -> None:
+        '''Tests that two Tags instances with different key attributes are considered unequal.'''
+        lhs = create_full_mock_tags()
+        rhs = create_full_mock_tags()
+        
+        rhs.key = cast(str, rhs.key)
+        rhs.key += MOCK_DIFF
+        
+        self.assertNotEqual(lhs, rhs)
+        
+    def test_success_not_eq_cover_image(self) -> None:
+        '''Tests that two Tags instances with different cover image attributes are considered unequal.'''
+        lhs = create_full_mock_tags()
+        rhs = create_full_mock_tags()
+        
+        rhs.cover_image = Image.new('RGB', (1, 1), color='black')
+        
+        self.assertNotEqual(lhs, rhs)
 
 class TestReadTags(unittest.TestCase):
     '''Tests for read_tags.'''
