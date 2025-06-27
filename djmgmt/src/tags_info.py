@@ -113,6 +113,7 @@ def compare_tags(source: str, comparison: str) -> list[str]:
         base_name = normalize_filename(comp_path)
         comparison_files[base_name] = comp_path
     
+    # compare the source paths present in the comparison directory
     for source_path in source_paths:
         base_name = normalize_filename(source_path)
         if base_name in comparison_files:
@@ -120,18 +121,15 @@ def compare_tags(source: str, comparison: str) -> list[str]:
             
             # Read tags from both files
             source_tags = common_tags.read_tags(source_path)
-            comp_tags = common_tags.read_tags(comp_path)
+            compare_tags = common_tags.read_tags(comp_path)
             
             # Skip if tags can't be read from either file
-            if not source_tags or not comp_tags:
-                logging.info(f"Unable to read tags from '{source_path}' or '{comp_path}'")
+            if not source_tags or not compare_tags:
+                logging.error(f"Unable to read tags from '{source_path}' or '{comp_path}'")
                 continue
             
             # Compare relevant tags (including genre); add to list if any differ
-            if (source_tags.artist != comp_tags.artist or
-                source_tags.album != comp_tags.album or
-                source_tags.title != comp_tags.title or
-                source_tags.genre != comp_tags.genre):
+            if source_tags != compare_tags:
                 changed_paths.append(os.path.abspath(source_path))
                 logging.info(f"Detected tag difference in '{source_path}'")
                 
