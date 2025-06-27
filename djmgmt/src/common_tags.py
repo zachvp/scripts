@@ -1,6 +1,7 @@
 import mutagen
 import logging
 import io
+import imagehash
 from PIL import Image
 from typing import Optional, Tuple
 
@@ -34,6 +35,42 @@ class Tags:
             'cover_image' : self.cover_image_str
         }
         return str(output)
+    
+    def cover_hash(self) -> Optional[imagehash.ImageHash]:
+        '''Computes and returns a perceptual hash for the cover image using imagehash.
+        Raises a ValueError and logs an error if hash generation fails.
+        '''
+        # unable to hash None value, so gracefully return
+        if self.cover_image is None:
+            return None
+        
+        try:
+            # attempt to return the perceptual hash of the cover image
+            return imagehash.phash(self.cover_image)
+        except Exception as e:
+            # handle and log any errors
+            logging.error(f"Error generating perceptual hash:\n{e}")
+            raise ValueError(f"Error generating perceptual hash: {e}")
+    
+    def compare_cover(self, other: 'Tags', threshold: int = 0) -> bool:
+        '''Compares the perceptual hash of this instance's cover image to that of another Tags instance.
+        Returns True if the images are similar according to the inclusive threshold, else False.
+        '''
+        try:
+            hash_self = self.cover_hash()
+            hash_other = other.cover_hash()
+        except ValueError as e:
+            # log the hash error
+            logging.error(f"Error comparing cover images due to hash generation failure:\n{e}.")
+            raise
+        
+        # handle None hashes: return True if both hashes are None
+        if hash_self is None or hash_other is None:
+            return hash_self is None and hash_other is None
+        
+        # compute the difference to judge similarity
+        difference = hash_self - hash_other
+        return difference <= threshold
 
 # DEV - Investigation
 relevant_keys = {'genre', 'beatgrid', 'TENC', 'TOAL', 'TCOM', 'TDRC', 'USLT::eng', 'initialkey', 'TIT1', 'TCOP', 'TBPM', 'TOPE', 'cuepoints', 'TDRL', 'TSSE', 'TDEN', 'TPOS', 'WPUB', 'TSRC', 'artist', 'energy', 'TPE1', 'album', 'WOAF', 'TFLT', 'TDTG', 'key', 'metadata_block_picture', 'TCMP', 'TCON', 'PCNT', 'TALB', 'TDOR', 'comment', 'title', 'TPE2', 'TPE4', 'energylevel', 'TPUB', 'tracknumber', 'TLEN', 'TIT2'}
@@ -174,51 +211,4 @@ def basic_identifier(title: str, artist: str) -> str:
 
 if __name__ == '__main__':
     # dev testing
-    paths = [
-        "/Users/user/Music/DJ/02 In All You See A Woman.aif",
-        "/Users/user/developer/test-private/tracks/03 - 暴風一族 (Remix).mp3",
-        "/Users/user/Music/DJ/Ferra Black - Vibra (Sera de Villalta Remix).wav"
-    ]
-    for p in paths:
-        dev_inspect_tags(p)
-        print()
-        
-    '''
-    Output:
-        {'TXXX:EnergyLevel': {'4'},
-        'TBPM': {'102'},
-        'TCON': {'zzz'},
-        'TDRC': {'2006'},
-        'TIT2': {'In All You See A Woman'},
-        'TPE1': {'Kathy Diamond'},
-        'TXXX:SERATO_PLAYCOUNT': {'0'},
-        'TALB': {'Miss Diamond To You'},
-        'COMM:iTunes_CDDB_TrackNumber:eng': {'2'},
-        'TRCK': {'2/14'},
-        'TPOS': {'1/1'},
-        'TKEY': {'1A'},
-        'RVA2:SeratoGain': {'Master volume: +0.0000 dB/0.0000'},
-        'COMM::eng': {'1A - 4'},
-        'COMM:iTunPGAP:eng': {'0'}}
-
-        {'TXXX:EnergyLevel': {'7'},
-        'COMM::eng': {'5A - Energy 7'},
-        'TCON': {'House/Tech/Indie/Disco'},
-        'TPE2': {'張國榮'},
-        'TDRC': {'2006'},
-        'TIT2': {'暴風一族 [Bao Feng Yi Zu] (Remix)'},
-        'TPE1': {'張國榮'},
-        'COMM:ID3v1 Comment:eng': {'5A - Energy 7'},
-        'TALB': {'Leslie Remix'},
-        'TRCK': {'3/4'},
-        'TPOS': {'1/1'},
-        'TKEY': {'5A'},
-        'TCOP': {'© 2006 Cinepoly Records Co. Ltd.'}}
-
-        {'TIT2': {'Vibra (Sera de Villalta Remix)'},
-        'TXXX:EnergyLevel': {'5'},
-        'TPE1': {'Ferra Black'},
-        'TCON': {'House/Deep/Tech/'},
-        'TKEY': {'4A'},
-        'COMM::eng': {'4A - 5'}}
-    '''
+    pass
