@@ -48,7 +48,18 @@ class Tags:
                 self.key == other.key and
                 self._eq_cover_image(other))
     
-    def cover_hash(self) -> Optional[imagehash.ImageHash]:
+    def __hash__(self) -> int:
+        return hash((
+            self.artist,
+            self.album,
+            self.title,
+            self.genre,
+            self.key,
+            self._hash_cover_image(),
+            self.cover_image_str
+        ))
+    
+    def _hash_cover_image(self) -> Optional[imagehash.ImageHash]:
         '''Computes and returns a perceptual hash for the cover image using imagehash.
         Raises a ValueError and logs an error if hash generation fails.
         '''
@@ -69,8 +80,8 @@ class Tags:
         Returns True if the images are similar according to the inclusive threshold, else False.
         '''
         try:
-            hash_self = self.cover_hash()
-            hash_other = other.cover_hash()
+            hash_self = self._hash_cover_image()
+            hash_other = other._hash_cover_image()
         except ValueError as e:
             # log the hash error
             logging.error(f"Error comparing cover images due to hash generation failure:\n{e}.")

@@ -388,7 +388,7 @@ class TestCoverHash(unittest.TestCase):
         
         # Call target function
         tags = create_full_mock_tags()
-        actual = tags.cover_hash()
+        actual = tags._hash_cover_image()
         
         # Assert expectations
         self.assertEqual(actual, mock_hash)
@@ -403,7 +403,7 @@ class TestCoverHash(unittest.TestCase):
                     MOCK_TITLE,
                     MOCK_GENRE,
                     MOCK_MUSIC_KEY)
-        actual = tags.cover_hash()
+        actual = tags._hash_cover_image()
         
         # Assert expectations
         self.assertIsNone(actual, 'Expect None value for hash when image is missing.')
@@ -419,7 +419,7 @@ class TestCoverHash(unittest.TestCase):
         # Call target function, exepting exception due to the mock error
         tags = create_full_mock_tags()
         with self.assertRaises(ValueError):
-            tags.cover_hash()
+            tags._hash_cover_image()
             
         # Assert expectations
         mock_phash.assert_called_once_with(MOCK_IMAGE)
