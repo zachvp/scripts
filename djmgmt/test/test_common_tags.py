@@ -358,7 +358,7 @@ class TestCoverHash(unittest.TestCase):
         mock_phash.assert_called_once_with(MOCK_IMAGE)
         mock_log_error.assert_called()
         
-class TestCompareCover(unittest.TestCase):
+class TestEQCoverImage(unittest.TestCase):
     '''Tests for the newly requested 'compare_cover' function.'''
     @patch('src.common_tags.Tags.cover_hash')
     def test_success_same_images(self, mock_cover_hash: MagicMock) -> None:
@@ -369,7 +369,7 @@ class TestCompareCover(unittest.TestCase):
         # Call target function
         tags_lhs = Tags()
         tags_rhs = Tags()
-        actual = tags_lhs.compare_cover(tags_rhs)
+        actual = tags_lhs._eq_cover_image(tags_rhs)
         
         # Assert expectations
         self.assertTrue(actual)
@@ -385,7 +385,7 @@ class TestCompareCover(unittest.TestCase):
         # Call target function
         tags_lhs = Tags()
         tags_rhs = Tags()
-        actual = tags_lhs.compare_cover(tags_rhs)
+        actual = tags_lhs._eq_cover_image(tags_rhs)
         
         # Assert expectations
         self.assertFalse(actual)
@@ -401,7 +401,7 @@ class TestCompareCover(unittest.TestCase):
         # Call target function
         tags_lhs = Tags()
         tags_rhs = Tags()
-        actual = tags_lhs.compare_cover(tags_rhs)
+        actual = tags_lhs._eq_cover_image(tags_rhs)
         
         # Assert expectations
         self.assertFalse(actual)
@@ -416,7 +416,7 @@ class TestCompareCover(unittest.TestCase):
         # Call target function
         tags_lhs = Tags()
         tags_rhs = Tags()
-        actual = tags_lhs.compare_cover(tags_rhs)
+        actual = tags_lhs._eq_cover_image(tags_rhs)
         
         # Assert expectations
         self.assertFalse(actual)
@@ -430,7 +430,7 @@ class TestCompareCover(unittest.TestCase):
         # Call target function
         tags_lhs = Tags()
         tags_rhs = Tags()
-        actual = tags_lhs.compare_cover(tags_rhs)
+        actual = tags_lhs._eq_cover_image(tags_rhs)
         
         # Assert expectations
         self.assertTrue(actual)
@@ -445,6 +445,6 @@ class TestCompareCover(unittest.TestCase):
         tags_lhs = Tags()
         tags_rhs = Tags()
         with self.assertRaises(ValueError):
-            tags_lhs.compare_cover(tags_rhs)
+            tags_lhs._eq_cover_image(tags_rhs)
         mock_cover_hash.assert_called()
 

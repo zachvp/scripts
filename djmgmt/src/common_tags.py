@@ -1,3 +1,4 @@
+from __future__ import annotations
 import mutagen
 import logging
 import io
@@ -36,6 +37,17 @@ class Tags:
         }
         return str(output)
     
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Tags):
+            return False
+        
+        return (self.artist == other.artist and
+                self.album == other.album and
+                self.title == other.title and
+                self.genre == other.genre and
+                self.key == other.key and
+                self._eq_cover_image(other))
+    
     def cover_hash(self) -> Optional[imagehash.ImageHash]:
         '''Computes and returns a perceptual hash for the cover image using imagehash.
         Raises a ValueError and logs an error if hash generation fails.
@@ -52,7 +64,7 @@ class Tags:
             logging.error(f"Error generating perceptual hash:\n{e}")
             raise ValueError(f"Error generating perceptual hash: {e}")
     
-    def compare_cover(self, other: 'Tags', threshold: int = 0) -> bool:
+    def _eq_cover_image(self, other: Tags, threshold: int = 0) -> bool:
         '''Compares the perceptual hash of this instance's cover image to that of another Tags instance.
         Returns True if the images are similar according to the inclusive threshold, else False.
         '''
