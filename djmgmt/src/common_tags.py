@@ -4,7 +4,7 @@ import logging
 import io
 import imagehash
 from PIL import Image
-from typing import Optional, Tuple
+from typing import Optional
 
 import mutagen.flac
 import mutagen.id3
@@ -158,7 +158,7 @@ def extract_tag_value(track: mutagen.FileType, tag_keys: set[str]) -> Optional[s
 
     return value
 
-def extract_cover_image(track: mutagen.FileType) -> Tuple[Optional[Image.Image], Optional[str]]:
+def extract_cover_image(track: mutagen.FileType) -> tuple[Optional[Image.Image], Optional[str]]:
     image: Optional[Image.Image] = None
     image_type: Optional[str] = None
     data = None

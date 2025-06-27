@@ -1,6 +1,6 @@
 import unittest
 import os
-from typing import Tuple, cast
+from typing import cast
 from argparse import Namespace
 import xml.etree.ElementTree as ET
 from unittest.mock import patch, MagicMock, call
@@ -40,7 +40,7 @@ COLLECTION_XML = f'''
 '''.strip()
 
 # Helpers
-def get_input_output_paths(filename: str) -> Tuple[str, str]:
+def get_input_output_paths(filename: str) -> tuple[str, str]:
     '''Returns tuple of input, output paths.'''
     return f"{MOCK_INPUT_DIR}/{filename}", f"{MOCK_OUTPUT_DIR}/{filename}"
 

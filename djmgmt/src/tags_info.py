@@ -97,40 +97,40 @@ def collect_filenames(root: str) -> list[str]:
     return names
 
 # TODO: extend to check for cover art change
-def compare_tags(source: str, comparison: str) -> list[str]:
+def compare_tags(source: str, comparison: str) -> list[tuple[str, str]]:
     '''Compares tag metadata between files in source and comparison directories.
     Returns a list of absolute source paths where tags have changed for matching filenames.'''
-    # Output data
-    changed_paths: list[str] = []
+    # output data
+    changed_paths: list[tuple[str, str]] = []
     
-    # Use to compare files based on filename, excluding extension
+    # use to compare files based on filename, excluding extension
     normalize_filename: Callable[[str], str] = lambda path: os.path.splitext(os.path.basename(path))[0]
     
-    # Collect paths and build a mapping for comparison files by normalized filename
+    # collect paths and build a mapping for comparison files by normalized filename
     source_paths = common.collect_paths(source)
     comparison_files = {}
-    for comp_path in common.collect_paths(comparison):
-        base_name = normalize_filename(comp_path)
-        comparison_files[base_name] = comp_path
+    for compare_path in common.collect_paths(comparison):
+        base_name = normalize_filename(compare_path)
+        comparison_files[base_name] = compare_path
     
     # compare the source paths present in the comparison directory
     for source_path in source_paths:
         base_name = normalize_filename(source_path)
         if base_name in comparison_files:
-            comp_path = comparison_files[base_name]
+            compare_path = comparison_files[base_name]
             
-            # Read tags from both files
+            # read tags from both files
             source_tags = common_tags.read_tags(source_path)
-            compare_tags = common_tags.read_tags(comp_path)
+            compare_tags = common_tags.read_tags(compare_path)
             
-            # Skip if tags can't be read from either file
+            # skip if tags can't be read from either file
             if not source_tags or not compare_tags:
-                logging.error(f"Unable to read tags from '{source_path}' or '{comp_path}'")
+                logging.error(f"Unable to read tags from '{source_path}' or '{compare_path}'")
                 continue
             
-            # Compare relevant tags (including genre); add to list if any differ
+            # compare relevant tags (including genre); add to list if any differ
             if source_tags != compare_tags:
-                changed_paths.append(os.path.abspath(source_path))
+                changed_paths.append((os.path.abspath(source_path), os.path.abspath(compare_path)))
                 logging.info(f"Detected tag difference in '{source_path}'")
                 
     return changed_paths
@@ -160,8 +160,8 @@ if __name__ == '__main__':
         changed = compare_tags(args.input, args.comparison)
         if args.output:
             with open(args.output, 'w', encoding='utf-8') as file:
-                for path in changed:
-                    file.write(f"{path}\n")
+                for paths in changed:
+                    file.write(f"{paths}\n")
         else:
-            for path in changed:
-                print(path)
+            for paths in changed:
+                print(paths)
