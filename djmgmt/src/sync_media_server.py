@@ -27,10 +27,6 @@ from typing import Callable
 from . import common
 from . import constants
 
-# Constants
-FILE_SYNC =f"{constants.PROJECT_ROOT}{os.sep}state{os.sep}sync_state.txt"
-FILE_SYNC_KEY = 'sync_date'
-
 # Classes
 class Namespace(argparse.Namespace):
     # Script Arguments
@@ -55,6 +51,24 @@ class Namespace(argparse.Namespace):
     SCAN_FULL = 'full'
     
     SCAN_MODES = {SCAN_QUICK, SCAN_FULL}
+    
+class DateContextFile:
+    FILE_SYNC =f"{constants.PROJECT_ROOT}{os.sep}state{os.sep}sync_state.txt"
+    FILE_SYNC_KEY = 'sync_date'
+    
+    def save(self, context: str) -> None:
+        with open(DateContextFile.FILE_SYNC, encoding='utf-8', mode='w') as state:
+            state.write(f"{DateContextFile.FILE_SYNC_KEY}: {context}")
+    
+    def read(self) -> str:
+        with open(DateContextFile.FILE_SYNC, encoding='utf-8', mode='r') as state: # todo: optimize to only open if recent change
+            saved_state = state.readline()
+            if saved_state:
+                return saved_state.split(':')[1].strip()
+        return ''
+
+# Constants
+SAVED_CONTEXT = DateContextFile()
 
 def parse_args(valid_functions: set[str], valid_scan_modes: set[str]) -> type[Namespace]:
     ''' Returns the parsed command-line arguments.
@@ -208,11 +222,7 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, ful
     return success
 
 def is_processed(date_context: str) -> bool:
-    date_context_processed = ''
-    with open(FILE_SYNC, encoding='utf-8', mode='r') as state: # todo: optimize to only open if recent change
-        saved_state = state.readline()
-        if saved_state:
-            date_context_processed = saved_state.split(':')[1].strip()
+    date_context_processed = SAVED_CONTEXT.read()
     if date_context_processed:
         if date_context <= date_context_processed:
             logging.info(f"already processed date context: {date_context}")
@@ -264,10 +274,8 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
             batch.append(mapping) # add the first mapping of the new context
             logging.debug(f"add new context mapping: {mapping}")
             
-            # persist the processed date context
-            with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
-                state.write(f"{FILE_SYNC_KEY}: {date_context_previous}")
-            logging.debug(f"add to batch: {mapping}")
+            # persist the latest processed context
+            SAVED_CONTEXT.save(date_context_previous)
             logging.info(f"processed batch in date context '{date_context_previous}'")
             logging.info(f"sync progress: {progressFormat(index + 1)}")
         else:
@@ -283,8 +291,10 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
         logging.info(f"processing batch in date context '{date_context}'")
         if not sync_batch(batch, date_context, os.path.dirname(dest), full_scan):
             raise RuntimeError(f"Batch sync failed for date context '{date_context}'")
-        with open(FILE_SYNC, encoding='utf-8', mode='w') as state:
-            state.write(f"{FILE_SYNC_KEY}: {date_context}")
+        
+        # persist the latest processed context
+        SAVED_CONTEXT.save(date_context)
+        
         logging.info(f"processed batch in date context '{date_context}'")
         logging.info(f"sync progress: {progressFormat(index + 1)}")
 
