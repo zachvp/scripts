@@ -6,7 +6,6 @@ import xml.etree.ElementTree as ET
 from unittest.mock import patch, MagicMock, call
 
 from src import batch_operations_music
-from src import batch_operations_music
 from src import constants
 from src.common_tags import Tags
 

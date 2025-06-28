@@ -5,12 +5,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 from unittest.mock import patch, MagicMock, mock_open, call
 
-# Imports required to call source code
-from .context import src
 from src import sync_media_server, constants, subsonic_client
-
-# Imports required to patch with mocks
-from src import encode_tracks
 
 # Constants
 DATE_PROCESSED_PAST     = '2025/05 may/19'

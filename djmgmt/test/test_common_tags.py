@@ -427,7 +427,7 @@ class TestCoverHash(unittest.TestCase):
         
 class TestEQCoverImage(unittest.TestCase):
     '''Tests for the newly requested 'compare_cover' function.'''
-    @patch('src.common_tags.Tags.cover_hash')
+    @patch('src.common_tags.Tags._hash_cover_image')
     def test_success_same_images(self, mock_cover_hash: MagicMock) -> None:
         '''Tests that comparison for images with the same hash returns True.'''
         # Set up mocks
@@ -442,7 +442,7 @@ class TestEQCoverImage(unittest.TestCase):
         self.assertTrue(actual)
         self.assertEqual(mock_cover_hash.call_count, 2)
         
-    @patch('src.common_tags.Tags.cover_hash')
+    @patch('src.common_tags.Tags._hash_cover_image')
     def test_success_different_images(self, mock_cover_hash: MagicMock) -> None:
         '''Tests that comparison for images with different hashes returns True.'''
         # Set up mocks: two different hash return values
@@ -458,7 +458,7 @@ class TestEQCoverImage(unittest.TestCase):
         self.assertFalse(actual)
         self.assertEqual(mock_cover_hash.call_count, 2)
     
-    @patch('src.common_tags.Tags.cover_hash')
+    @patch('src.common_tags.Tags._hash_cover_image')
     def test_success_exists_vs_none(self, mock_cover_hash: MagicMock) -> None:
         '''Tests that comparison between Tags containing an image and Tags missing an image returns False.'''
         # Set up mocks: lhs exists, rhs None.
@@ -473,7 +473,7 @@ class TestEQCoverImage(unittest.TestCase):
         # Assert expectations
         self.assertFalse(actual)
         
-    @patch('src.common_tags.Tags.cover_hash')
+    @patch('src.common_tags.Tags._hash_cover_image')
     def test_success_none_vs_exists(self, mock_cover_hash: MagicMock) -> None:
         '''Tests that comparison between Tags missing an image and Tags containing an image returns False.'''
         # Set up mocks: lhs None, rhs exists
@@ -488,7 +488,7 @@ class TestEQCoverImage(unittest.TestCase):
         # Assert expectations
         self.assertFalse(actual)
         
-    @patch('src.common_tags.Tags.cover_hash')
+    @patch('src.common_tags.Tags._hash_cover_image')
     def test_success_none_vs_none(self, mock_cover_hash: MagicMock) -> None:
         '''Tests that comparison between two Tags instances missing an image returns True.'''
         # Set up mocks: both hashes as None
@@ -502,7 +502,7 @@ class TestEQCoverImage(unittest.TestCase):
         # Assert expectations
         self.assertTrue(actual)
     
-    @patch('src.common_tags.Tags.cover_hash')
+    @patch('src.common_tags.Tags._hash_cover_image')
     def test_error_hash(self, mock_cover_hash: MagicMock) -> None:
         '''Tests that comparison resulting in a hash error raises a value error.'''
         # Set up mocks: hash exception
