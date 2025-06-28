@@ -19,41 +19,69 @@ from . import constants
 # classes
 class Namespace(argparse.Namespace):
     # arguments
+    ## required
     function: str
     input: str
     output: str
+
+    ## optional    
     extension: str
-    
     store_path: str
     store_skipped: bool
     interactive: bool
+    scan_mode: str
     
     # functions
-    FUNCTION_LOSSLESS = 'lossless'
-    FUNCTION_LOSSY = 'lossy'
+    FUNCTION_LOSSLESS    = 'lossless'
+    FUNCTION_LOSSY       = 'lossy'
     FUNCTION_MISSING_ART = 'missing_art'
+    
     FUNCTIONS = {FUNCTION_LOSSLESS, FUNCTION_LOSSY, FUNCTION_MISSING_ART}
+    
+    # options
+    SCAN_MODE_XML = 'xml'
+    SCAN_MODE_OS  = 'os'
+    
+    SCAN_MODES = {SCAN_MODE_XML, SCAN_MODE_OS}
 
 # helper functions
 def parse_args(functions: set[str]) -> type[Namespace]:
     '''Process the script's command line aruments.'''
+    EXTENSION_FUNCTIONS = {Namespace.FUNCTION_LOSSLESS, Namespace.FUNCTION_LOSSY}
+    
+    # configure args
     parser = argparse.ArgumentParser()
     parser.add_argument('function', type=str, help=f"the function to run; one of: '{functions}'")
     parser.add_argument('input', type=str, help='the input path')
     parser.add_argument('output', type=str, help='the output path')
     
-    parser.add_argument('--extension', '-e', type=str, help='the output extension for each file')
+    parser.add_argument('--extension', '-e', type=str, help=f"the output extension for each file; required for '{EXTENSION_FUNCTIONS}'")
     parser.add_argument('--store-path', type=str, help='the script storage path to write to')
     parser.add_argument('--store-skipped', action='store_true', help='store the skipped files in store path')
     parser.add_argument('--interactive', '-i', action='store_true', help='run the script in interactive mode')
+    parser.add_argument('--scan-mode', type=str, help=f"the missing art scan mode; one of: '{Namespace.SCAN_MODES}' (case-insensitive)")
 
+    # parse args
     args = parser.parse_args(namespace=Namespace)
     
+    # validate function
     if args.function not in functions:
         parser.error(f"invalid function '{args.function}', expect one of: '{functions}'")
 
+    # validate storage path args
     if args.store_skipped and not args.store_path:
         parser.error("if option '--store-skipped' is set, option '--store-path' is required")
+    
+    # validate extension argument
+    if args.extension and args.function not in EXTENSION_FUNCTIONS:
+        parser.error(f"function '{args.function}' requires '--extension' argument")
+        
+    # validate scan mode argument
+    args.scan_mode = args.scan_mode.lower()
+    if not args.scan_mode and args.function == Namespace.FUNCTION_MISSING_ART:
+        parser.error(f"funtion '{args.function}' requires '--scan-mode' option")
+    if args.scan_mode and args.scan_mode not in Namespace.SCAN_MODES:
+        parser.error(f"invalid scan mode: '{args.scan_mode}'")
 
     return args
 
@@ -447,7 +475,7 @@ async def run_missing_art_tasks(tasks: list[tuple[str, Task[tuple[int, str]]]]) 
             output = json.loads(output)['streams']
             cover_stream = guess_cover_stream_specifier(output)
             if cover_stream > -1:
-                logging.info(f"guessed cover image in stream: {cover_stream}")
+                logging.debug(f"guessed cover image in stream: {cover_stream}")
             elif cover_stream == -2:
                 logging.info(f"found potential placeholder cover for '{source}'")
             else:
@@ -457,7 +485,30 @@ async def run_missing_art_tasks(tasks: list[tuple[str, Task[tuple[int, str]]]]) 
             logging.error(f"unable to determine missing art for '{source}':\n{output}")
     return results
 
-async def find_missing_art(collection_file_path: str, collection_xpath: str, playlist_xpath: str, threads=24) -> list[str]:
+async def find_missing_art_os(source_dir, threads=24) -> list[str]:
+    # output data
+    missing: list[str] = []
+    
+    # collect the playlist IDs
+    tasks: list[tuple[str, Task[tuple[int, str]]]] = []
+    
+    # iterate over the source dir paths
+    for path in common.collect_paths(source_dir):
+        # collect task batch
+        task = asyncio.create_task(run_command_async(command_ffprobe_json(path)))
+        tasks.append((path, task))
+        logging.debug(f"add task: {len(tasks)}")
+        
+        # run task batch
+        if len(tasks) == threads:
+            missing += await run_missing_art_tasks(tasks)
+            tasks.clear()
+    
+    # run remaining tasks
+    missing += await run_missing_art_tasks(tasks)
+    return missing
+
+async def find_missing_art_xml(collection_file_path: str, collection_xpath: str, playlist_xpath: str, threads=24) -> list[str]:
     from . import organize_library_dates as library
     
     tree = library.load_collection(collection_file_path)
@@ -498,7 +549,14 @@ if __name__ == '__main__':
         encode_lossy_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_MISSING_ART:
         # TODO: add timing
-        coroutine = find_missing_art(script_args.input, constants.XPATH_COLLECTION, constants.XPATH_PRUNED, threads=72)
+        coroutine = None
+        missing = []
+        if script_args.scan_mode == Namespace.SCAN_MODE_XML:        
+            coroutine = find_missing_art_xml(script_args.input, constants.XPATH_COLLECTION, constants.XPATH_PRUNED, threads=72)
+        else:
+            coroutine = find_missing_art_os(script_args.input, threads=72)
+        
+        # run the configured function and write the result to the given file
         missing = asyncio.run(coroutine)
         missing = sorted([f"{os.path.splitext(os.path.basename(m))[0]}\n" for m in missing])
         with open(script_args.output, 'w', encoding='utf-8') as file:

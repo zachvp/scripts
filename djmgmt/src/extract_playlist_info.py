@@ -12,7 +12,7 @@ import os
 import csv
 import sys
 
-import common
+from . import common
 
 def extract_tsv(path: str, fields: list[int]) -> list[str]:
     output = []

@@ -97,7 +97,6 @@ def collect_filenames(root: str) -> list[str]:
         names.append(name)
     return names
 
-# TODO: extend to check for cover art change
 def compare_tags(source: str, comparison: str) -> list[tuple[str, str]]:
     '''Compares tag metadata between files in source and comparison directories.
     Returns a list of absolute source paths where tags have changed for matching filenames.'''
