@@ -155,14 +155,17 @@ def get_dirs(top: str) -> list[str]:
 
 def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: set[str], interactive: bool) -> None:
     from tempfile import TemporaryDirectory
+    from asyncio import run
     
-    # Create a temporary directory to place the encoded files.
+    # create a temporary directory to place the encoded files.
     with TemporaryDirectory() as temp_dir:
-        result = encode_tracks.encode_lossless(source, temp_dir, '.aiff', interactive=interactive)
-        # Remove all of the original non-standard files that have been encoded.
+        # encode all non-standard lossless files
+        result = run(encode_tracks.encode_lossless(source, temp_dir, '.aiff', interactive=interactive))
+        
+        # remove all of the original non-standard files that have been encoded.
         for input_path, _ in result:
             os.remove(input_path)
-        # Sweep all the encoded files from the temporary directory to the original source directory
+        # sweep all the encoded files from the temporary directory to the original source directory
         sweep(temp_dir, source, False, valid_extensions, prefix_hints)
 
 # TODO: refactor to use template file as foundation for new file
@@ -550,16 +553,31 @@ def update_library(source: str,
         
         The source, library, and client_mirror_path parameters should all be distinct directories.
     '''
-    from . import sync_media_server
     from tempfile import TemporaryDirectory
+    from . import sync_media_server
+    from . import tags_info
     
-    # Create a temporary directory to process the files from 'source'
-    with TemporaryDirectory() as temp_dir:
-        process(source, temp_dir, interactive, valid_extensions, prefix_hints)
-        sweep(temp_dir, library, interactive, valid_extensions, prefix_hints)
+    # Create a temporary directory to process the files from source
+    with TemporaryDirectory() as processing_dir:
+        # process all of the source files into the temp dir
+        process(source, processing_dir, interactive, valid_extensions, prefix_hints)
+        
+        # move the processed files to the library, and update the djmgmt collection record
+        sweep(processing_dir, library, interactive, valid_extensions, prefix_hints)
         collection = record_collection(library, COLLECTION_PATH)
-
-        sync_media_server.run_sync_mappings(collection, client_mirror_path, True)
+        # 1. Re-sync outdated files:
+        #     * determine file path pairs with changed metadata (DJ lib path, lossy lib path)
+        #     * extract all date contexts from lossy lib paths, get minimum
+        #     * pass all date contexts as override param to sync
+        #         * for each date context: re-encode and re-transfer TODO
+        # combine any changed mappings with the standard filtered collection mappings
+        changed = tags_info.compare_tags(library, client_mirror_path)
+        mappings = sync_media_server.create_sync_mappings(collection, client_mirror_path)
+        if changed:
+            mappings += changed
+        
+        # run the sync
+        sync_media_server.run_sync_mappings(mappings)
 
 if __name__ == '__main__':
     common.configure_log(path=__file__)

@@ -43,7 +43,7 @@ class TestIsProcessed(unittest.TestCase):
     @patch('builtins.open', new_callable=mock_open, read_data=f"sync_date: {DATE_PROCESSED_CURRENT}")
     def test_is_processed_past(self, mock_sync_state: MagicMock) -> None:
         '''Tests that matching date contexts before the processed date are considered processed.'''
-        actual = sync_media_server.is_processed(DATE_PROCESSED_PAST)
+        actual = sync_media_server.SavedDateContext.is_processed(DATE_PROCESSED_PAST)
         self.assertTrue(actual, f"Date context '{DATE_PROCESSED_PAST}' is expected to be already processed.")
         mock_sync_state.assert_called_once()
     
@@ -51,7 +51,7 @@ class TestIsProcessed(unittest.TestCase):
     @patch('builtins.open', new_callable=mock_open, read_data=f"sync_date: {DATE_PROCESSED_CURRENT}")
     def test_is_processed_current(self, mock_sync_state: MagicMock) -> None:
         '''Tests that matching date contexts equal to the processed date are considered processed.'''
-        actual = sync_media_server.is_processed(DATE_PROCESSED_CURRENT)
+        actual = sync_media_server.SavedDateContext.is_processed(DATE_PROCESSED_CURRENT)
         self.assertTrue(actual, f"Date context '{DATE_PROCESSED_CURRENT}' is expected to be already processed.")
         mock_sync_state.assert_called_once()
     
@@ -59,7 +59,7 @@ class TestIsProcessed(unittest.TestCase):
     @patch('builtins.open', new_callable=mock_open, read_data=f"sync_date: {DATE_PROCESSED_CURRENT}")
     def test_is_processed_future(self, mock_sync_state: MagicMock) -> None:
         '''Tests that matching date contexts later than the processed date are NOT considered processed.'''
-        actual = sync_media_server.is_processed(DATE_PROCESSED_FUTURE)
+        actual = sync_media_server.SavedDateContext.is_processed(DATE_PROCESSED_FUTURE)
         self.assertFalse(actual, f"Date context '{DATE_PROCESSED_FUTURE}' is NOT expected to be already processed.")
         mock_sync_state.assert_called_once()
 
@@ -101,7 +101,7 @@ class TestSyncBatch(unittest.TestCase):
         
         # Assert that the expected functions are called with expected parameters.
         self.assertEqual(actual, True, 'Expect call to succeed')
-        mock_encode.assert_called_once_with(batch, '.mp3', threads=28)
+        mock_encode.assert_called_once_with(batch, '.mp3', threads=28, skip_existing=False)
         mock_transform.assert_called_once_with(dest)
         mock_transfer.assert_called_once_with(mock_transform.return_value, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
         
@@ -147,7 +147,7 @@ class TestSyncBatch(unittest.TestCase):
         
         # Assertions
         self.assertEqual(actual, True, 'Expect call to succeed')
-        mock_encode.assert_called_once_with(batch, '.mp3', threads=28)
+        mock_encode.assert_called_once_with(batch, '.mp3', threads=28, skip_existing=False)
         mock_transform.assert_called_once_with(dest)
         mock_transfer.assert_called_once()
         mock_call_endpoint.assert_called()
@@ -179,7 +179,7 @@ class TestSyncBatch(unittest.TestCase):
         
         # Assertions
         self.assertEqual(actual, False, 'Expect call to fail')
-        mock_encode.assert_called_once_with(batch, '.mp3', threads=28)
+        mock_encode.assert_called_once_with(batch, '.mp3', threads=28, skip_existing=False)
         mock_transform.assert_called_once_with(dest)
         
     @patch('src.encode_tracks.encode_lossy')
@@ -369,69 +369,57 @@ class TestSyncMappings(unittest.TestCase):
 class TestRunSyncMappings(unittest.TestCase):
     @patch('src.sync_media_server.rsync_healthcheck')
     @patch('src.sync_media_server.sync_from_mappings')
-    @patch('src.sync_media_server.create_sync_mappings')
     def test_success(self,
-                     mock_create_sync_mappings: MagicMock,
                      mock_sync_from_mappings: MagicMock,
                      mock_rsync_healthcheck: MagicMock) -> None:
         # Set up mocks
-        mock_create_sync_mappings.return_value = ['/mock/mapping/1', '/mock/mapping/2']
+        mock_mappings = [('/mock/mapping/1', '/mock/mapping/2')]
         
         # Call target function
         mock_full_scan = True
-        root = ET.ElementTree(ET.fromstring(COLLECTION_XML))
-        sync_media_server.run_sync_mappings(root, MOCK_OUTPUT_DIR, mock_full_scan)
+        sync_media_server.run_sync_mappings(mock_mappings, mock_full_scan)
         
         # Assert expectations
-        mock_create_sync_mappings.assert_called_once_with(root, MOCK_OUTPUT_DIR)
-        mock_sync_from_mappings.assert_called_once_with(mock_create_sync_mappings.return_value, mock_full_scan)
+        mock_sync_from_mappings.assert_called_once_with(mock_mappings, mock_full_scan)
         mock_rsync_healthcheck.assert_called_once()
     
     @patch('src.sync_media_server.rsync_healthcheck')
     @patch('src.sync_media_server.sync_from_mappings')
-    @patch('src.sync_media_server.create_sync_mappings')
     def test_exception_sync_from_mappings(self,
-                                          mock_create_sync_mappings: MagicMock,
                                           mock_sync_from_mappings: MagicMock,
                                           mock_rsync_healthcheck: MagicMock) -> None:
         # Set up mocks
         mock_error = 'Mock error'
-        mock_create_sync_mappings.return_value = ['/mock/mapping/1', '/mock/mapping/2']
+        mock_mappings = [('/mock/mapping/1', '/mock/mapping/2')]
         mock_sync_from_mappings.side_effect = Exception(mock_error)
         
         # Call target function
         mock_full_scan = True
-        root = ET.ElementTree(ET.fromstring(COLLECTION_XML))
         with self.assertRaises(Exception) as e:
-            sync_media_server.run_sync_mappings(root, MOCK_OUTPUT_DIR, mock_full_scan)
+            sync_media_server.run_sync_mappings(mock_mappings, mock_full_scan)
             self.assertEqual(e.msg, mock_error)
         
         # Assert expectations
-        mock_create_sync_mappings.assert_called_once_with(root, MOCK_OUTPUT_DIR)
-        mock_sync_from_mappings.assert_called_once_with(mock_create_sync_mappings.return_value, mock_full_scan)
+        mock_sync_from_mappings.assert_called_once_with(mock_mappings, mock_full_scan)
         mock_rsync_healthcheck.assert_called_once()
         
     @patch('src.sync_media_server.rsync_healthcheck')
     @patch('src.sync_media_server.sync_from_mappings')
-    @patch('src.sync_media_server.create_sync_mappings')
     def test_rsync_healthcheck_fail(self,
-                                    mock_create_sync_mappings: MagicMock,
                                     mock_sync_from_mappings: MagicMock,
                                     mock_rsync_healthcheck: MagicMock) -> None:
         # Set up mocks
         mock_error = 'Mock error'
-        mock_create_sync_mappings.return_value = ['/mock/mapping/1', '/mock/mapping/2']
+        mock_mappings = [('/mock/mapping/1', '/mock/mapping/2')]
         mock_rsync_healthcheck.return_value = False
         
         # Call target function
         mock_full_scan = True
         with self.assertRaises(Exception) as e:
-            root = ET.ElementTree(ET.fromstring(COLLECTION_XML))
-            sync_media_server.run_sync_mappings(root, MOCK_OUTPUT_DIR, mock_full_scan)
+            sync_media_server.run_sync_mappings(mock_mappings, mock_full_scan)
             self.assertEqual(e.msg, mock_error)
         
         # Assert expectations
-        mock_create_sync_mappings.assert_not_called()
         mock_sync_from_mappings.assert_not_called()
         mock_rsync_healthcheck.assert_called_once()
 

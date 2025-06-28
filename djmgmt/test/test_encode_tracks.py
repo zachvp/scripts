@@ -1,8 +1,6 @@
 import unittest
 import os
-import asyncio
 from unittest.mock import patch, MagicMock, call, AsyncMock
-from argparse import Namespace
 from typing import cast
 
 from src import encode_tracks

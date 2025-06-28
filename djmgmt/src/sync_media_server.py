@@ -52,23 +52,44 @@ class Namespace(argparse.Namespace):
     
     SCAN_MODES = {SCAN_QUICK, SCAN_FULL}
     
-class DateContextFile:
+class SavedDateContext:
     FILE_SYNC =f"{constants.PROJECT_ROOT}{os.sep}state{os.sep}sync_state.txt"
     FILE_SYNC_KEY = 'sync_date'
     
-    def save(self, context: str) -> None:
-        with open(DateContextFile.FILE_SYNC, encoding='utf-8', mode='w') as state:
-            state.write(f"{DateContextFile.FILE_SYNC_KEY}: {context}")
+    override_context = ''
     
-    def read(self) -> str:
-        with open(DateContextFile.FILE_SYNC, encoding='utf-8', mode='r') as state: # todo: optimize to only open if recent change
+    @staticmethod
+    def save(context: str) -> None:
+        '''Persists the date context to disk.'''
+        with open(SavedDateContext.FILE_SYNC, encoding='utf-8', mode='w') as state:
+            state.write(f"{SavedDateContext.FILE_SYNC_KEY}: {context}")
+    
+    @staticmethod
+    def load() -> str:
+        '''Returns the override context if present, otherwise will load the saved context from disk.'''
+        if SavedDateContext.override_context:
+            return SavedDateContext.override_context
+        
+        with open(SavedDateContext.FILE_SYNC, encoding='utf-8', mode='r') as state: # todo: optimize to only open if recent change
             saved_state = state.readline()
             if saved_state:
                 return saved_state.split(':')[1].strip()
         return ''
+    
+    @staticmethod
+    def override(context: str) -> None:
+        '''Memory-only override that will take priority over the disk date context.'''
+        SavedDateContext.override_context = context
 
-# Constants
-SAVED_CONTEXT = DateContextFile()
+    @staticmethod        
+    def is_processed(date_context: str) -> bool:
+        date_context_processed = SavedDateContext.load()
+        if date_context_processed:
+            if date_context <= date_context_processed:
+                logging.info(f"already processed date context: {date_context}")
+                return True
+        logging.info(f"date context is unprocessed: {date_context}")
+        return False
 
 def parse_args(valid_functions: set[str], valid_scan_modes: set[str]) -> type[Namespace]:
     ''' Returns the parsed command-line arguments.
@@ -150,14 +171,14 @@ def transfer_files(source_path: str, dest_address: str, rsync_module: str) -> tu
     logging.info(f"transfer from '{source_path}' to '{dest_address}'")
     
     # Options
-    #   --progess: show progress during transfer
     #   -a: archive mode
     #   -v: increase verbosity
     #   -z: compress file data during the transfer
     #   -i: output a change-summary for all updates
     #   -t: preserve modification times
     #   -R: use relative path names
-    options = "--progress -avzitR --exclude '.*'"
+    #   --progess: show progress during transfer
+    options = " -avzitR --progress --exclude '.*'"
     command = shlex.split(f"rsync {shlex.quote(source_path)} {dest_address}/{rsync_module} {options}")
     try:
         logging.debug(f'run command: "{shlex.join(command)}"')
@@ -176,7 +197,7 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, ful
     
     Returns True if the batch sync was successful, False otherwise.
     '''
-    import asyncio
+    from asyncio import run
     from . import subsonic_client
     from . import encode_tracks
     
@@ -185,7 +206,7 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, ful
     
     # encode the current batch to MP3 format
     logging.info(f"encoding batch in date context {date_context}:\n{batch}")
-    asyncio.run(encode_tracks.encode_lossy(batch, '.mp3', threads=28))
+    run(encode_tracks.encode_lossy(batch, '.mp3', threads=28, skip_existing=False))
     logging.info(f"finished encoding batch in date context {date_context}")
     
     # transfer batch to the media server
@@ -221,15 +242,6 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, ful
                     time.sleep(1) # TODO: sleep for more time if full scan
     return success
 
-def is_processed(date_context: str) -> bool:
-    date_context_processed = SAVED_CONTEXT.read()
-    if date_context_processed:
-        if date_context <= date_context_processed:
-            logging.info(f"already processed date context: {date_context}")
-            return True
-    logging.info(f"date context is unprocessed: {date_context}")
-    return False
-
 # TODO: Support file updates (e.g. if metadata changes)
 def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
     # core data
@@ -254,13 +266,15 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
         if date_context_previous:
             date_context_previous = date_context_previous[0]
         else:
-            logging.error(f"no previous date context in path '{dest_previous}'")
-            break
+            message = f"no previous date context in path '{dest_previous}'"
+            logging.error(message)
+            raise ValueError(message)
         if date_context:
             date_context = date_context[0]
         else:
-            logging.error(f"no date context in path '{dest}'")
-            break
+            message = f"no current date context in path '{dest}'"
+            logging.error(message)
+            raise ValueError(message)
         
         # collect each mapping in a given date context
         if date_context_previous == date_context:
@@ -275,7 +289,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
             logging.debug(f"add new context mapping: {mapping}")
             
             # persist the latest processed context
-            SAVED_CONTEXT.save(date_context_previous)
+            SavedDateContext.save(date_context_previous)
             logging.info(f"processed batch in date context '{date_context_previous}'")
             logging.info(f"sync progress: {progressFormat(index + 1)}")
         else:
@@ -293,7 +307,7 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
             raise RuntimeError(f"Batch sync failed for date context '{date_context}'")
         
         # persist the latest processed context
-        SAVED_CONTEXT.save(date_context)
+        SavedDateContext.save(date_context)
         
         logging.info(f"processed batch in date context '{date_context}'")
         logging.info(f"sync progress: {progressFormat(index + 1)}")
@@ -312,9 +326,11 @@ def rsync_healthcheck() -> bool:
             # TODO: refactor be lambda function in common
             logging.error(f"return code '{error.returncode}':\n{error.stderr}".strip())
             return False
-        
+    
 def create_sync_mappings(collection: ET.ElementTree, output_dir: str) -> list[tuple[str, str]]:
-    # collect input parameters to sync files
+    '''Creates a mapping list of system paths based on the given XML collection and output directory.
+    Each list entry maps from a source collection file path to a target date context + metadata-structured file path.
+    See organize_library_dates.generate_date_paths for more info.'''
     from . import organize_library_dates as library
     
     # collect the target playlist IDs to sync
@@ -323,18 +339,20 @@ def create_sync_mappings(collection: ET.ElementTree, output_dir: str) -> list[tu
         track.attrib[constants.ATTR_TRACK_KEY]
         for track in pruned
     }
+    
+    # generate the paths to sync based on the target playlist
     collection_node = library.find_node(collection, constants.XPATH_COLLECTION)
     mappings = library.generate_date_paths(collection_node,
                                            output_dir,
                                            playlist_ids=playlist_ids,
                                            metadata_path=True)
+    
+    # filter out processed date contexts from the mappings
     filtered_mappings: list[tuple[str, str]] = []
     for input_path, output_path in mappings:
         context = common.find_date_context(output_path)
-        if context and not is_processed(context[0]):
+        if context and not SavedDateContext.is_processed(context[0]):
             filtered_mappings.append((input_path, output_path))
-    
-    filtered_mappings.sort(key=lambda m: key_date_context(m))
     return filtered_mappings
 
 # Primary functions
@@ -385,14 +403,18 @@ def sync_from_path(args: type[Namespace]):
             os.makedirs(output_parent_path)
         action(input_path_full, output_path_full)
 
-def run_sync_mappings(collection: ET.ElementTree, output_dir: str, full_scan: bool) -> None:
+def run_sync_mappings(mappings: list[tuple[str, str]], full_scan: bool = True) -> None:
+    # record initial run timestamp
+    timestamp = time.time()
+    
     # Only attempt sync if remote is accessible
     if not rsync_healthcheck():
         raise RuntimeError("rsync unhealthy, abort sync")
     
-    # Initialize timing and run the sync
-    timestamp = time.time()
-    mappings = create_sync_mappings(collection, output_dir)
+    # sort the mappings so they are synced in chronological order
+    mappings.sort(key=lambda m: key_date_context(m))
+    
+    # initialize timing and run the sync
     try:
         sync_from_mappings(mappings, full_scan)
     except Exception as e:
@@ -414,4 +436,5 @@ if __name__ == '__main__':
     elif script_args.function == Namespace.FUNCTION_SYNC:
         import organize_library_dates as library
         tree = library.load_collection(script_args.input)
-        run_sync_mappings(tree, script_args.output, script_args.scan_mode == Namespace.SCAN_FULL)
+        mappings = create_sync_mappings(tree, script_args.output)
+        run_sync_mappings(mappings)

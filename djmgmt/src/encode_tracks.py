@@ -408,7 +408,7 @@ def encode_lossy_cli(args: type[Namespace]) -> None:
     path_mappings = common.add_output_path(args.output, path_mappings, args.input)
     asyncio.run(encode_lossy(path_mappings, args.extension))
 
-async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4) -> None:
+async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4, skip_existing=True) -> None:
     '''Encodes the given input, output mappings in lossy format with the given extension. Uses FFMPEG as backend.
     Encoding operations are parallelized.'''
     tasks: list[Task[tuple[int, str]]] = []
@@ -424,10 +424,11 @@ async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, thr
             logging.debug(f"create path: '{dest_dir}'")
             os.makedirs(dest_dir)
         
-        # skip existing files
-        if os.path.exists(dest):
-            logging.debug(f"path exists, skipping: '{dest}'")
-            continue
+        # check to skip existing files
+        if skip_existing:
+            if os.path.exists(dest):
+                logging.debug(f"path exists, skipping: '{dest}'")
+                continue
         
         # determine if the source file has a cover image
         ffprobe_data = read_ffprobe_json(source)

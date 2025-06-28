@@ -1362,21 +1362,31 @@ class TestRecordCollection(unittest.TestCase):
 
 class TestUpdateLibrary(unittest.TestCase):
     @patch('src.sync_media_server.run_sync_mappings')
-    @patch('src.batch_operations_music.sweep')
+    @patch('src.sync_media_server.create_sync_mappings')
+    @patch('src.tags_info.compare_tags')
     @patch('src.batch_operations_music.record_collection')
+    @patch('src.batch_operations_music.sweep')
     @patch('src.batch_operations_music.process')
+    @patch('tempfile.TemporaryDirectory')
     def test_success(self,
+                     mock_temp_dir: MagicMock,
                      mock_process: MagicMock,
-                     mock_record_collection: MagicMock,
                      mock_sweep: MagicMock,
+                     mock_record_collection: MagicMock,
+                     mock_compare_tags: MagicMock,
+                     mock_create_sync_mappings: MagicMock,
                      mock_run_sync_mappings: MagicMock) -> None:
-        '''Tests that dependent functions are called in the correct order with expected parameters.'''
+        '''Tests that dependent functions are called with expected parameters.'''
         # Set up mocks
-        mock_call_container = MagicMock()
-        mock_process.side_effect = lambda *_, **__: mock_call_container.process()
-        mock_record_collection.side_effect = lambda *_, **__: mock_call_container.record_collection()
-        mock_sweep.side_effect = lambda *_, **__: mock_call_container.sweep()
-        mock_run_sync_mappings.side_effect = lambda *_, **__: mock_call_container.run_sync_mappings()
+        mock_temp_dir_path = '/mock/temp/dir'
+        mock_collection = MagicMock()
+        mock_compare_tags.return_value = [] # mock no changes to sync
+        mock_create_sync_mappings.return_value = [
+            (os.path.join(MOCK_INPUT_DIR, 'mock_file_0'), os.path.join(MOCK_OUTPUT_DIR, 'mock_file_0'))
+        ]
+        
+        mock_temp_dir.return_value.__enter__.return_value = mock_temp_dir_path
+        mock_record_collection.return_value = mock_collection
         
         # Call target function
         mock_library = '/mock/library'
@@ -1392,42 +1402,23 @@ class TestUpdateLibrary(unittest.TestCase):
                                               mock_hints)
         
         # Assert expectations
-        # Assert that the primary dependent functions are called in the correct order
-        self.assertEqual(mock_call_container.mock_calls[0], call.process())
-        self.assertEqual(mock_call_container.mock_calls[1], call.sweep())
-        self.assertEqual(mock_call_container.mock_calls[2], call.record_collection())
-        self.assertEqual(mock_call_container.mock_calls[3], call.run_sync_mappings())
+        ## Call parameters: process
+        mock_process.assert_called_once_with(MOCK_INPUT_DIR, mock_temp_dir_path, mock_interactive, mock_extensions, mock_hints)
         
-        # Assert the primary dependent function call counts
-        mock_process.assert_called_once()
-        mock_sweep.assert_called_once()
-        mock_record_collection.assert_called_once()
-        mock_run_sync_mappings.assert_called_once()
+        ## Call parameters: sweep
+        mock_sweep.assert_called_once_with(mock_temp_dir_path, mock_library, mock_interactive, mock_extensions, mock_hints)
         
-        # Assert the primary dependent function call parameters
-        # Assert expected call parameters: process
-        self.assertEqual(mock_process.call_args.args[0], MOCK_INPUT_DIR)
-        # Argument 1 depends on implementation (e.g. temp folder path), so skip check
-        # TODO: add asssertion for arg 1
-        self.assertEqual(mock_process.call_args.args[2], mock_interactive)
-        self.assertEqual(mock_process.call_args.args[3], mock_extensions)
-        self.assertEqual(mock_process.call_args.args[4], mock_hints)
+        ## Call parameters: record_collection
+        mock_record_collection.assert_called_once_with(mock_library, batch_operations_music.COLLECTION_PATH)
+
+        ## Call parameters: compare_tags
+        mock_compare_tags.assert_called_once_with(mock_library, mock_client_mirror)
         
-        # Assert expected call parameters: sweep
-        # Argument 0 depends on implementation (e.g. temp folder path), so skip check
-        # TODO: add asssertion for arg 0
-        self.assertEqual(mock_sweep.call_args.args[1], mock_library)
-        self.assertEqual(mock_sweep.call_args.args[2], mock_interactive)
-        self.assertEqual(mock_sweep.call_args.args[3], mock_extensions)
-        self.assertEqual(mock_sweep.call_args.args[4], mock_hints)
+        ## Call parameters: create_sync_mappings
+        mock_create_sync_mappings.assert_called_once_with(mock_collection, mock_client_mirror)
         
-        # Assert expected call parameters: record_collection
-        # Expect the collection to be updated according to the library path
-        self.assertEqual(mock_record_collection.call_args.args, (mock_library, batch_operations_music.COLLECTION_PATH))
-        
-        # Assert expected call parameters: run_sync_mappings
-        # Expect the sync to run with the result of record_collection and client mirror path in full scan mode
-        self.assertEqual(mock_run_sync_mappings.call_args.args, (mock_call_container.record_collection(), mock_client_mirror, True))
+        ## Call parameters: run_sync_mappings
+        mock_run_sync_mappings.assert_called_once_with(mock_create_sync_mappings.return_value)
         
     @patch('src.sync_media_server.run_sync_mappings')
     @patch('src.batch_operations_music.sweep')

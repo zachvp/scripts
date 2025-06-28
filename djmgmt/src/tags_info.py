@@ -99,7 +99,7 @@ def collect_filenames(root: str) -> list[str]:
 
 def compare_tags(source: str, comparison: str) -> list[tuple[str, str]]:
     '''Compares tag metadata between files in source and comparison directories.
-    Returns a list of absolute source paths where tags have changed for matching filenames.'''
+    Returns a list of (source, comparison) path mappings where tags have changed for matching filenames.'''
     # output data
     changed_paths: list[tuple[str, str]] = []
     
