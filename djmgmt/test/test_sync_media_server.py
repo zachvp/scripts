@@ -424,7 +424,7 @@ class TestRunSyncMappings(unittest.TestCase):
         mock_rsync_healthcheck.assert_called_once()
 
 class TestCreateSyncMappings(unittest.TestCase):
-    @patch('src.sync_media_server.is_processed')
+    @patch('src.sync_media_server.SavedDateContext.is_processed')
     @patch('src.common.find_date_context')
     @patch('src.organize_library_dates.generate_date_paths')
     @patch('src.organize_library_dates.find_node')
@@ -454,7 +454,7 @@ class TestCreateSyncMappings(unittest.TestCase):
                                                          playlist_ids={'1'},
                                                          metadata_path=True)
         
-    @patch('src.sync_media_server.is_processed')
+    @patch('src.sync_media_server.SavedDateContext.is_processed')
     @patch('src.common.find_date_context')
     @patch('src.organize_library_dates.generate_date_paths')
     @patch('src.organize_library_dates.find_node')

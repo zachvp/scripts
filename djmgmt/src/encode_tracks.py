@@ -86,21 +86,33 @@ def parse_args(functions: set[str]) -> type[Namespace]:
     return args
 
 def ffmpeg_base(input_path: str, output_path: str, options: str) -> list[str]:
+    '''Creates the base FFMPEG transcoding command with the options:
+        -ar 44100: Set the audio sampling frequency to 44100 Hz
+        -write_id3v2 1: Write ID3 V2 tags
+    '''
     all_options = f"-ar 44100 -write_id3v2 1 {options}".strip()
     return ['ffmpeg', '-i', input_path] + shlex.split(all_options) + [output_path]
 
-def ffmpeg_standardize(input_path: str, output_path: str) -> list[str]:
-    '''Returns a list of ffmpeg command line arguments that will encode the `input_path` to the `output_path`.
-    Core command:
+def ffmpeg_lossless(input_path: str, output_path: str) -> list[str]:
+    # TODO: fix docstring formatting
+    '''Creates an FFMPEG command that will transcode the `input_path` to the `output_path` with high quality lossless settings.
+    Core command example:
         ffmpeg -i /path/to/input.foo -ar 44100 -c:a pcm_s16be -write_id3v2 1 -y path/to/output.bar
-        ffmpeg options: 44100 Hz sample rate, decode audio stream, 16-bit PCM big-endian, write ID3V2 tags
+    Options:
+        -c:a: decode audio stream
+        pcm_s16be: 16-bit PCM big-endian
+        -y: overwrite output file if present, without asking permission
     '''
     options = '-c:a pcm_s16be -y'
 
     return ffmpeg_base(input_path, output_path, options)
 
-def ffmpeg_mp3(input_path: str, output_path: str, map_options: str='-map 0') -> list[str]:
-    options = f"-b:a 320k {map_options}"
+def ffmpeg_lossy(input_path: str, output_path: str, map_options: str='-map 0') -> list[str]:
+    '''Creates an FFMPEG command that will transcode the `input_path` to the `output_path` with high quality lossy settings.
+    Options:
+      -b:a 320k: sets bitrate to 320K
+      -y: overwrite output file if present, without asking permission'''
+    options = f"-b:a 320k {map_options} -y"
     return ffmpeg_base(input_path, output_path, options)
 
 def read_ffprobe_value(input_path: str, stream_key: str) -> str:
@@ -345,7 +357,7 @@ async def encode_lossless(input_dir: str,
                     break
 
             # -- build and run the ffmpeg encode command
-            command = ffmpeg_standardize(input_path, output_path)
+            command = ffmpeg_lossless(input_path, output_path)
             task = asyncio.create_task(run_command_async(command))
             tasks.append((input_path, output_path, task))
             
@@ -441,7 +453,7 @@ async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, thr
             logging.info(f"no cover image found for '{source}'")
         
         # construct the command and add it to the task batch
-        command = ffmpeg_mp3(source, dest, map_options=map_options)
+        command = ffmpeg_lossy(source, dest, map_options=map_options)
         task = asyncio.create_task(run_command_async(command))
         tasks.append(task)
         logging.debug(f"add task: {len(tasks)}")

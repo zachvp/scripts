@@ -12,7 +12,7 @@ MOCK_OUTPUT = '/mock/output'
 class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):    
     @patch('os.path.getsize')
     @patch('builtins.open')
-    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.ffmpeg_lossless')
     @patch('src.encode_tracks.check_skip_bit_depth')
     @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
@@ -68,7 +68,7 @@ class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):
         
     @patch('os.path.getsize')
     @patch('builtins.open')
-    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.ffmpeg_lossless')
     @patch('src.encode_tracks.check_skip_bit_depth')
     @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
@@ -124,7 +124,7 @@ class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):
         
     @patch('os.path.getsize')
     @patch('builtins.open')
-    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.ffmpeg_lossless')
     @patch('src.encode_tracks.check_skip_bit_depth')
     @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
@@ -181,7 +181,7 @@ class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):
     
     @patch('os.path.getsize')
     @patch('builtins.open')
-    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.ffmpeg_lossless')
     @patch('src.encode_tracks.check_skip_bit_depth')
     @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
@@ -222,7 +222,7 @@ class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):
         
     @patch('os.path.getsize')
     @patch('builtins.open')
-    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.ffmpeg_lossless')
     @patch('src.encode_tracks.check_skip_bit_depth')
     @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
@@ -264,7 +264,7 @@ class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):
         
     @patch('os.path.getsize')
     @patch('builtins.open')
-    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.ffmpeg_lossless')
     @patch('src.encode_tracks.check_skip_bit_depth')
     @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
@@ -307,7 +307,7 @@ class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):
     @patch('os.path.getsize')
     @patch('builtins.open')
     @patch('subprocess.run')
-    @patch('src.encode_tracks.ffmpeg_standardize')
+    @patch('src.encode_tracks.ffmpeg_lossless')
     @patch('src.encode_tracks.check_skip_bit_depth')
     @patch('src.encode_tracks.check_skip_sample_rate')
     @patch('os.walk')
@@ -372,7 +372,7 @@ class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):
 
 class TestEncodeLossy(unittest.IsolatedAsyncioTestCase):
     @patch('src.encode_tracks.run_command_async')
-    @patch('src.encode_tracks.ffmpeg_mp3')
+    @patch('src.encode_tracks.ffmpeg_lossy')
     @patch('src.encode_tracks.guess_cover_stream_specifier')
     @patch('src.encode_tracks.read_ffprobe_json')
     @patch('os.path.exists')
