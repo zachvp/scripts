@@ -1,6 +1,6 @@
 import unittest
 import os
-from typing import cast
+from typing import cast, Callable
 from argparse import Namespace
 import xml.etree.ElementTree as ET
 from unittest.mock import patch, MagicMock, call
@@ -1361,6 +1361,10 @@ class TestRecordCollection(unittest.TestCase):
         self.assertRegex(mock_log_error.call_args.args[0], r'^Error loading collection file.+$')
 
 class TestUpdateLibrary(unittest.TestCase):
+    def create_mock_file_mapping(self, index: int) -> tuple[str, str]:
+        create_mock_path: Callable[[str, int], str] = lambda p, n: os.path.join(p, f"mock_file_{n}")
+        return (create_mock_path(MOCK_INPUT_DIR, index), create_mock_path(MOCK_OUTPUT_DIR, index))
+    
     @patch('src.sync_media_server.run_sync_mappings')
     @patch('src.sync_media_server.create_sync_mappings')
     @patch('src.tags_info.compare_tags')
@@ -1380,11 +1384,11 @@ class TestUpdateLibrary(unittest.TestCase):
         # Set up mocks
         mock_temp_dir_path = '/mock/temp/dir'
         mock_collection = MagicMock()
-        mock_compare_tags.return_value = [] # mock no changes to sync
-        mock_create_sync_mappings.return_value = [
-            (os.path.join(MOCK_INPUT_DIR, 'mock_file_0'), os.path.join(MOCK_OUTPUT_DIR, 'mock_file_0'))
-        ]
+        mock_changed_mappings = [self.create_mock_file_mapping(0)]
+        mock_created_mappings = [self.create_mock_file_mapping(1)]
         
+        mock_compare_tags.return_value = mock_changed_mappings.copy()
+        mock_create_sync_mappings.return_value = mock_created_mappings.copy()
         mock_temp_dir.return_value.__enter__.return_value = mock_temp_dir_path
         mock_record_collection.return_value = mock_collection
         
@@ -1418,7 +1422,8 @@ class TestUpdateLibrary(unittest.TestCase):
         mock_create_sync_mappings.assert_called_once_with(mock_collection, mock_client_mirror)
         
         ## Call parameters: run_sync_mappings
-        mock_run_sync_mappings.assert_called_once_with(mock_create_sync_mappings.return_value)
+        expected_mappings = mock_created_mappings + mock_changed_mappings
+        mock_run_sync_mappings.assert_called_once_with(expected_mappings)
         
     @patch('src.sync_media_server.run_sync_mappings')
     @patch('src.batch_operations_music.sweep')
