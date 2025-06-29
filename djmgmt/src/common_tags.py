@@ -41,12 +41,26 @@ class Tags:
         if not isinstance(other, Tags):
             return False
         
+        # DBG
+        if self.artist != other.artist:
+            logging.warning('no match: artist')
+        if self.album != other.album:
+            logging.warning('no match: album')
+        if self.title != other.title:
+            logging.warning('no match: title')
+        if self.genre != other.genre:
+            logging.warning('no match: genre')
+        if self.key != other.key:
+            logging.warning('no match: key')
+        if not (all([self.cover_image, other.cover_image]) or not any([self.cover_image, other.cover_image])):
+            logging.warning('no match: one file has missing cover image')
+        
         return (self.artist == other.artist and
                 self.album == other.album and
                 self.title == other.title and
                 self.genre == other.genre and
                 self.key == other.key and
-                self._eq_cover_image(other))
+                (all([self.cover_image, other.cover_image]) or not any([self.cover_image, other.cover_image])))
     
     def __hash__(self) -> int:
         return hash((
@@ -159,6 +173,7 @@ def extract_tag_value(track: mutagen.FileType, tag_keys: set[str]) -> Optional[s
     return value
 
 def extract_cover_image(track: mutagen.FileType) -> tuple[Optional[Image.Image], Optional[str]]:
+    # TODO: extract the image that's labelled as a cover image, current logic can extract non-cover images
     image: Optional[Image.Image] = None
     image_type: Optional[str] = None
     data = None
@@ -234,4 +249,9 @@ def basic_identifier(title: str, artist: str) -> str:
 
 if __name__ == '__main__':
     # dev testing
+    # TODO: investigate:
+    #       key: /Users/zachvp/Music/DJ/CharVoni – Always There (Intense Dub Mix).aiff (present in RB but not MP3 tag)
+    #       genre: /Users/zachvp/Music/DJ/_samples/misc/madagascar 2 - raise your arms.wav (present in RB but not MP3 tag)
+    #       cover: /Users/zachvp/Music/DJ/Christa Vi, Joyce Muniz - Wake Beside You F.aiff
+    
     pass

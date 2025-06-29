@@ -4,6 +4,7 @@ import os
 from . import constants
 
 # Constants
+# TODO: use project path as root for logs, they shouldn't be in src/
 DEFAULT_PATH = os.path.abspath(__file__)
 
 def configure_log(level=logging.DEBUG, path=DEFAULT_PATH) -> None:

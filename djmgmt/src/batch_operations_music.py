@@ -565,11 +565,7 @@ def update_library(source: str,
         # move the processed files to the library, and update the djmgmt collection record
         sweep(processing_dir, library, interactive, valid_extensions, prefix_hints)
         collection = record_collection(library, COLLECTION_PATH)
-        # 1. Re-sync outdated files:
-        #     * determine file path pairs with changed metadata (DJ lib path, lossy lib path)
-        #     * extract all date contexts from lossy lib paths, get minimum
-        #     * pass all date contexts as override param to sync
-        #         * for each date context: re-encode and re-transfer TODO
+
         # combine any changed mappings with the standard filtered collection mappings
         changed = tags_info.compare_tags(library, client_mirror_path)
         mappings = sync_media_server.create_sync_mappings(collection, client_mirror_path)
