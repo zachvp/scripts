@@ -16,15 +16,13 @@ class Tags:
                  title           : Optional[str]=None,
                  genre           : Optional[str]=None,
                  key             : Optional[str]=None,
-                 cover_image     : Optional[Image.Image] = None,
-                 cover_image_str : Optional[str]=None):
+                 cover_image     : Optional[Image.Image] = None):
         self.artist = artist
         self.album = album
         self.title = title
         self.genre = genre
         self.key = key
         self.cover_image = cover_image
-        self.cover_image_str = cover_image_str
     
     def __str__(self) -> str:
         output = {
@@ -32,8 +30,7 @@ class Tags:
             'album'       : self.album,
             'title'       : self.title,
             'genre'       : self.genre,
-            'key'         : self.key,
-            'cover_image' : self.cover_image_str
+            'key'         : self.key
         }
         return str(output)
     
@@ -52,15 +49,15 @@ class Tags:
             logging.warning('no match: genre')
         if self.key != other.key:
             logging.warning('no match: key')
-        if not (all([self.cover_image, other.cover_image]) or not any([self.cover_image, other.cover_image])):
-            logging.warning('no match: one file has missing cover image')
+        if not self._eq_cover_image(other, 5):
+            logging.warning('no match: cover image')
         
-        return (self.artist == other.artist and
-                self.album == other.album and
-                self.title == other.title and
-                self.genre == other.genre and
-                self.key == other.key and
-                (all([self.cover_image, other.cover_image]) or not any([self.cover_image, other.cover_image])))
+        return all([self.artist == other.artist,
+                    self.album  == other.album,
+                    self.title  == other.title,
+                    self.genre  == other.genre,
+                    self.key    == other.key,
+                    self._eq_cover_image(other, 5)])
     
     def __hash__(self) -> int:
         return hash((
@@ -69,8 +66,7 @@ class Tags:
             self.title,
             self.genre,
             self.key,
-            self._hash_cover_image(),
-            self.cover_image_str
+            self._hash_cover_image()
         ))
     
     def _hash_cover_image(self) -> Optional[imagehash.ImageHash]:
@@ -169,38 +165,40 @@ def get_track_key(track: mutagen.FileType, options: set[str]) -> Optional[str]:
 def extract_tag_value(track: mutagen.FileType, tag_keys: set[str]) -> Optional[str]:
     key = get_track_key(track, tag_keys)
     value = str(track[key]) if key and key in track else None
+    value = value[0] if isinstance(value, list) else value
 
     return value
 
-def extract_cover_image(track: mutagen.FileType) -> tuple[Optional[Image.Image], Optional[str]]:
-    # TODO: extract the image that's labelled as a cover image, current logic can extract non-cover images
+def extract_cover_image(track: mutagen.FileType) -> Optional[Image.Image]:
     image: Optional[Image.Image] = None
-    image_type: Optional[str] = None
     data = None
     
     # extract image for files with ID3 tags (MP3, AIFF, WAV)
     for tag in track.tags.values(): # type: ignore
         if isinstance(tag, mutagen.id3.APIC):
             data = tag.data # type: ignore
-            image_type = str(tag.type) # type: ignore
     
     # extract image for FLAC files
-    if image is None and isinstance(track, mutagen.flac.FLAC): # type: ignore
+    if data is None and isinstance(track, mutagen.flac.FLAC): # type: ignore
         if track.pictures:  # type: ignore
             picture = track.pictures[0] # type: ignore
             data = picture.data
-            # standardize the type
-            image_type = str(mutagen.id3.PictureType(picture.type))
     
-    # Load the image data
+    # load the image data
     if data:     
         try:
+            # attempt image verification, which will raise an exception if it fails
             image = Image.open(io.BytesIO(data))
-            image.load()
+            image.verify()
+            
+            # re-open the image to refresh the file pointer to a valid state
+            image = Image.open(io.BytesIO(data))
         except Exception as e:
+            # image may be invalid, so set to None
+            image = None
             logging.warning(f"Invalid image data:\n{e}")
     
-    return image, image_type
+    return image
 
 def read_tags(path: str) -> Optional[Tags]:
     # define possible tag keys
@@ -226,7 +224,7 @@ def read_tags(path: str) -> Optional[Tags]:
     album = extract_tag_value(track, album_keys)
     genre = extract_tag_value(track, genre_keys)
     key = extract_tag_value(track, music_key_keys)
-    cover_image, cover_string = extract_cover_image(track)
+    cover_image = extract_cover_image(track)
     
     # failure if title and artist not present
     if title is None and artist is None:
@@ -237,7 +235,7 @@ def read_tags(path: str) -> Optional[Tags]:
     if artist is None or title is None:
         logging.warning(f"missing title or artist for '{path}'")
 
-    return Tags(artist, album, title, genre, key, cover_image, cover_string)
+    return Tags(artist, album, title, genre, key, cover_image)
 
 def basic_identifier(title: str, artist: str) -> str:
     if not title:
@@ -246,12 +244,3 @@ def basic_identifier(title: str, artist: str) -> str:
         artist = 'none'
     
     return f"{artist} - {title}".strip().lower()
-
-if __name__ == '__main__':
-    # dev testing
-    # TODO: investigate:
-    #       key: /Users/zachvp/Music/DJ/CharVoni – Always There (Intense Dub Mix).aiff (present in RB but not MP3 tag)
-    #       genre: /Users/zachvp/Music/DJ/_samples/misc/madagascar 2 - raise your arms.wav (present in RB but not MP3 tag)
-    #       cover: /Users/zachvp/Music/DJ/Christa Vi, Joyce Muniz - Wake Beside You F.aiff
-    
-    pass

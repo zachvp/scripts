@@ -15,34 +15,32 @@ from src.common_tags import Tags
 
 # Constants
 ## Mock input arguments and values
-MOCK_INPUT_PATH = '/mock/input'
-MOCK_ARTIST = 'mock_artist'
-MOCK_ALBUM = 'mock_album'
-MOCK_TITLE = 'mock_title'
-MOCK_GENRE = 'mock_genre'
-MOCK_MUSIC_KEY = 'mock_music_key'
-MOCK_IMAGE = Image.new('RGB', (1, 1), color='white')
-MOCK_IMAGE_DESCRIPTION = 'mock_image_description'
-MOCK_DIFF = 'mock_diff'
+MOCK_INPUT_PATH    = '/mock/input'
+MOCK_ARTIST        = 'mock_artist'
+MOCK_ALBUM         = 'mock_album'
+MOCK_TITLE         = 'mock_title'
+MOCK_GENRE         = 'mock_genre'
+MOCK_MUSIC_KEY_KEY = 'mock_music_key'
+MOCK_IMAGE         = Image.new('RGB', (1, 1), color='white')
+MOCK_DIFF          = 'mock_diff'
 
 ## Mock tag data keys
-MOCK_TITLE_KEY = 'mock_title_key'
-MOCK_ARTIST_KEY = 'mock_artist_key'
-MOCK_ALBUM_KEY = 'mock_album_key'
-MOCK_GENRE_KEY = 'mock_genre_key'
-MOCK_MUSIC_KEY = 'mock_music_key'
+MOCK_TITLE_KEY     = 'mock_title_key'
+MOCK_ARTIST_KEY    = 'mock_artist_key'
+MOCK_ALBUM_KEY     = 'mock_album_key'
+MOCK_GENRE_KEY     = 'mock_genre_key'
+MOCK_MUSIC_KEY_KEY = 'mock_music_key_key'
 
 ## Mock track file data
-MOCK_TRACK_DATA = {
-    MOCK_TITLE_KEY: MOCK_TITLE,
-    MOCK_ARTIST_KEY: MOCK_ARTIST,
-    MOCK_ALBUM_KEY: MOCK_ALBUM,
-    MOCK_GENRE_KEY: MOCK_GENRE,
-    MOCK_MUSIC_KEY: MOCK_MUSIC_KEY,
+MOCK_TRACK_TAGS = {
+    MOCK_TITLE_KEY     : MOCK_TITLE,
+    MOCK_ARTIST_KEY    : MOCK_ARTIST,
+    MOCK_ALBUM_KEY     : MOCK_ALBUM,
+    MOCK_GENRE_KEY     : MOCK_GENRE,
+    MOCK_MUSIC_KEY_KEY : MOCK_MUSIC_KEY_KEY,
 }
-MOCK_IMAGE_TYPE = mutagen.id3.PictureType.COVER_FRONT
 
-# Classes: Corresponds to each type in constants.EXTENSIONS
+# Mock classes: Corresponds to each type in constants.EXTENSIONS
 class MockMP3(MagicMock, mutagen.mp3.MP3):
     pass
 
@@ -75,12 +73,11 @@ def create_full_mock_tags() -> Tags:
                 MOCK_ALBUM,
                 MOCK_TITLE,
                 MOCK_GENRE,
-                MOCK_MUSIC_KEY,
-                MOCK_IMAGE,
-                MOCK_IMAGE_DESCRIPTION)
+                MOCK_MUSIC_KEY_KEY,
+                MOCK_IMAGE)
 
 class TestTags(unittest.TestCase):
-    '''Tests for creating a Tags instance.'''
+    '''Tests for the Tags class.'''
     
     def test_success_init_full(self) -> None:
         '''Tests that all attributes are properly initialized.'''
@@ -92,12 +89,11 @@ class TestTags(unittest.TestCase):
         self.assertEqual(actual.album, MOCK_ALBUM)
         self.assertEqual(actual.title, MOCK_TITLE)
         self.assertEqual(actual.genre, MOCK_GENRE)
-        self.assertEqual(actual.key, MOCK_MUSIC_KEY)
+        self.assertEqual(actual.key, MOCK_MUSIC_KEY_KEY)
         
         ## Image assertions: compare byte contents
         self.assertIsNotNone(actual.cover_image)
         self.assertEqual(image_to_bytes(cast(Image.Image, actual.cover_image)), image_to_bytes(MOCK_IMAGE))
-        self.assertEqual(actual.cover_image_str, MOCK_IMAGE_DESCRIPTION)
         
     def test_success_str(self) -> None:
         '''Tests that all attributes are present in the string representation.'''
@@ -109,8 +105,7 @@ class TestTags(unittest.TestCase):
         self.assertIn(MOCK_ALBUM, actual)
         self.assertIn(MOCK_TITLE, actual)
         self.assertIn(MOCK_GENRE, actual)
-        self.assertIn(MOCK_MUSIC_KEY, actual)
-        self.assertIn(MOCK_IMAGE_DESCRIPTION, actual)
+        self.assertIn(MOCK_MUSIC_KEY_KEY, actual)
     
     def test_success_eq(self) -> None:
         '''Tests that two Tags instances with identical attributes are considered equal.'''
@@ -169,135 +164,54 @@ class TestTags(unittest.TestCase):
         
         self.assertNotEqual(lhs, rhs)
         
-    def test_success_not_eq_cover_image(self) -> None:
+    @patch('src.common_tags.Tags._eq_cover_image')
+    def test_success_not_eq_cover_image(self, mock_eq_cover: MagicMock) -> None:
         '''Tests that two Tags instances with different cover image attributes are considered unequal.'''
         lhs = create_full_mock_tags()
         rhs = create_full_mock_tags()
-        
-        rhs.cover_image = Image.new('RGB', (1, 1), color='black')
+        mock_eq_cover.return_value = False
         
         self.assertNotEqual(lhs, rhs)
 
-class TestReadTags(unittest.TestCase):
-    '''Tests for read_tags.'''
-    
-    # Helpers
-    def assert_image(self, actual: Tags, mock_data) -> None:
-        # Assert image content matches mock data
-        self.assertIsNotNone(actual)
-        image = cast(Image.Image, actual.cover_image)
-        self.assertEqual(image_to_bytes(image), mock_data)
-        
-        # Assert the image type was extracted to Tags instance
-        self.assertEqual(actual.cover_image_str, str(MOCK_IMAGE_TYPE))
-        
-    def create_mock_tag_data(self, mock_data: bytes, include_tags: bool = True) -> MagicMock:
-        mock_tag_data = MagicMock()
-        tags_data = {
-            'mock_id3_apic': mutagen.id3.APIC(data=mock_data, type=MOCK_IMAGE_TYPE),
-        }
-        if not include_tags:
-            tags_data = {}
-        mock_tag_data.__contains__.side_effect = tags_data.__contains__
-        mock_tag_data.__getitem__.side_effect = tags_data.__getitem__
-        mock_tag_data.values.side_effect = tags_data.values
-        return mock_tag_data
-    
-    def configure_mock_track(self, mock_track: MagicMock) -> None:
-        mock_track.__contains__.side_effect = MOCK_TRACK_DATA.__contains__ # type: ignore
-        mock_track.__getitem__.side_effect = MOCK_TRACK_DATA.__getitem__ # type: ignore
-        
-    def run_read_tags_id3_filetype(self, mock_track: MagicMock, mock_file_constructor: MagicMock, mock_get_track_key: MagicMock):
-        '''Common test runner for ID3-like file type cases (e.g. MP3, AIFF, WAV).'''
-        # Mock data
-        mock_data = create_mock_image_data()
-        
-        # Configure mocks
-        self.configure_mock_track(mock_track)
-        
-        ## Configure the mock mutagen tags
-        mock_tag_data = self.create_mock_tag_data(mock_data)
-        
-        # Set the mock attributes
-        mock_track.tags = mock_tag_data
-        mock_file_constructor.return_value = mock_track
-        
-        ## Mock get track key
-        mock_get_track_key.side_effect = [ MOCK_TITLE_KEY, MOCK_ARTIST_KEY, MOCK_ALBUM_KEY, MOCK_GENRE_KEY, MOCK_MUSIC_KEY]
-        
-        # Call target function
-        actual = common_tags.read_tags(MOCK_INPUT_PATH)
-        
-        # Assert expectations
-        mock_file_constructor.assert_called_once_with(MOCK_INPUT_PATH)
-        
-        self.assertIsNotNone(actual)
-        actual = cast(Tags, actual)
-        
-        ## Assert existing tags
-        self.assertEqual(actual.artist, MOCK_ARTIST)
-        self.assertEqual(actual.album, MOCK_ALBUM)
-        self.assertEqual(actual.title, MOCK_TITLE)
-        self.assertEqual(actual.genre, MOCK_GENRE)
-        self.assertEqual(actual.key, MOCK_MUSIC_KEY)
-        
-        ## Assert that the Tags instance contains a PIL.Image with the expected data
-        self.assert_image(actual, mock_data)
+class TestExtractCoverImage(unittest.TestCase):
+    '''Tests for common_tags.extract_cover_image.'''
     
     # Test cases
-    @patch('src.common_tags.get_track_key')
-    @patch('mutagen.File')
-    def test_success_mp3(self,
-                         mock_file_constructor: MagicMock,
-                         mock_get_track_key: MagicMock) -> None:
-        '''Tests that the MP3 file tags are properly read when they're all present.'''
+    def test_success_mp3(self) -> None:
+        '''Tests that the cover image is properly extracted for MP3.'''
         # Set up mocks
         mock_track = MockMP3()
         
         # Run the common test logic for file type
-        self.run_read_tags_id3_filetype(mock_track, mock_file_constructor, mock_get_track_key)
+        self.run_extract_cover_id3_filetype(mock_track)
         
-    @patch('src.common_tags.get_track_key')
-    @patch('mutagen.File')
-    def test_success_wav(self,
-                         mock_file_constructor: MagicMock,
-                         mock_get_track_key: MagicMock) -> None:
-        '''Tests that the WAV file tags are properly read when they're all present.'''
+    def test_success_wav(self) -> None:
+        '''Tests that the cover image is properly extracted for WAV.'''
         # Set up mocks
         mock_track = MockWav()
         
         # Run the common test logic for file type
-        self.run_read_tags_id3_filetype(mock_track, mock_file_constructor, mock_get_track_key)
+        self.run_extract_cover_id3_filetype(mock_track)
         
-    @patch('src.common_tags.get_track_key')
-    @patch('mutagen.File')
-    def test_success_aiff(self,
-                          mock_file_constructor: MagicMock,
-                          mock_get_track_key: MagicMock) -> None:
-        '''Tests that the AIFF file tags are properly read when they're all present.'''
+    def test_success_aiff(self) -> None:
+        '''Tests that the cover image is properly extracted for AIFF.'''
         # Set up mocks
         mock_track = MockAIFF()
         
         # Run the common test logic for file type
-        self.run_read_tags_id3_filetype(mock_track, mock_file_constructor, mock_get_track_key)
+        self.run_extract_cover_id3_filetype(mock_track)
         
-    @patch('src.common_tags.get_track_key')
-    @patch('mutagen.File')
-    def test_success_flac(self,
-                          mock_file_constructor: MagicMock,
-                          mock_get_track_key: MagicMock) -> None:
-        '''Tests that the FLAC file tags are properly read when they're all present.'''
+    def test_success_flac(self) -> None:
+        '''Tests that the cover image is properly extracted for FLAC.'''
         # Set up mocks: FLAC images are stored differently than ID3-like images, so custom mocking is required.
         mock_data = create_mock_image_data()
 
         ## Mock the track file contents
         mock_track = MockFLAC(spec=mutagen.flac.FLAC)
-        self.configure_mock_track(mock_track)
         
-        # Additional mock config for FLAC picture
+        ## Additional mock config for FLAC picture
         picture = mutagen.flac.Picture()
         picture.data = mock_data
-        picture.type = MOCK_IMAGE_TYPE
         mock_track.metadata_blocks = []
         mock_track.add_picture(picture)
         
@@ -306,10 +220,99 @@ class TestReadTags(unittest.TestCase):
         
         # Set the mock attributes
         mock_track.tags = mock_tag_data
-        mock_file_constructor.return_value = mock_track
         
-        ## Mock get track key
-        mock_get_track_key.side_effect = [ MOCK_TITLE_KEY, MOCK_ARTIST_KEY, MOCK_ALBUM_KEY, MOCK_GENRE_KEY, MOCK_MUSIC_KEY]
+        # Call target function
+        actual = common_tags.extract_cover_image(mock_track)
+        
+        # Assert expectations
+        ## Assert that the function extracted the expected image instance
+        actual = cast(Image.Image, actual)
+        self.assert_image(actual, mock_data)
+
+    def test_success_no_image(self) -> None:
+        '''Tests that a track without image metatadata returns None.'''
+        # Set up mocks
+        mock_track = MagicMock()
+        
+        # Call target function
+        actual = common_tags.extract_cover_image(mock_track)
+        
+        # Assert expectations
+        self.assertIsNone(actual)
+    
+    @patch('logging.warning')
+    @patch('PIL.PngImagePlugin.PngImageFile.verify') # mock images use PNG instance
+    def test_error_invalid_image(self, mock_verify: MagicMock, mock_log_warning: MagicMock) -> None:
+        '''Tests that a track that has corrupted image data will return None and log a warning.'''
+        # Set up mocks
+        ## Mock track
+        mock_track = MockMP3()
+        mock_data = create_mock_image_data()
+        mock_tag_data = self.create_mock_tag_data(mock_data)
+        mock_track.tags = mock_tag_data
+        
+        ## Mock verification error
+        mock_verify.side_effect = Exception('mock image verification error')
+        
+        # Call target function
+        actual = common_tags.extract_cover_image(mock_track)
+        
+        # Assert expectations
+        self.assertIsNone(actual)
+        mock_log_warning.assert_called()
+        
+    # Helpers
+    def assert_image(self, actual: Image.Image, mock_data) -> None:
+        # Assert image content matches mock data
+        self.assertIsNotNone(actual)
+        self.assertEqual(image_to_bytes(actual), mock_data)
+        
+    def create_mock_tag_data(self, mock_data: bytes, include_tags: bool = True) -> MagicMock:
+        mock_tag_data = MagicMock()
+        tags_data = {}
+        if include_tags:
+            tags_data = {
+                'mock_id3_apic': mutagen.id3.APIC(data=mock_data),
+            }
+
+        mock_tag_data.__contains__.side_effect = tags_data.__contains__
+        mock_tag_data.__getitem__.side_effect = tags_data.__getitem__
+        mock_tag_data.values.side_effect = tags_data.values
+        return mock_tag_data
+        
+    def run_extract_cover_id3_filetype(self, mock_track: MagicMock):
+        '''Common test runner for ID3-like file type cases (e.g. MP3, AIFF, WAV).'''
+        # Configure mock data for the image and tags
+        mock_data = create_mock_image_data()
+        
+        mock_tag_data = self.create_mock_tag_data(mock_data)
+        mock_track.tags = mock_tag_data
+        
+        # Call target function
+        actual = common_tags.extract_cover_image(mock_track)
+        
+        # Assert expectations
+        ## Assert that the function extracted the expected image instance
+        actual = cast(Image.Image, actual)
+        self.assert_image(actual, mock_data)
+
+class TestReadTags(unittest.TestCase):
+    '''Tests for read_tags.'''
+    @patch('src.common_tags.extract_cover_image')
+    @patch('src.common_tags.extract_tag_value')
+    @patch('mutagen.File')
+    def test_success(self,
+                     mock_file_constructor: MagicMock,
+                     mock_extract_tag_value: MagicMock,
+                     mock_extract_cover_image: MagicMock):
+        '''Common test runner for ID3-like file type cases (e.g. MP3, AIFF, WAV).'''
+        # Configure mocks
+        mock_track = MagicMock()
+        self.configure_mock_track(mock_track)
+        
+        mock_file_constructor.return_value = mock_track
+        mock_extract_tag_value.side_effect = [ MOCK_TITLE, MOCK_ARTIST, MOCK_ALBUM, MOCK_GENRE, MOCK_MUSIC_KEY_KEY]
+        mock_extract_cover_image.return_value = MOCK_IMAGE
         
         # Call target function
         actual = common_tags.read_tags(MOCK_INPUT_PATH)
@@ -325,39 +328,10 @@ class TestReadTags(unittest.TestCase):
         self.assertEqual(actual.album, MOCK_ALBUM)
         self.assertEqual(actual.title, MOCK_TITLE)
         self.assertEqual(actual.genre, MOCK_GENRE)
-        self.assertEqual(actual.key, MOCK_MUSIC_KEY)
-        
-        ## Assert that the Tags instance contains a PIL.Image with the expected data
-        self.assert_image(actual, mock_data)
-
-    @patch('src.common_tags.get_track_key')
-    @patch('mutagen.File')
-    def test_success_no_cover_image(self,
-                                    mock_file_constructor: MagicMock,
-                                    mock_get_track_key: MagicMock) -> None:
-        '''Tests that the existing and new tags are properly read from a track when they're all present.'''
-        # Set up mocks
-        mock_file = MagicMock()
-        self.configure_mock_track(mock_file)
-        mock_file_constructor.return_value = mock_file
-        
-        ## Mock get track key
-        mock_get_track_key.side_effect = [ MOCK_TITLE_KEY, MOCK_ARTIST_KEY, MOCK_ALBUM_KEY, MOCK_GENRE_KEY, MOCK_MUSIC_KEY]
-        
-        # Call target function
-        actual = common_tags.read_tags(MOCK_INPUT_PATH)
-        
-        # Assert expectations
-        self.assertIsNotNone(actual)
-        actual = cast(Tags, actual)
-        self.assertEqual(actual.artist, MOCK_ARTIST)
-        self.assertEqual(actual.album, MOCK_ALBUM)
-        self.assertEqual(actual.title, MOCK_TITLE)
-        self.assertEqual(actual.genre, MOCK_GENRE)
-        self.assertEqual(actual.key, MOCK_MUSIC_KEY)
-        self.assertIsNone(actual.cover_image)
-        self.assertIsNone(actual.cover_image_str)
-        
+        self.assertEqual(actual.key, MOCK_MUSIC_KEY_KEY)
+        self.assertEqual(actual.cover_image, MOCK_IMAGE)
+    
+    # Test cases
     @patch('src.common_tags.get_track_key')
     @patch('mutagen.File')
     def test_success_no_artist_no_title(self,
@@ -365,20 +339,26 @@ class TestReadTags(unittest.TestCase):
                                         mock_get_track_key: MagicMock) -> None:
         '''Tests that None is returned when title and artist are missing.'''
         # Set up mocks
-        mock_file = MagicMock()
-        self.configure_mock_track(mock_file)
-        mock_file_constructor.return_value = mock_file
+        mock_track = MagicMock()
+        self.configure_mock_track(mock_track)
+        mock_file_constructor.return_value = mock_track
         
         ## Mock get track key
-        mock_get_track_key.side_effect = [ None, None, MOCK_ALBUM_KEY, MOCK_GENRE_KEY, MOCK_MUSIC_KEY]
+        mock_get_track_key.side_effect = [ None, None, MOCK_ALBUM_KEY, MOCK_GENRE_KEY, MOCK_MUSIC_KEY_KEY]
         
         # Call target function
         actual = common_tags.read_tags(MOCK_INPUT_PATH)
         
         self.assertIsNone(actual)
+        
+    # Helpers
+    def configure_mock_track(self, mock_track: MagicMock) -> None:
+        mock_track.__contains__.side_effect = MOCK_TRACK_TAGS.__contains__ # type: ignore
+        mock_track.__getitem__.side_effect = MOCK_TRACK_TAGS.__getitem__ # type: ignore
 
-class TestCoverHash(unittest.TestCase):
-    '''Tests for the newly requested 'cover_hash' function.'''
+class TestTagsHashCoverImage(unittest.TestCase):
+    '''Tests for the 'common_tags.Tags._hash_cover_image' method.'''
+    
     @patch('imagehash.phash')
     def test_success_image_present(self, mock_phash: MagicMock) -> None:
         '''Tests that a Tags instance containing an image is hashed with that image.'''
@@ -402,7 +382,7 @@ class TestCoverHash(unittest.TestCase):
                     MOCK_ALBUM,
                     MOCK_TITLE,
                     MOCK_GENRE,
-                    MOCK_MUSIC_KEY)
+                    MOCK_MUSIC_KEY_KEY)
         actual = tags._hash_cover_image()
         
         # Assert expectations
@@ -426,7 +406,8 @@ class TestCoverHash(unittest.TestCase):
         mock_log_error.assert_called()
         
 class TestEQCoverImage(unittest.TestCase):
-    '''Tests for the newly requested 'compare_cover' function.'''
+    '''Tests for the 'common_tags.Tags._eq_cover_image' function.'''
+    
     @patch('src.common_tags.Tags._hash_cover_image')
     def test_success_same_images(self, mock_cover_hash: MagicMock) -> None:
         '''Tests that comparison for images with the same hash returns True.'''
