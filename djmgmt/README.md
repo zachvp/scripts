@@ -11,5 +11,8 @@
 5. Read Rekordbox DB for unassigned Tags in _pruned
 6. Use GitHub for project management
 
-## Library remediation
+## Manual library goals
 1. Refactor genres: Move House/Techno to Techno/
+2. Backup SoundCloud mixes locally: create local mirror of all uploaded signature mixes
+    Add cover image, encode to MP3
+    Use mix URL -> recording filename as possible hint
