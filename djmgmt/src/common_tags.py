@@ -175,14 +175,15 @@ def extract_cover_image(track: mutagen.FileType) -> Optional[Image.Image]:
     
     # extract image for files with ID3 tags (MP3, AIFF, WAV)
     for tag in track.tags.values(): # type: ignore
-        if isinstance(tag, mutagen.id3.APIC):
+        if isinstance(tag, mutagen.id3.APIC) and tag.type == mutagen.id3.PictureType.COVER_FRONT: # type: ignore
             data = tag.data # type: ignore
     
     # extract image for FLAC files
-    if data is None and isinstance(track, mutagen.flac.FLAC): # type: ignore
-        if track.pictures:  # type: ignore
-            picture = track.pictures[0] # type: ignore
-            data = picture.data
+    if data is None and isinstance(track, mutagen.flac.FLAC):
+        if track.pictures:
+            for picture in track.pictures:
+                if picture.type == mutagen.id3.PictureType.COVER_FRONT:
+                    data = picture.data
     
     # load the image data
     if data:     

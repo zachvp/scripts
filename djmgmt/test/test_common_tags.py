@@ -207,10 +207,11 @@ class TestExtractCoverImage(unittest.TestCase):
         mock_data = create_mock_image_data()
 
         ## Mock the track file contents
-        mock_track = MockFLAC(spec=mutagen.flac.FLAC)
+        mock_track = MockFLAC()
         
         ## Additional mock config for FLAC picture
         picture = mutagen.flac.Picture()
+        picture.type = mutagen.id3.PictureType.COVER_FRONT
         picture.data = mock_data
         mock_track.metadata_blocks = []
         mock_track.add_picture(picture)
