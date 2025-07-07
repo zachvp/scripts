@@ -25,7 +25,7 @@ COLLECTION_XML = f'''
 
 <DJ_PLAYLISTS Version="1.0.0">
     <PRODUCT Name="rekordbox" Version="6.8.5" Company="AlphaTheta"/>
-    <COLLECTION Entries="1">
+    <COLLECTION Entries="0">
     
     </COLLECTION>
     <PLAYLISTS>
@@ -1461,6 +1461,3 @@ class TestUpdateLibrary(unittest.TestCase):
         mock_record_collection.assert_called_once()
         mock_sweep.assert_called_once()
         mock_run_sync_mappings.assert_called_once()
-
-if __name__ == "__main__":
-    unittest.main()

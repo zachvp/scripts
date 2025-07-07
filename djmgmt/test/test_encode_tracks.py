@@ -421,6 +421,3 @@ class TestEncodeLossy(unittest.IsolatedAsyncioTestCase):
         mock_collect_paths.assert_called_once_with(args.input)
         mock_add_output_path.assert_called_once_with(args.output, mock_collect_paths.return_value, args.input)
         mock_encode_lossy.assert_called_once_with(mock_add_output_path.return_value, args.extension)
-
-if __name__ == "__main__":
-    unittest.main()

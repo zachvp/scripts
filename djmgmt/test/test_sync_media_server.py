@@ -483,7 +483,3 @@ class TestCreateSyncMappings(unittest.TestCase):
                                                          MOCK_OUTPUT_DIR,
                                                          playlist_ids={'1'},
                                                          metadata_path=True)
-
-
-if __name__ == '__main__':
-    unittest.main()

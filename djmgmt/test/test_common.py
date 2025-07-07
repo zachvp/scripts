@@ -76,6 +76,3 @@ class TestFindDateContext(unittest.TestCase):
         actual = common.find_date_context(path)
         
         self.assertIsNone(actual)
-
-if __name__ == '__main__':
-    unittest.main()
