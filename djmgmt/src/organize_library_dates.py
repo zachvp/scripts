@@ -145,6 +145,39 @@ def find_node(collection: ET.ElementTree, xpath: str) -> ET.Element:
     assert node, f"unable to find {xpath} for collection"
     return node
 
+def filter_path_mappings(mappings: list[tuple[str, str]], collection: ET.Element, playlist_xpath: str) -> list[tuple[str, str]]:
+    # output data
+    filtered = []
+    
+    # find the collection node
+    collection_node = collection.find(constants.XPATH_COLLECTION)
+    if collection_node is None:
+        return filtered
+    
+    # find the playlist node
+    playlist = collection.find(playlist_xpath)
+    if playlist is None:
+        return filtered
+    
+    # extract track keys from the playlist
+    track_keys = set()
+    for track in playlist:
+        key = track.get(constants.ATTR_TRACK_KEY)
+        if key:
+            track_keys.add(key)
+    
+    # extract playlist track system paths from the collection
+    track_paths = set()
+    for track in collection_node:
+        track_id = track.get(constants.ATTR_TRACK_ID)
+        path = track.get(constants.ATTR_PATH)
+        if track_id and path and track_id in track_keys:
+            track_paths.add(collection_path_to_syspath(path))
+    
+    # filter the mappings according to the track paths
+    filtered = [mapping for mapping in mappings if mapping[0] in track_paths]
+    return filtered
+
 # Dev functions
 def dev_debug():
     test_str =\

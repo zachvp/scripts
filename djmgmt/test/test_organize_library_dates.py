@@ -237,5 +237,172 @@ class TestCollectionPathToSyspath(unittest.TestCase):
         expected = '/Users/user/Music/DJ/MOCK - COMPLEX_PATH.aiff'
         self.assertEqual(actual, expected)
 
-if __name__ == "__main__":
-    unittest.main()
+# Constants: filter path mappings
+## track XML with a simple, non-encoded location
+TRACK_XML_PLAYLIST_SIMPLE = '''
+    <TRACK
+        TrackID="1"
+        Name="Test Track"
+        Artist="MOCK_ARTIST"
+        Album="MOCK_ALBUM"
+        DateAdded="2020-02-03"
+        Location="file://localhost/Users/user/Music/DJ/MOCK_PLAYLIST_FILE.aiff">
+    </TRACK>
+'''.strip()
+
+## track XML with a URL-encoded location
+TRACK_XML_PLAYLIST_ENCODED = '''
+    <TRACK
+        TrackID="2"
+        Name="Test Track"
+        Artist="MOCK_ARTIST"
+        Album="MOCK_ALBUM"
+        DateAdded="2020-02-03"
+        Location="file://localhost/Users/user/Music/DJ/haircuts%20for%20men%20-%20%e8%8a%b1%e3%81%a8%e9%b3%a5%e3%81%a8%e5%b1%b1.aiff">
+    </TRACK>
+'''.strip()
+
+## track XML not present in playlist
+TRACK_XML_COLLECTION = '''
+    <TRACK
+        TrackID="3"
+        Name="Test Track"
+        Artist="MOCK_ARTIST"
+        Album="MOCK_ALBUM"
+        DateAdded="2020-02-03"
+        Location="file://localhost/Users/user/Music/DJ/MOCK_COLLECTION_FILE.aiff">
+    </TRACK>
+'''.strip()
+
+# collection XML that contains 2 tracks present in the '_pruned' playlist, and 1 track that only exists in the collection
+DJ_PLAYLISTS_XML = f'''
+<?xml version="1.0" encoding="UTF-8"?>
+
+<DJ_PLAYLISTS Version="1.0.0">
+    <PRODUCT Name="rekordbox" Version="6.8.5" Company="AlphaTheta"/>
+    <COLLECTION Entries="3">
+    {TRACK_XML_COLLECTION}
+    {TRACK_XML_PLAYLIST_SIMPLE}
+    {TRACK_XML_PLAYLIST_ENCODED}
+    </COLLECTION>
+    <PLAYLISTS>
+        <NODE Type="0" Name="ROOT" Count="2">
+            <NODE Name="CUE Analysis Playlist" Type="1" KeyType="0" Entries="0"/>
+            <NODE Name="_pruned" Type="1" KeyType="0" Entries="2">
+            <TRACK Key="1"/>
+            <TRACK Key="2"/>
+            </NODE>
+        </NODE>
+    </PLAYLISTS>
+</DJ_PLAYLISTS>
+'''.strip()
+
+class TestFilterPathMappings(unittest.TestCase):
+    def test_success_mappings_simple(self) -> None:
+        '''Tests that the given simple mapping passes through the filter.'''
+        
+        # Call target function
+        mappings = [
+            # playlist file: simple
+            ('/Users/user/Music/DJ/MOCK_PLAYLIST_FILE.aiff', '/mock/output/MOCK_PLAYLIST_FILE.mp3'),
+        ]
+        collection = ET.fromstring(DJ_PLAYLISTS_XML)
+        actual = library.filter_path_mappings(mappings, collection, constants.XPATH_PRUNED)
+        
+        # Assert expectations
+        self.assertEqual(actual, mappings)
+        
+    def test_success_mappings_special_characters(self) -> None:
+        '''Tests that the given special character mapping passes through the filter.'''
+        
+        # Call target function
+        mappings = [
+            # playlist file: non-standard characters
+            ('/Users/user/Music/DJ/haircuts for men - 花と鳥と山.aiff', '/mock/output/haircuts for men - 花と鳥と山.mp3'),
+        ]
+        collection = ET.fromstring(DJ_PLAYLISTS_XML)
+        actual = library.filter_path_mappings(mappings, collection, constants.XPATH_PRUNED)
+        
+        # Assert expectations
+        self.assertEqual(actual, mappings)
+        
+    def test_success_mappings_non_playlist_file(self) -> None:
+        '''Tests that the given non-playlist file does not pass through the filter.'''
+        
+        # Call target function
+        mappings = [            
+            # non-playlist collection file
+            ('/Users/user/Music/DJ/MOCK_COLLECTION_FILE.aiff', '/mock/output/MOCK_COLLECTION_FILE.mp3'),
+        ]
+        collection = ET.fromstring(DJ_PLAYLISTS_XML)
+        actual = library.filter_path_mappings(mappings, collection, constants.XPATH_PRUNED)
+        
+        # Assert expectations
+        self.assertEqual(len(actual), 0)
+    
+    def test_success_empty_playlist(self) -> None:
+        '''Tests that no mappings are filtered for a collection with an empty playlist.'''
+        # Prepare input
+        ## Create the collection XML with no playlist elements
+        COLLECTION_XML_EMPTY_PLAYLIST = f'''
+            <?xml version="1.0" encoding="UTF-8"?>
+
+            <DJ_PLAYLISTS Version="1.0.0">
+                <PRODUCT Name="rekordbox" Version="6.8.5" Company="AlphaTheta"/>
+                <COLLECTION Entries="1">
+                {TRACK_XML_COLLECTION}
+                {TRACK_XML_PLAYLIST_SIMPLE}
+                </COLLECTION>
+                <PLAYLISTS>
+                    <NODE Type="0" Name="ROOT" Count="2">
+                        <NODE Name="CUE Analysis Playlist" Type="1" KeyType="0" Entries="0"/>
+                        <NODE Name="_pruned" Type="1" KeyType="0" Entries="1">
+                        </NODE>
+                    </NODE>
+                </PLAYLISTS>
+            </DJ_PLAYLISTS>
+            '''.strip()
+        ## Include some collection mappings
+        mappings = [
+            # playlist file: simple
+            ('/Users/user/Music/DJ/MOCK_FILE.aiff', '/mock/output/MOCK_FILE.mp3'),
+            
+            # non-playlist collection file
+            ('/Users/user/Music/DJ/MOCK_COLLECTION_FILE.aiff', '/mock/output/MOCK_COLLECTION_FILE.mp3'),
+        ]
+        collection = ET.fromstring(COLLECTION_XML_EMPTY_PLAYLIST)
+        
+        # Call target function
+        actual = library.filter_path_mappings(mappings, collection, constants.XPATH_PRUNED)
+        
+        # Assert expectations: no mappings should return for an empty playlist
+        self.assertEqual(len(actual), 0)
+    
+    def test_success_empty_mapping_input(self) -> None:
+        '''Tests that an empty mapping input returns an empty list.'''
+        # Prepare input
+        mappings = []
+        collection = ET.fromstring(DJ_PLAYLISTS_XML)
+        
+        # Call target function
+        actual = library.filter_path_mappings(mappings, collection, constants.XPATH_PRUNED)
+        
+        # Assert expectations: no mappings should return for an empty mappings input
+        self.assertEqual(len(actual), 0)
+    
+    def test_success_invalid_playlist(self) -> None:
+        # Prepare input
+        mappings = [
+            # playlist file: simple
+            ('/Users/user/Music/DJ/MOCK_FILE.aiff', '/mock/output/MOCK_FILE.mp3'),
+            
+            # non-playlist collection file
+            ('/Users/user/Music/DJ/MOCK_COLLECTION_FILE.aiff', '/mock/output/MOCK_COLLECTION_FILE.mp3'),
+        ]
+        collection = ET.fromstring(DJ_PLAYLISTS_XML)
+        
+        # Call target function
+        actual = library.filter_path_mappings(mappings, collection, constants.XPATH_PRUNED)
+        
+        # Assert expectations: no mappings should return for an invalid playlist
+        self.assertEqual(len(actual), 0)
