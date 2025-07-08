@@ -25,7 +25,7 @@ from typing import cast
 from . import constants
 from . import common
 from . import encode_tracks
-from .common_tags import read_tags
+from .common_tags import Tags
 
 # constants
 PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
@@ -246,7 +246,7 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
                 # Check if track already exists
                 existing_track = collection.find(f"./{TAG_TRACK}[@Location=\"{file_url}\"]")
                 
-                tags = read_tags(file_path)
+                tags = Tags.load(file_path)
                 if not tags:
                     continue
                 

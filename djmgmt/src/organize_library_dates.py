@@ -271,7 +271,7 @@ def move_files(args: type[Namespace], path_mappings: list[str]) -> None:
         shutil.move(source, dest)
 
 def collect_identifiers(collection: ET.Element, playlist_ids: set[str] = set()) -> list[str]:
-    from . import common_tags
+    from .common_tags import Tags
     
     identifiers: list[str] = []
     
@@ -281,13 +281,13 @@ def collect_identifiers(collection: ET.Element, playlist_ids: set[str] = set()) 
         if playlist_ids and node.attrib[constants.ATTR_TRACK_ID] not in playlist_ids:
             logging.debug(f"skip non-playlist track: '{node_syspath}'")
             continue
-                    # load track tags, check for errors
-        tags = common_tags.read_tags(node_syspath)
+        # load track tags, check for errors
+        tags = Tags.load(node_syspath)
         if not tags or not tags.artist or not tags.title:
             logging.error(f"incomplete tags: {tags}")
             continue
         
-        identifiers.append(common_tags.basic_identifier(tags.title, tags.artist))
+        identifiers.append(tags.basic_identifier())
     
     return identifiers
 

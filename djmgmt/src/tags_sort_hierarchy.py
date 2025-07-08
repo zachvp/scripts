@@ -17,7 +17,7 @@ import os
 import shutil
 import logging
 
-from . import common_tags
+from .common_tags import Tags
 from . import batch_operations_music
 from . import constants
 
@@ -99,7 +99,7 @@ def sort_hierarchy(source: str, compatibility: bool, date: bool, interactive: bo
             # filter for music files
             if os.path.splitext(filename)[1] in {'.aiff', '.aif', '.mp3', '.wav'}:
                 # read the artist and album
-                tags = common_tags.read_tags(filepath)
+                tags = Tags.load(filepath)
                 if tags:
                     # extract and clean up the artist string
                     artist = tags.artist if tags.artist else constants.UNKNOWN_ARTIST

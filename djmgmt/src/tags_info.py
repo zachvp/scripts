@@ -7,7 +7,7 @@ import argparse
 import logging
 from typing import Callable
 
-from . import common_tags
+from .common_tags import Tags
 from . import common
 
 # command support
@@ -57,7 +57,7 @@ def log_duplicates(root: str) -> None:
     paths = common.collect_paths(root)
     for path in paths:
         # load track tags, check for errors
-        tags = common_tags.read_tags(path)
+        tags = Tags.load(path)
         if not tags:
             continue
 
@@ -78,13 +78,13 @@ def collect_identifiers(root: str) -> list[str]:
     paths = common.collect_paths(root)
     for path in paths:
         # load track tags, check for errors
-        tags = common_tags.read_tags(path)
+        tags = Tags.load(path)
         if not tags or not tags.artist or not tags.title:
             logging.error(f"incomplete tags: {tags}")
             continue
 
         # set item = concatenation of track title & artist
-        tracks.append(common_tags.basic_identifier(tags.title, tags.artist))
+        tracks.append(tags.basic_identifier())
     return tracks
 
 def collect_filenames(root: str) -> list[str]:
@@ -120,8 +120,8 @@ def compare_tags(source: str, comparison: str) -> list[tuple[str, str]]:
             compare_path = comparison_files[base_name]
             
             # read tags from both files
-            source_tags = common_tags.read_tags(source_path)
-            compare_tags = common_tags.read_tags(compare_path)
+            source_tags = Tags.load(source_path)
+            compare_tags = Tags.load(compare_path)
             
             # skip if tags can't be read from either file
             if not source_tags or not compare_tags:
