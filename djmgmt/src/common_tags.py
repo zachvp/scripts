@@ -165,7 +165,7 @@ def get_track_key(track: mutagen.FileType, options: set[str]) -> Optional[str]:
 def extract_tag_value(track: mutagen.FileType, tag_keys: set[str]) -> Optional[str]:
     key = get_track_key(track, tag_keys)
     value = str(track[key]) if key and key in track else None
-    value = value[0] if isinstance(value, list) else value
+    value = value[0] if isinstance(value, list) else value # TODO: fix this; value will always be string here
 
     return value
 
