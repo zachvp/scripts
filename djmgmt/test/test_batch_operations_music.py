@@ -20,7 +20,7 @@ MOCK_GENRE = 'mock_genre'
 MOCK_TONALITY = 'mock_tonality'
 MOCK_DATE_ADDED = 'mock_date_added'
 
-COLLECTION_XML = f'''
+DJ_PLAYLISTS_XML = f'''
 <?xml version="1.0" encoding="UTF-8"?>
 
 <DJ_PLAYLISTS Version="1.0.0">
@@ -629,24 +629,23 @@ class TestPruneEmpty(unittest.TestCase):
         mock_prune_empty.assert_called_once_with('/mock/source/', False)
         
 class TestRecordCollection(unittest.TestCase):
-    # ----------------------
-    # Begin happy path cases
-    # ----------------------
+    '''Tests for batch_operations_music.record_collection.'''
+    
     @patch.object(ET.ElementTree, 'write')
     @patch('src.batch_operations_music.ET.parse')
     @patch('os.path.exists')
-    @patch('src.batch_operations_music.read_tags')
+    @patch('src.common_tags.Tags.load')
     @patch('os.walk')
     def test_success_new_file(self,
                               mock_walk: MagicMock,
-                              mock_read_tags: MagicMock,
+                              mock_tags_load: MagicMock,
                               mock_path_exists: MagicMock,
                               mock_xml_parse: MagicMock,
                               mock_xml_write: MagicMock) -> None:
         '''Tests that a single music file is correctly written to a non-existent XML collection.'''
         # Set up mocks
         mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file.aiff', '03 - 暴風一族 (Remix).mp3'])]
-        mock_read_tags.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
+        mock_tags_load.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
         mock_path_exists.return_value = False
         
         # Call the target function
@@ -660,7 +659,7 @@ class TestRecordCollection(unittest.TestCase):
         
         # Assert that the function reads the file tags
         FILE_PATH_MUSIC = f"{MOCK_INPUT_DIR}{os.sep}"
-        mock_read_tags.assert_has_calls([
+        mock_tags_load.assert_has_calls([
             call(f"{FILE_PATH_MUSIC}mock_file.aiff"),
             call(f"{FILE_PATH_MUSIC}03 - 暴風一族 (Remix).mp3")
         ])
@@ -771,11 +770,11 @@ class TestRecordCollection(unittest.TestCase):
     @patch.object(ET.ElementTree, 'write')
     @patch('src.batch_operations_music.ET.parse')
     @patch('os.path.exists')
-    @patch('src.batch_operations_music.read_tags')
+    @patch('src.common_tags.Tags.load')
     @patch('os.walk')
     def test_success_file_exists(self,
                                  mock_walk: MagicMock,
-                                 mock_read_tags: MagicMock,
+                                 mock_tags_load: MagicMock,
                                  mock_path_exists: MagicMock,
                                  mock_xml_parse: MagicMock,
                                  mock_xml_write: MagicMock) -> None:
@@ -783,15 +782,15 @@ class TestRecordCollection(unittest.TestCase):
         # Set up mocks
         mock_path_exists.return_value = True
         mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file_0.aiff'])]
-        mock_read_tags.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
-        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(COLLECTION_XML))
+        mock_tags_load.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
+        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(DJ_PLAYLISTS_XML))
         
         # Insert the first track
         first_call = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
         
         # Reset mocks from first call
         mock_walk.reset_mock()
-        mock_read_tags.reset_mock()
+        mock_tags_load.reset_mock()
         mock_path_exists.reset_mock()
         mock_xml_parse.reset_mock()
         mock_xml_write.reset_mock()
@@ -799,7 +798,7 @@ class TestRecordCollection(unittest.TestCase):
         # Set up mocks for second call
         mock_path_exists.return_value = True
         mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file_1.aiff', '03 - 暴風一族 (Remix).mp3'])]
-        mock_read_tags.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
+        mock_tags_load.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
         mock_xml_parse.return_value = first_call
         
         # Call the target function to check that 'mock_file_1' was inserted
@@ -813,7 +812,7 @@ class TestRecordCollection(unittest.TestCase):
         
         # Assert that the function reads the file tags
         FILE_PATH_MUSIC = f"{MOCK_INPUT_DIR}{os.sep}"
-        mock_read_tags.assert_has_calls([
+        mock_tags_load.assert_has_calls([
             call(f"{FILE_PATH_MUSIC}mock_file_1.aiff"),
             call(f"{FILE_PATH_MUSIC}03 - 暴風一族 (Remix).mp3")
         ])
@@ -925,11 +924,11 @@ class TestRecordCollection(unittest.TestCase):
     @patch.object(ET.ElementTree, 'write')
     @patch('src.batch_operations_music.ET.parse')
     @patch('os.path.exists')
-    @patch('src.batch_operations_music.read_tags')
+    @patch('src.common_tags.Tags.load')
     @patch('os.walk')
     def test_success_track_exists_same_metadata(self,
                                                 mock_walk: MagicMock,
-                                                mock_read_tags: MagicMock,
+                                                mock_tags_load: MagicMock,
                                                 mock_path_exists: MagicMock,
                                                 mock_xml_parse: MagicMock,
                                                 mock_xml_write: MagicMock) -> None:
@@ -971,7 +970,7 @@ class TestRecordCollection(unittest.TestCase):
         
         # Assert call expectations
         mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        mock_read_tags.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_file}")
+        mock_tags_load.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_file}")
         mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
         
@@ -982,11 +981,11 @@ class TestRecordCollection(unittest.TestCase):
     @patch.object(ET.ElementTree, 'write')
     @patch('src.batch_operations_music.ET.parse')
     @patch('os.path.exists')
-    @patch('src.batch_operations_music.read_tags')
+    @patch('src.common_tags.Tags.load')
     @patch('os.walk')
     def test_success_track_exists_update_metadata(self,
                                                   mock_walk: MagicMock,
-                                                  mock_read_tags: MagicMock,
+                                                  mock_tags_load: MagicMock,
                                                   mock_path_exists: MagicMock,
                                                   mock_xml_parse: MagicMock,
                                                   mock_xml_write: MagicMock) -> None:
@@ -1024,7 +1023,7 @@ class TestRecordCollection(unittest.TestCase):
         mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(existing_track_xml))
         
         # Mock updated tag metadata
-        mock_read_tags.side_effect = [Tags(f"{MOCK_ARTIST}_update",
+        mock_tags_load.side_effect = [Tags(f"{MOCK_ARTIST}_update",
                                            f"{MOCK_ALBUM}_update",
                                            f"{MOCK_TITLE}_update",
                                            f"{MOCK_GENRE}_update",
@@ -1035,7 +1034,7 @@ class TestRecordCollection(unittest.TestCase):
         
         # Assert call expectations
         mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        mock_read_tags.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_file}")
+        mock_tags_load.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_file}")
         mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
         
@@ -1077,18 +1076,18 @@ class TestRecordCollection(unittest.TestCase):
     @patch.object(ET.ElementTree, 'write')
     @patch('src.batch_operations_music.ET.parse')
     @patch('os.path.exists')
-    @patch('src.batch_operations_music.read_tags')
+    @patch('src.common_tags.Tags.load')
     @patch('os.walk')
     def test_success_missing_metadata(self,
                                       mock_walk: MagicMock,
-                                      mock_read_tags: MagicMock,
+                                      mock_tags_load: MagicMock,
                                       mock_path_exists: MagicMock,
                                       mock_xml_parse: MagicMock,
                                       mock_xml_write: MagicMock) -> None:
         '''Tests that a single music file is correctly written to a non-existent XML collection.'''
         # Set up mocks
         mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file.aiff'])]
-        mock_read_tags.return_value = Tags() # mock empty tag data
+        mock_tags_load.return_value = Tags() # mock empty tag data
         mock_path_exists.return_value = False
         
         # Call the target function
@@ -1102,7 +1101,7 @@ class TestRecordCollection(unittest.TestCase):
         
         # Assert that the function reads the file tags
         FILE_PATH_MUSIC = f"{MOCK_INPUT_DIR}{os.sep}"
-        mock_read_tags.assert_has_calls([
+        mock_tags_load.assert_has_calls([
             call(f"{FILE_PATH_MUSIC}mock_file.aiff"),
         ])
         
@@ -1162,11 +1161,11 @@ class TestRecordCollection(unittest.TestCase):
     @patch.object(ET.ElementTree, 'write')
     @patch('src.batch_operations_music.ET.parse')
     @patch('os.path.exists')
-    @patch('src.batch_operations_music.read_tags')
+    @patch('src.common_tags.Tags.load')
     @patch('os.walk')
     def test_success_no_music_files(self,
                                     mock_walk: MagicMock,
-                                    mock_read_tags: MagicMock,
+                                    mock_tags_load: MagicMock,
                                     mock_path_exists: MagicMock,
                                     mock_xml_parse: MagicMock,
                                     mock_xml_write: MagicMock) -> None:
@@ -1180,7 +1179,7 @@ class TestRecordCollection(unittest.TestCase):
         
         # Assert call expectations: all files should be skipped
         mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        mock_read_tags.assert_not_called()
+        mock_tags_load.assert_not_called()
         mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
         mock_xml_parse.assert_not_called()
         
@@ -1246,17 +1245,17 @@ class TestRecordCollection(unittest.TestCase):
     @patch.object(ET.ElementTree, 'write')
     @patch('src.batch_operations_music.ET.parse')
     @patch('os.path.exists')
-    @patch('src.batch_operations_music.read_tags')
+    @patch('src.common_tags.Tags.load')
     @patch('os.walk')
     def test_success_unreadable_tags(self,
                                      mock_walk: MagicMock,
-                                     mock_read_tags: MagicMock,
+                                     mock_tags_load: MagicMock,
                                      mock_path_exists: MagicMock,
                                      mock_xml_parse: MagicMock,
                                      mock_xml_write: MagicMock) -> None:
         '''Tests that a track is not added to the collection XML if its tags are invalid.'''
         # Setup mocks
-        mock_read_tags.return_value = None # Mock tag reading failure
+        mock_tags_load.return_value = None # Mock tag reading failure
         mock_bad_file = 'mock_bad_file.mp3'
         existing_track_xml = f'''
         <?xml version="1.0" encoding="UTF-8"?>
@@ -1291,7 +1290,7 @@ class TestRecordCollection(unittest.TestCase):
         
         # Assert call expectations
         mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        mock_read_tags.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_bad_file}")
+        mock_tags_load.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_bad_file}")
         mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
         
@@ -1303,11 +1302,11 @@ class TestRecordCollection(unittest.TestCase):
     @patch.object(ET.ElementTree, 'write')
     @patch('src.batch_operations_music.ET.parse')
     @patch('os.path.exists')
-    @patch('src.batch_operations_music.read_tags')
+    @patch('src.common_tags.Tags.load')
     @patch('os.walk')
     def test_collection_exists_invalid_content(self,
                                                mock_walk: MagicMock,
-                                               mock_read_tags: MagicMock,
+                                               mock_tags_load: MagicMock,
                                                mock_path_exists: MagicMock,
                                                mock_xml_parse: MagicMock,
                                                mock_xml_write: MagicMock,
@@ -1324,7 +1323,7 @@ class TestRecordCollection(unittest.TestCase):
             
         # Assert expectations: Code should only check that path exists and attempt to parse
         mock_walk.assert_not_called()
-        mock_read_tags.assert_not_called()
+        mock_tags_load.assert_not_called()
         mock_path_exists.assert_called_once_with(MOCK_XML_FILE_PATH)
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
         mock_xml_write.assert_not_called()
@@ -1334,11 +1333,11 @@ class TestRecordCollection(unittest.TestCase):
     @patch.object(ET.ElementTree, 'write')
     @patch('src.batch_operations_music.ET.parse')
     @patch('os.path.exists')
-    @patch('src.batch_operations_music.read_tags')
+    @patch('src.common_tags.Tags.load')
     @patch('os.walk')
     def test_collection_exists_missing_collection_tag(self,
                                                       mock_walk: MagicMock,
-                                                      mock_read_tags: MagicMock,
+                                                      mock_tags_load: MagicMock,
                                                       mock_path_exists: MagicMock,
                                                       mock_xml_parse: MagicMock,
                                                       mock_xml_write: MagicMock,
@@ -1354,7 +1353,7 @@ class TestRecordCollection(unittest.TestCase):
             
         # Assert expectations: Code should only check that path exists and attempt to parse
         mock_walk.assert_not_called()
-        mock_read_tags.assert_not_called()
+        mock_tags_load.assert_not_called()
         mock_path_exists.assert_called_once_with(MOCK_XML_FILE_PATH)
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
         mock_xml_write.assert_not_called()

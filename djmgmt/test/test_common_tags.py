@@ -75,6 +75,11 @@ def create_full_mock_tags() -> Tags:
                 MOCK_GENRE,
                 MOCK_MUSIC_KEY_KEY,
                 MOCK_IMAGE)
+    
+def configure_mock_track(mock_track: MagicMock, data: dict[str, str] = MOCK_TRACK_TAGS) -> None:
+    mock_track.__contains__.side_effect = data.__contains__
+    mock_track.__getitem__.side_effect = data.__getitem__
+    mock_track.__iter__.side_effect = data.__iter__
 
 class TestTags(unittest.TestCase):
     '''Tests for the Tags class.'''
@@ -173,8 +178,80 @@ class TestTags(unittest.TestCase):
         
         self.assertNotEqual(lhs, rhs)
 
-class TestExtractCoverImage(unittest.TestCase):
-    '''Tests for common_tags.extract_cover_image.'''
+class TestTagsGetTrackKey(unittest.TestCase):
+    '''Tests for Tags.get_track_key'''
+    
+    def test_success_key_exists(self) -> None:
+        '''Tests that a key that exists in the track is found.'''
+        # Configure mocks
+        mock_track = MagicMock()
+        configure_mock_track(mock_track)
+        
+        # Call target function
+        actual = Tags.get_track_key(mock_track, {MOCK_TITLE_KEY})
+        
+        # Assert expectations
+        self.assertEqual(actual, MOCK_TITLE_KEY)
+    
+    def test_success_key_missing(self) -> None:
+        '''Tests that a key missing from the track returns None.'''
+        # Configure mocks
+        mock_track = MagicMock()
+        configure_mock_track(mock_track)
+        
+        # Call target function
+        actual = Tags.get_track_key(mock_track, {'mock_missing_key'})
+        
+        # Assert expectations
+        self.assertIsNone(actual)
+        
+    @patch('logging.error')
+    def test_error_key_missing(self, mock_log_error: MagicMock) -> None:
+        '''Tests that a raised ValueError returns None and logs an error.'''
+        # Configure mocks
+        mock_track = MagicMock()
+        mock_track.__contains__.side_effect = ValueError()
+        
+        # Call target function
+        actual = Tags.get_track_key(mock_track, {'mock_missing_key'})
+        
+        # Assert expectations
+        self.assertIsNone(actual)
+        mock_log_error.assert_called_once()
+
+class TestTagsExtractTagValue(unittest.TestCase):
+    '''Tests for Tags.extract_tag_value'''
+    
+    @patch('src.common_tags.Tags.get_track_key')
+    def test_success_key_exists_string(self, mock_get_track_key: MagicMock) -> None:
+        '''Tests that a tag string is extracted from a tag containing the corresponding entry.'''
+        # Configure mocks
+        mock_get_track_key.return_value = MOCK_TITLE_KEY
+        mock_track = MagicMock()
+        configure_mock_track(mock_track)
+        
+        # Call target function
+        actual = Tags.extract_tag_value(mock_track, set())
+        
+        # Assert expectations
+        self.assertEqual(actual, MOCK_TITLE)
+    
+    @patch('src.common_tags.Tags.get_track_key')
+    def test_success_key_none(self, mock_get_track_key: MagicMock) -> None:
+        '''Tests that None is returned if get_track_key returns None.'''
+        # Configure mocks
+        mock_get_track_key.return_value = None
+        mock_track = MagicMock()
+        configure_mock_track(mock_track)
+        
+        # Call target function
+        actual = Tags.extract_tag_value(mock_track, set())
+        
+        # Assert expectations
+        self.assertIsNone(actual)
+
+class TestTagsExtractCoverImage(unittest.TestCase):
+    '''Tests for Tags.extract_cover_image.'''
     
     # Test cases
     def test_success_mp3(self) -> None:
@@ -223,7 +300,7 @@ class TestExtractCoverImage(unittest.TestCase):
         mock_track.tags = mock_tag_data
         
         # Call target function
-        actual = common_tags.extract_cover_image(mock_track)
+        actual = Tags.extract_cover_image(mock_track)
         
         # Assert expectations
         ## Assert that the function extracted the expected image instance
@@ -236,7 +313,7 @@ class TestExtractCoverImage(unittest.TestCase):
         mock_track = MagicMock()
         
         # Call target function
-        actual = common_tags.extract_cover_image(mock_track)
+        actual = Tags.extract_cover_image(mock_track)
         
         # Assert expectations
         self.assertIsNone(actual)
@@ -256,7 +333,7 @@ class TestExtractCoverImage(unittest.TestCase):
         mock_verify.side_effect = Exception('mock image verification error')
         
         # Call target function
-        actual = common_tags.extract_cover_image(mock_track)
+        actual = Tags.extract_cover_image(mock_track)
         
         # Assert expectations
         self.assertIsNone(actual)
@@ -290,33 +367,34 @@ class TestExtractCoverImage(unittest.TestCase):
         mock_track.tags = mock_tag_data
         
         # Call target function
-        actual = common_tags.extract_cover_image(mock_track)
+        actual = Tags.extract_cover_image(mock_track)
         
         # Assert expectations
         ## Assert that the function extracted the expected image instance
         actual = cast(Image.Image, actual)
         self.assert_image(actual, mock_data)
 
-class TestReadTags(unittest.TestCase):
-    '''Tests for read_tags.'''
-    @patch('src.common_tags.extract_cover_image')
-    @patch('src.common_tags.extract_tag_value')
+class TestTagsLoad(unittest.TestCase):
+    '''Tests for Tags.load.'''
+    
+    @patch('src.common_tags.Tags.extract_cover_image')
+    @patch('src.common_tags.Tags.extract_tag_value')
     @patch('mutagen.File')
     def test_success(self,
                      mock_file_constructor: MagicMock,
                      mock_extract_tag_value: MagicMock,
                      mock_extract_cover_image: MagicMock):
-        '''Common test runner for ID3-like file type cases (e.g. MP3, AIFF, WAV).'''
+        '''Tests that all Tags attributes can be loaded.'''
         # Configure mocks
         mock_track = MagicMock()
-        self.configure_mock_track(mock_track)
+        configure_mock_track(mock_track)
         
         mock_file_constructor.return_value = mock_track
-        mock_extract_tag_value.side_effect = [ MOCK_TITLE, MOCK_ARTIST, MOCK_ALBUM, MOCK_GENRE, MOCK_MUSIC_KEY_KEY]
+        mock_extract_tag_value.side_effect = [MOCK_TITLE, MOCK_ARTIST, MOCK_ALBUM, MOCK_GENRE, MOCK_MUSIC_KEY_KEY]
         mock_extract_cover_image.return_value = MOCK_IMAGE
         
         # Call target function
-        actual = common_tags.read_tags(MOCK_INPUT_PATH)
+        actual = Tags.load(MOCK_INPUT_PATH)
         
         # Assert expectations
         mock_file_constructor.assert_called_once_with(MOCK_INPUT_PATH)
@@ -332,8 +410,7 @@ class TestReadTags(unittest.TestCase):
         self.assertEqual(actual.key, MOCK_MUSIC_KEY_KEY)
         self.assertEqual(actual.cover_image, MOCK_IMAGE)
     
-    # Test cases
-    @patch('src.common_tags.get_track_key')
+    @patch('src.common_tags.Tags.get_track_key')
     @patch('mutagen.File')
     def test_success_no_artist_no_title(self,
                                         mock_file_constructor: MagicMock,
@@ -341,21 +418,104 @@ class TestReadTags(unittest.TestCase):
         '''Tests that None is returned when title and artist are missing.'''
         # Set up mocks
         mock_track = MagicMock()
-        self.configure_mock_track(mock_track)
+        configure_mock_track(mock_track)
         mock_file_constructor.return_value = mock_track
         
         ## Mock get track key
-        mock_get_track_key.side_effect = [ None, None, MOCK_ALBUM_KEY, MOCK_GENRE_KEY, MOCK_MUSIC_KEY_KEY]
+        mock_get_track_key.side_effect = [None, None, MOCK_ALBUM_KEY, MOCK_GENRE_KEY, MOCK_MUSIC_KEY_KEY]
         
         # Call target function
-        actual = common_tags.read_tags(MOCK_INPUT_PATH)
+        actual = Tags.load(MOCK_INPUT_PATH)
         
+        # Assert expectations
+        self.assertIsNone(actual)
+    
+    @patch('mutagen.File')
+    def test_error_file_load(self,
+                             mock_file_constructor: MagicMock) -> None:
+        '''Tests that None is returned if the file loading fails.'''
+        # Set up mocks
+        mock_file_constructor.side_effect = mutagen.MutagenError()
+        
+        # Call target function
+        actual = Tags.load('mock_bad_path')
+        
+        # Assert expectations
+        self.assertIsNone(actual)
+    
+    @patch('mutagen.File')
+    def test_error_file_empty(self,
+                              mock_file_constructor: MagicMock) -> None:
+        '''Tests that None is returned if the file loading returns None.'''
+        # Set up mocks
+        mock_file_constructor.return_value = None
+        
+        # Call target function
+        actual = Tags.load(MOCK_INPUT_PATH)
+        
+        # Assert expectations
         self.assertIsNone(actual)
         
-    # Helpers
-    def configure_mock_track(self, mock_track: MagicMock) -> None:
-        mock_track.__contains__.side_effect = MOCK_TRACK_TAGS.__contains__ # type: ignore
-        mock_track.__getitem__.side_effect = MOCK_TRACK_TAGS.__getitem__ # type: ignore
+    @patch('mutagen.File')
+    def test_error_file_no_tags(self,
+                                mock_file_constructor: MagicMock) -> None:
+        '''Tests that None is returned if the file tags are None.'''
+        # Set up mocks
+        mock_file_constructor.tags = None
+        
+        # Call target function
+        actual = Tags.load(MOCK_INPUT_PATH)
+        
+        # Assert expectations
+        self.assertIsNone(actual)
+
+class TestTagsBasicIdentifier(unittest.TestCase):
+    '''Tests for Tags.basic_identifier.'''
+    
+    def test_success_simple(self) -> None:
+        '''Test for a Tags instance with only artist and title.'''
+        # Call target function
+        tags = Tags(artist=MOCK_ARTIST, title=MOCK_TITLE)
+        actual = tags.basic_identifier()
+        
+        # Assert expectations
+        self.assertEqual(actual, f"{MOCK_ARTIST} - {MOCK_TITLE}")
+    
+    def test_success_full(self) -> None:
+        '''Test for a Tags instance with all attributes.'''
+        # Call target function
+        tags = create_full_mock_tags()
+        actual = tags.basic_identifier()
+        
+        # Assert expectations
+        self.assertEqual(actual, f"{MOCK_ARTIST} - {MOCK_TITLE}")
+        
+    def test_success_missing_title(self) -> None:
+        '''Test for a Tags instance with no title.'''
+        # Call target function
+        tags = Tags(artist=MOCK_ARTIST)
+        actual = tags.basic_identifier()
+        
+        # Assert expectations
+        self.assertEqual(actual, f"{MOCK_ARTIST} - none")
+        
+    def test_success_missing_arist(self) -> None:
+        '''Test for a Tags instance with no artist.'''
+        # Call target function
+        tags = Tags(title=MOCK_TITLE)
+        actual = tags.basic_identifier()
+        
+        # Assert expectations
+        self.assertEqual(actual, f"none - {MOCK_TITLE}")
+    
+    def test_success_normalize_format(self) -> None:
+        '''Tests that the output is normalized for artist & title with mixed case and trailing title whitespace.'''
+        # Call target function
+        tags = Tags(title='mOcK_tItLe    ', artist='MoCk_ArTiSt')
+        actual = tags.basic_identifier()
+        
+        # Assert expectations
+        self.assertEqual(actual, f"{MOCK_ARTIST} - {MOCK_TITLE}")
 
 class TestTagsHashCoverImage(unittest.TestCase):
     '''Tests for the 'common_tags.Tags._hash_cover_image' method.'''

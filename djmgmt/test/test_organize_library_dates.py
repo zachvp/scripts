@@ -8,7 +8,7 @@ from src import constants
 # Constants
 TRACK_XML = '''
     <TRACK
-        TrackID="123456789"
+        TrackID="1"
         Name="Test Track"
         Artist="MOCK_ARTIST"
         Album="MOCK_ALBUM"
@@ -129,7 +129,7 @@ class TestGenerateDatePaths(unittest.TestCase):
         collection = ET.fromstring(COLLECTION_XML)
         
         # Call test function
-        actual = library.generate_date_paths(collection, '/mock/root/', playlist_ids={'123456789'})
+        actual = library.generate_date_paths(collection, '/mock/root/', playlist_ids={'1'})
         
         # Assert expectations
         # Output
@@ -406,3 +406,86 @@ class TestFilterPathMappings(unittest.TestCase):
         
         # Assert expectations: no mappings should return for an invalid playlist
         self.assertEqual(len(actual), 0)
+
+class TestLibraryCollectIdentifiers(unittest.TestCase):
+    '''Tests for organize_library_dates.collect_identifiers.'''
+    
+    @patch('src.common_tags.Tags.load')
+    @patch('src.organize_library_dates.collection_path_to_syspath')
+    def test_success_no_filter(self,
+                               mock_to_syspath: MagicMock,
+                               mock_tags_load: MagicMock) -> None:
+        '''Tests that the identifiers are loaded from the given collection XML with no playlist filter.'''
+        # Set up mocks
+        mock_identifier = 'mock_identifier'
+        mock_tags = MagicMock()
+        mock_tags.basic_identifier.return_value = mock_identifier
+        mock_tags_load.return_value = mock_tags
+        
+        # Call target function
+        collection = ET.fromstring(COLLECTION_XML)
+        actual = library.collect_identifiers(collection)
+        
+        # Assert expectations
+        self.assertEqual(actual, [mock_identifier])
+        mock_to_syspath.assert_called_once()
+        
+    @patch('src.common_tags.Tags.load')
+    @patch('src.organize_library_dates.collection_path_to_syspath')
+    def test_success_filter_included(self,
+                                     mock_to_syspath: MagicMock,
+                                     mock_tags_load: MagicMock) -> None:
+        '''Tests that the identifiers are loaded from the given collection XML with a matching playlist filter.'''
+        # Set up mocks
+        mock_identifier = 'mock_identifier'
+        mock_tags = MagicMock()
+        mock_tags.basic_identifier.return_value = mock_identifier
+        mock_tags_load.return_value = mock_tags
+        
+        # Call target function
+        collection = ET.fromstring(COLLECTION_XML)
+        actual = library.collect_identifiers(collection, {'1'})
+        
+        # Assert expectations
+        self.assertEqual(actual, [mock_identifier])
+        mock_to_syspath.assert_called_once()
+        
+    @patch('src.common_tags.Tags.load')
+    @patch('src.organize_library_dates.collection_path_to_syspath')
+    def test_success_filter_excluded(self,
+                                     mock_to_syspath: MagicMock,
+                                     mock_tags_load: MagicMock) -> None:
+        '''Tests that no identifiers are loaded from the given collection XML with a non-matching playlist filter.'''
+        # Set up mocks
+        mock_identifier = 'mock_identifier'
+        mock_tags = MagicMock()
+        mock_tags.basic_identifier.return_value = mock_identifier
+        mock_tags_load.return_value = mock_tags
+        
+        # Call target function
+        collection = ET.fromstring(COLLECTION_XML)
+        actual = library.collect_identifiers(collection, {'mock_exclude_id'})
+        
+        # Assert expectations
+        self.assertEqual(len(actual), 0)
+        mock_to_syspath.assert_called_once()
+    
+    @patch('logging.error')
+    @patch('src.common_tags.Tags.load')
+    @patch('src.organize_library_dates.collection_path_to_syspath')
+    def test_error_tags_load(self,
+                             mock_to_syspath: MagicMock,
+                             mock_tags_load: MagicMock,
+                             mock_log_error: MagicMock) -> None:
+        '''Tests that the identifiers are not loaded from the given collection XML when the track tags can't load.'''
+        # Set up mocks
+        mock_tags_load.return_value = None
+        
+        # Call target function
+        collection = ET.fromstring(COLLECTION_XML)
+        actual = library.collect_identifiers(collection)
+        
+        # Assert expectations
+        self.assertEqual(len(actual), 0)
+        mock_to_syspath.assert_called_once()
+        mock_log_error.assert_called_once()
