@@ -2,7 +2,11 @@ import unittest
 import os
 from unittest.mock import patch, MagicMock, call, AsyncMock
 from typing import cast
+from argparse import Namespace
 
+from src import constants
+
+# Test targets
 from src import encode_tracks
 
 # Constants
@@ -421,3 +425,46 @@ class TestEncodeLossy(unittest.IsolatedAsyncioTestCase):
         mock_collect_paths.assert_called_once_with(args.input)
         mock_add_output_path.assert_called_once_with(args.output, mock_collect_paths.return_value, args.input)
         mock_encode_lossy.assert_called_once_with(mock_add_output_path.return_value, args.extension)
+
+class TestMissingArtCLI(unittest.TestCase):
+    @patch('src.common.write_paths')
+    @patch('src.encode_tracks.find_missing_art_xml')
+    def test_success_xml(self,
+                         mock_find_missing_art_xml: MagicMock,
+                         mock_write_paths: MagicMock) -> None:
+        '''Tests that the missing art XML function is called properly and the missing art paths are written.'''
+        # Set up mocks
+        mock_paths = MagicMock()
+        mock_find_missing_art_xml.return_value = mock_paths
+        
+        # Call target function
+        args = encode_tracks.Namespace(function=encode_tracks.Namespace.FUNCTION_MISSING_ART,
+                                       input=MOCK_INPUT,
+                                       output=MOCK_OUTPUT,
+                                       scan_mode=encode_tracks.Namespace.SCAN_MODE_XML)
+        encode_tracks.missing_art_cli(args) # type: ignore
+        
+        # Assert expectations
+        mock_find_missing_art_xml.assert_called_once_with(args.input, constants.XPATH_COLLECTION, constants.XPATH_PRUNED, threads=72)
+        mock_write_paths.assert_called_once_with(mock_paths, args.output)
+        
+    @patch('src.common.write_paths')
+    @patch('src.encode_tracks.find_missing_art_os')
+    def test_success_os(self,
+                        mock_find_missing_art_os: MagicMock,
+                        mock_write_paths: MagicMock) -> None:
+        '''Tests that the missing art OS function is called properly and the missing art paths are written.'''
+        # Set up mocks
+        mock_paths = MagicMock()
+        mock_find_missing_art_os.return_value = mock_paths
+        
+        # Call target function
+        args = Namespace(function=encode_tracks.Namespace.FUNCTION_MISSING_ART,
+                         input=MOCK_INPUT,
+                         output=MOCK_OUTPUT,
+                         scan_mode=encode_tracks.Namespace.SCAN_MODE_OS)
+        encode_tracks.missing_art_cli(args) # type: ignore
+        
+        # Assert expectations
+        mock_find_missing_art_os.assert_called_once_with(args.input, threads=72)
+        mock_write_paths.assert_called_once_with(mock_paths, args.output)

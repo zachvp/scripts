@@ -528,6 +528,8 @@ def process(source: str, output: str, interactive: bool, valid_extensions: set[s
         
         The source and target directories may be the same for effectively in-place processing.
     '''
+    from asyncio import run
+    
     sweep(source, output, interactive, valid_extensions, prefix_hints)
     extract(output, output, interactive)
     flatten_hierarchy(output, output, interactive)

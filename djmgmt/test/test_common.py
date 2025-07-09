@@ -1,11 +1,12 @@
 import unittest
 import logging
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch, mock_open, call
 from typing import cast
 
 # Constants
 PROJECT_ROOT = os.path.abspath(f"{os.path.dirname(__file__)}/{os.path.pardir}")
+MOCK_INPUT = '/mock/input'
 
 # Custom imports
 import sys
@@ -76,3 +77,27 @@ class TestFindDateContext(unittest.TestCase):
         actual = common.find_date_context(path)
         
         self.assertIsNone(actual)
+
+class TesttWritePaths(unittest.TestCase):
+    @patch('builtins.open', new_callable=mock_open)
+    def test_success(self, mock_file_open: MagicMock) -> None:
+        '''Tests that the function sorts the paths and writes to the given file'''
+        # Set up mocks
+        paths = ['b', 'a']
+        
+        # Call target function
+        common.write_paths(paths, MOCK_INPUT)
+
+        # Assert expectations
+        mock_file_open.assert_called_once_with(MOCK_INPUT, 'w', encoding='utf-8')
+        mock_file = mock_file_open.return_value
+        
+        ## Alter the check depending on valid implementations (writelines vs write in a loop)
+        ## In either case, the function should write sorted lines.
+        if mock_file.writelines.call_count > 0:
+            mock_file.writelines.assert_called_once_with(['a\n', 'b\n'])
+        else:
+            mock_file.write.assert_has_calls([
+                call('a\n'),
+                call('b\n')
+            ])

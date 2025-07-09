@@ -535,6 +535,8 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_rmtree.assert_not_called()
         
 class TestProcess(unittest.TestCase):
+    @patch('src.common.write_paths')
+    @patch('src.encode_tracks.find_missing_art_os')
     @patch('src.batch_operations_music.standardize_lossless')
     @patch('src.batch_operations_music.prune_non_music')
     @patch('src.batch_operations_music.prune_empty')
@@ -547,7 +549,9 @@ class TestProcess(unittest.TestCase):
                      mock_flatten: MagicMock,
                      mock_prune_empty: MagicMock,
                      mock_prune_non_music: MagicMock,
-                     mock_standardize_lossless: MagicMock) -> None:
+                     mock_standardize_lossless: MagicMock,
+                     mock_find_missing_art_os: MagicMock,
+                     mock_write_paths: MagicMock) -> None:
         '''Tests that the process function calls the expected functions in the the correct order.'''
         # Set up mocks
         mock_call_container = MagicMock()
@@ -557,6 +561,8 @@ class TestProcess(unittest.TestCase):
         mock_prune_empty.side_effect = lambda *_, **__: mock_call_container.prune_empty()
         mock_prune_non_music.side_effect = lambda *_, **__: mock_call_container.prune_non_music()
         mock_standardize_lossless.side_effect = lambda *_, **__: mock_call_container.standardize_lossless()
+        mock_find_missing_art_os.side_effect = lambda *_, **__: mock_call_container.find_missing_art_os()
+        mock_write_paths.side_effect = lambda *_, **__: mock_call_container.write_paths()
         
         # Mock the result of the lossless function
         mock_standardize_lossless.return_value = [
@@ -565,8 +571,10 @@ class TestProcess(unittest.TestCase):
         ]
         
         # Call target function
-        args = Namespace(input='/mock/input/', output='/mock/output/', interactive=False)
-        batch_operations_music.process_cli(args, set(), set()) # type: ignore
+        mock_interactive = False
+        mock_valid_extensions = {'a'}
+        mock_prefix_hints = {'b'}
+        batch_operations_music.process(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, mock_interactive, mock_valid_extensions, mock_prefix_hints)
         
         # Assert that the primary dependent functions are called in the correct order
         self.assertEqual(mock_call_container.mock_calls[0], call.sweep())
@@ -575,14 +583,35 @@ class TestProcess(unittest.TestCase):
         self.assertEqual(mock_call_container.mock_calls[3], call.standardize_lossless())
         self.assertEqual(mock_call_container.mock_calls[4], call.prune_non_music())
         self.assertEqual(mock_call_container.mock_calls[5], call.prune_empty())
+        self.assertEqual(mock_call_container.mock_calls[6], call.find_missing_art_os())
+        self.assertEqual(mock_call_container.mock_calls[7], call.write_paths())
         
         # Assert call counts and parameters
         mock_sweep.assert_called_once()
         mock_extract.assert_called_once()
         mock_flatten.assert_called_once()
+        mock_standardize_lossless.assert_called_once_with(MOCK_OUTPUT_DIR, mock_valid_extensions, mock_prefix_hints, mock_interactive)
+        self.assertEqual(MOCK_OUTPUT_DIR, mock_find_missing_art_os.call_args.args[0])
+        self.assertEqual(mock_call_container.find_missing_art_os(), mock_write_paths.call_args.args[0])
+
+class TestProcessCLI(unittest.TestCase):
+    @patch('src.batch_operations_music.process')
+    def test_success(self, mock_process: MagicMock) -> None:
+        '''Tests that the process function is called with the expected arguments.'''
+        # Call target function
+        mock_interactive = False
+        mock_valid_extensions = {'a'}
+        mock_prefix_hints = {'b'}
+        args = Namespace(input=MOCK_INPUT_DIR, output=MOCK_OUTPUT_DIR, interactive=mock_interactive)
+        batch_operations_music.process_cli(args, mock_valid_extensions, mock_prefix_hints) # type: ignore
         
-        mock_standardize_lossless.assert_called_once()
-        mock_standardize_lossless.assert_called_once_with(args.output, set(), set(), args.interactive)
+        # Assert expectations
+        mock_process.assert_called_once_with(MOCK_INPUT_DIR,
+                                             MOCK_OUTPUT_DIR,
+                                             mock_interactive,
+                                             mock_valid_extensions,
+                                             mock_prefix_hints)
+
 
 class TestPruneEmpty(unittest.TestCase):
     @patch('shutil.rmtree')
