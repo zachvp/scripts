@@ -115,3 +115,9 @@ def get_encoding(path: str) -> str:
         return result['encoding']
     else:
         return ''
+
+def write_paths(paths: list[str], output_path: str) -> None:
+    '''Sorts and writes the given list of full file paths to the specified output file.'''
+    sorted_paths = sorted([f"{p}\n" for p in paths])
+    with open(output_path, 'w', encoding='utf-8') as file:
+        file.writelines(sorted_paths)

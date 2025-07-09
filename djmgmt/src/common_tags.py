@@ -132,7 +132,6 @@ class Tags:
             value = track[key]
             value = value[0] if isinstance(value, list) else value
             value = str(value)
-
         return value
 
     @classmethod

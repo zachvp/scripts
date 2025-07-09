@@ -499,10 +499,8 @@ async def run_missing_art_tasks(tasks: list[tuple[str, Task[tuple[int, str]]]]) 
     return results
 
 async def find_missing_art_os(source_dir, threads=24) -> list[str]:
-    # output data
+    # output data and command tasks
     missing: list[str] = []
-    
-    # collect the playlist IDs
     tasks: list[tuple[str, Task[tuple[int, str]]]] = []
     
     # iterate over the source dir paths
@@ -551,6 +549,19 @@ async def find_missing_art_xml(collection_file_path: str, collection_xpath: str,
     missing += await run_missing_art_tasks(tasks)
     return missing
 
+def missing_art_cli(args: type[Namespace]) -> None:
+    # TODO: add timing
+    coroutine = None
+    missing = []
+    if args.scan_mode == Namespace.SCAN_MODE_XML:        
+        coroutine = find_missing_art_xml(args.input, constants.XPATH_COLLECTION, constants.XPATH_PRUNED, threads=72)
+    else:
+        coroutine = find_missing_art_os(args.input, threads=72)
+    
+    # run the configured function and write the result to the given file
+    missing = asyncio.run(coroutine)
+    common.write_paths(missing, args.output)
+
 # Main
 if __name__ == '__main__':
     common.configure_log(level=logging.DEBUG, path=__file__)
@@ -561,16 +572,4 @@ if __name__ == '__main__':
     elif script_args.function == Namespace.FUNCTION_LOSSY:
         encode_lossy_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_MISSING_ART:
-        # TODO: add timing
-        coroutine = None
-        missing = []
-        if script_args.scan_mode == Namespace.SCAN_MODE_XML:        
-            coroutine = find_missing_art_xml(script_args.input, constants.XPATH_COLLECTION, constants.XPATH_PRUNED, threads=72)
-        else:
-            coroutine = find_missing_art_os(script_args.input, threads=72)
-        
-        # run the configured function and write the result to the given file
-        missing = asyncio.run(coroutine)
-        missing = sorted([f"{os.path.splitext(os.path.basename(m))[0]}\n" for m in missing])
-        with open(script_args.output, 'w', encoding='utf-8') as file:
-            file.writelines(missing)
+        missing_art_cli(script_args)

@@ -518,7 +518,6 @@ def prune_non_music(source: str, valid_extensions: set[str], interactive: bool) 
 def prune_non_music_cli(args: type[Namespace], valid_extensions: set[str]) -> None:
     prune_non_music(args.input, valid_extensions, args.interactive)
 
-# TODO: check for missing art
 def process(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> None:
     '''Performs the following, in sequence:
         1. Sweeps all music files and archives from a source directory into a target directory.
@@ -535,6 +534,10 @@ def process(source: str, output: str, interactive: bool, valid_extensions: set[s
     standardize_lossless(output, valid_extensions, prefix_hints, interactive)
     prune_non_music(output, valid_extensions, interactive)
     prune_empty(output, interactive)
+    
+    missing_art_path = os.path.join(constants.PROJECT_ROOT, 'state', 'missing-art.txt')
+    missing = run(encode_tracks.find_missing_art_os(output, threads=72))
+    common.write_paths(missing, missing_art_path)
 
 def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
     process(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
