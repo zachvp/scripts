@@ -78,6 +78,52 @@ class TestFindDateContext(unittest.TestCase):
         
         self.assertIsNone(actual)
 
+class TestCollectPaths(unittest.TestCase):
+    @patch('os.walk')
+    def test_success_simple(self, mock_walk: MagicMock) -> None:
+        '''Tests that the full path of a single file is returned.'''
+        # Set up mocks
+        mock_file = 'mock_file'
+        mock_walk.return_value = [(MOCK_INPUT, [], [mock_file])]
+        
+        # Call target function
+        actual = common.collect_paths(MOCK_INPUT)
+        
+        # Assert expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT)
+        self.assertEqual(actual, [f"{MOCK_INPUT}{os.sep}{mock_file}"])
+    
+    @patch('os.walk')
+    def test_success_ignore_hidden_dirs(self, mock_walk: MagicMock) -> None:
+        '''Tests that hidden directories are ignored/deleted.'''
+        # Set up mocks
+        mock_file = 'mock_file'
+        mock_hidden = '.mock_hidden'
+        dirs = [mock_hidden]
+        mock_walk.return_value = [(MOCK_INPUT, dirs, [mock_file])]
+        
+        # Call target function
+        actual = common.collect_paths(MOCK_INPUT)
+        
+        # Assert expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT)
+        self.assertEqual(actual, [f"{MOCK_INPUT}{os.sep}{mock_file}"])
+        self.assertEqual(len(dirs), 0)
+        
+    @patch('os.walk')
+    def test_success_ignore_hidden_files(self, mock_walk: MagicMock) -> None:
+        # Set up mocks
+        mock_file = 'mock_file'
+        mock_hidden = '.mock_hidden'
+        mock_walk.return_value = [(MOCK_INPUT, [], [mock_hidden, mock_file])]
+        
+        # Call target function
+        actual = common.collect_paths(MOCK_INPUT)
+        
+        # Assert expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT)
+        self.assertEqual(actual, [f"{MOCK_INPUT}{os.sep}{mock_file}"])
+
 class TestWritePaths(unittest.TestCase):
     @patch('builtins.open', new_callable=mock_open)
     def test_success(self, mock_file_open: MagicMock) -> None:
@@ -91,13 +137,4 @@ class TestWritePaths(unittest.TestCase):
         # Assert expectations
         mock_file_open.assert_called_once_with(MOCK_INPUT, 'w', encoding='utf-8')
         mock_file = mock_file_open.return_value
-        
-        ## Alter the check depending on valid implementations (writelines vs write in a loop)
-        ## In either case, the function should write sorted lines.
-        if mock_file.writelines.call_count > 0:
-            mock_file.writelines.assert_called_once_with(['a\n', 'b\n'])
-        else:
-            mock_file.write.assert_has_calls([
-                call('a\n'),
-                call('b\n')
-            ])
+        mock_file.writelines.assert_called_once_with(['a\n', 'b\n'])

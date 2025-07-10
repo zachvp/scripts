@@ -38,11 +38,6 @@ DJ_PLAYLISTS_XML = f'''
 </DJ_PLAYLISTS>
 '''.strip()
 
-# Helpers
-def get_input_output_paths(filename: str) -> tuple[str, str]:
-    '''Returns tuple of input, output paths.'''
-    return f"{MOCK_INPUT_DIR}/{filename}", f"{MOCK_OUTPUT_DIR}/{filename}"
-
 # Primary test class
 class TestSweepMusic(unittest.TestCase):
     @patch('shutil.move')
