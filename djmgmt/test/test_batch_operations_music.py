@@ -612,7 +612,6 @@ class TestProcessCLI(unittest.TestCase):
                                              mock_valid_extensions,
                                              mock_prefix_hints)
 
-
 class TestPruneEmpty(unittest.TestCase):
     @patch('shutil.rmtree')
     @patch('src.batch_operations_music.is_empty_dir')

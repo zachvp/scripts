@@ -78,7 +78,7 @@ class TestFindDateContext(unittest.TestCase):
         
         self.assertIsNone(actual)
 
-class TesttWritePaths(unittest.TestCase):
+class TestWritePaths(unittest.TestCase):
     @patch('builtins.open', new_callable=mock_open)
     def test_success(self, mock_file_open: MagicMock) -> None:
         '''Tests that the function sorts the paths and writes to the given file'''
