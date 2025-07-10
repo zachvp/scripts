@@ -52,7 +52,7 @@ def create_query(params: dict[str, str] = {}) -> str:
         't': f'{create_token(password, salt)}', # token
         's': f'{salt}',                         # salt
         'v': '1.16.1',                          # version
-        'c': 'pi_client'                  # client id
+        'c': 'corevega_client'                  # client id
     }
     # add any params
     for key, value in params.items():
@@ -62,8 +62,8 @@ def create_query(params: dict[str, str] = {}) -> str:
 def call_endpoint(endpoint: str, params: dict[str, str] = {}) -> Response:
     # call the endpoint
     query_string = create_query(params)
-    # base_url = f"http://pi.local:4533/rest"
-    base_url = f"https://pi.net/rest"
+    # base_url = f"http://corevega.local:4533/rest"
+    base_url = f"https://corevega.net/rest"
     url = f"{base_url}/{endpoint}.view?{query_string}"
     logging.debug(f'send request: {url}')
     return requests.get(url)
