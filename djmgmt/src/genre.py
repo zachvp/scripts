@@ -8,7 +8,7 @@ from collections import defaultdict
 import xml.etree.ElementTree as ET
 from collections.abc import Collection
 
-from . import organize_library_dates as ORG
+from . import library
 from . import constants
 
 # print the tracks present in collection, but not the given playlist
@@ -84,7 +84,7 @@ def output_genre_category(playlist_ids: set[str], collection: ET.Element) -> lis
         print(c)
     return categories
 
-def output_renamed_genres(playlist_ids: set[str], collection) -> set[str]:
+def output_renamed_genres(playlist_ids: set[str], collection: ET.Element) -> set[str]:
     map_data = create_genre_map('data/read/genre-shorthand-mapping.txt')
     genres: set[str] = set()
 
@@ -125,7 +125,7 @@ def create_genre_map(path: str) -> dict[str, str]:
 def output_collection_filter(root: ET.Element) -> list[str]:
     output : list[str] = []
     for track in root:
-        path = ORG.collection_path_to_syspath(track.attrib[constants.ATTR_PATH])
+        path = library.collection_path_to_syspath(track.attrib[constants.ATTR_PATH])
         output.append(f"{track.attrib[constants.ATTR_GENRE]}\t{path}")
     for line in output:
         print(line)

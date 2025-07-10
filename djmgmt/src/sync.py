@@ -199,14 +199,14 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, ful
     '''
     from asyncio import run
     from . import subsonic_client
-    from . import encode_tracks
+    from . import encode
     
     # Return flag
     success = True
     
     # encode the current batch to MP3 format
     logging.info(f"encoding batch in date context {date_context}:\n{batch}")
-    run(encode_tracks.encode_lossy(batch, '.mp3', threads=28, skip_existing=False))
+    run(encode.encode_lossy(batch, '.mp3', threads=28, skip_existing=False))
     logging.info(f"finished encoding batch in date context {date_context}")
     
     # transfer batch to the media server
@@ -330,8 +330,8 @@ def rsync_healthcheck() -> bool:
 def create_sync_mappings(collection: ET.ElementTree, output_dir: str) -> list[tuple[str, str]]:
     '''Creates a mapping list of system paths based on the given XML collection and output directory.
     Each list entry maps from a source collection file path to a target date context + metadata-structured file path.
-    See organize_library_dates.generate_date_paths for more info.'''
-    from . import organize_library_dates as library
+    See library.generate_date_paths for more info.'''
+    from . import library
     
     # collect the target playlist IDs to sync
     pruned = library.find_node(collection, constants.XPATH_PRUNED)
@@ -434,7 +434,7 @@ if __name__ == '__main__':
     if script_args.function in {Namespace.FUNCTION_COPY, Namespace.FUNCTION_MOVE}:
         sync_from_path(script_args)
     elif script_args.function == Namespace.FUNCTION_SYNC:
-        import organize_library_dates as library
+        from . import library
         tree = library.load_collection(script_args.input)
         mappings = create_sync_mappings(tree, script_args.output)
         run_sync_mappings(mappings)

@@ -17,8 +17,8 @@ import os
 import shutil
 import logging
 
-from .common_tags import Tags
-from . import batch_operations_music
+from .tags import Tags
+from . import music
 from . import constants
 
 # Constants
@@ -90,7 +90,7 @@ def sort_hierarchy(source: str, compatibility: bool, date: bool, interactive: bo
     '''
     # scan the input directory
     for working_dir, _, filenames in os.walk(source):
-        batch_operations_music.prune(working_dir, [], filenames)
+        music.prune(working_dir, [], filenames)
 
         # scan all filenames
         for filename in filenames:

@@ -5,9 +5,9 @@ from argparse import Namespace
 import xml.etree.ElementTree as ET
 from unittest.mock import patch, MagicMock, call
 
-from src import batch_operations_music
+from src import music
 from src import constants
-from src.common_tags import Tags
+from src.tags import Tags
 
 # Constants
 MOCK_INPUT_DIR = '/mock/input'
@@ -47,7 +47,7 @@ def get_input_output_paths(filename: str) -> tuple[str, str]:
 class TestSweepMusic(unittest.TestCase):
     @patch('shutil.move')
     @patch('zipfile.ZipFile')
-    @patch('src.batch_operations_music.is_prefix_match')
+    @patch('src.music.is_prefix_match')
     @patch('os.path.exists')
     @patch('os.walk')
     def test_sweep_music_files(self,
@@ -64,10 +64,10 @@ class TestSweepMusic(unittest.TestCase):
         mock_is_prefix_match.return_value = False
         
         # Call target function
-        batch_operations_music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
+        music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
                                      False,
                                      constants.EXTENSIONS,
-                                     batch_operations_music.PREFIX_HINTS)
+                                     music.PREFIX_HINTS)
         
         # Assert expectations
         mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
@@ -82,7 +82,7 @@ class TestSweepMusic(unittest.TestCase):
     
     @patch('shutil.move')
     @patch('zipfile.ZipFile')
-    @patch('src.batch_operations_music.is_prefix_match')
+    @patch('src.music.is_prefix_match')
     @patch('os.path.exists')
     @patch('os.walk')
     def test_no_sweep_non_music_files(self,
@@ -104,10 +104,10 @@ class TestSweepMusic(unittest.TestCase):
         mock_is_prefix_match.return_value = False
         
         # Call target function
-        batch_operations_music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
+        music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
                                      False,
                                      constants.EXTENSIONS,
-                                     batch_operations_music.PREFIX_HINTS)
+                                     music.PREFIX_HINTS)
         
         # Assert expectations
         mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
@@ -118,7 +118,7 @@ class TestSweepMusic(unittest.TestCase):
     
     @patch('shutil.move')
     @patch('zipfile.ZipFile')
-    @patch('src.batch_operations_music.is_prefix_match')
+    @patch('src.music.is_prefix_match')
     @patch('os.path.exists')
     @patch('os.walk')
     def test_sweep_prefix_archive(self,
@@ -135,22 +135,22 @@ class TestSweepMusic(unittest.TestCase):
         mock_is_prefix_match.return_value = True
         
         # Call target function
-        batch_operations_music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
+        music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
                                      False,
                                      constants.EXTENSIONS,
-                                     batch_operations_music.PREFIX_HINTS)
+                                     music.PREFIX_HINTS)
         
         # Assert expectations
         mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
         mock_path_exists.assert_called_once_with(f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
-        mock_is_prefix_match.assert_called_once_with(mock_filename, batch_operations_music.PREFIX_HINTS)
+        mock_is_prefix_match.assert_called_once_with(mock_filename, music.PREFIX_HINTS)
         mock_zipfile.assert_not_called()
         mock_move.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}",
                                           f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
 
     @patch('shutil.move')
     @patch('zipfile.ZipFile')
-    @patch('src.batch_operations_music.is_prefix_match')
+    @patch('src.music.is_prefix_match')
     @patch('os.path.exists')
     @patch('os.walk')
     def test_sweep_music_archive(self,
@@ -172,23 +172,23 @@ class TestSweepMusic(unittest.TestCase):
         mock_zipfile.return_value.__enter__.return_value = mock_archive
 
         # Call target function        
-        batch_operations_music.sweep(MOCK_INPUT_DIR,
+        music.sweep(MOCK_INPUT_DIR,
                                      MOCK_OUTPUT_DIR,
                                      False,
                                      constants.EXTENSIONS,
-                                     batch_operations_music.PREFIX_HINTS)
+                                     music.PREFIX_HINTS)
         
         # Assert expectations
         mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
         mock_path_exists.assert_called_once_with(f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
-        mock_is_prefix_match.assert_called_once_with(mock_filename, batch_operations_music.PREFIX_HINTS)
+        mock_is_prefix_match.assert_called_once_with(mock_filename, music.PREFIX_HINTS)
         mock_zipfile.assert_called_once()
         mock_move.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}",
                                           f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
     
     @patch('shutil.move')
     @patch('zipfile.ZipFile')
-    @patch('src.batch_operations_music.is_prefix_match')
+    @patch('src.music.is_prefix_match')
     @patch('os.path.exists')
     @patch('os.walk')
     def test_sweep_album_archive(self,
@@ -211,16 +211,16 @@ class TestSweepMusic(unittest.TestCase):
         mock_zipfile.return_value.__enter__.return_value = mock_archive
 
         # Call target function        
-        batch_operations_music.sweep(MOCK_INPUT_DIR,
+        music.sweep(MOCK_INPUT_DIR,
                                      MOCK_OUTPUT_DIR,
                                      False,
                                      constants.EXTENSIONS,
-                                     batch_operations_music.PREFIX_HINTS)
+                                     music.PREFIX_HINTS)
         
         # Assert expectations
         mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
         mock_path_exists.assert_called_once_with(f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
-        mock_is_prefix_match.assert_called_once_with(mock_filename, batch_operations_music.PREFIX_HINTS)
+        mock_is_prefix_match.assert_called_once_with(mock_filename, music.PREFIX_HINTS)
         mock_zipfile.assert_called_once()
         mock_move.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}",
                                           f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
@@ -228,7 +228,7 @@ class TestSweepMusic(unittest.TestCase):
 # Primary test class
 class TestFlattenHierarchy(unittest.TestCase):
     @patch('shutil.move')
-    @patch('src.batch_operations_music.flatten_zip')
+    @patch('src.music.flatten_zip')
     @patch('os.walk')
     def test_success_loose_files(self,
                                  mock_walk: MagicMock,
@@ -244,7 +244,7 @@ class TestFlattenHierarchy(unittest.TestCase):
         mock_walk.return_value = [(MOCK_INPUT_DIR, [], mock_filenames)]
 
         # Call target function        
-        batch_operations_music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
+        music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
         
         # Assert expectations
         mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
@@ -256,7 +256,7 @@ class TestFlattenHierarchy(unittest.TestCase):
         ])
     
     @patch('shutil.move')
-    @patch('src.batch_operations_music.flatten_zip')
+    @patch('src.music.flatten_zip')
     @patch('os.walk')
     def test_success_zip_files(self,
                                mock_walk: MagicMock,
@@ -268,7 +268,7 @@ class TestFlattenHierarchy(unittest.TestCase):
         mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_archive.zip'])]
         
         # Call target function        
-        batch_operations_music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
+        music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
         
         # Assert expectations
         input_filepath = f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}"
@@ -292,7 +292,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_called_once_with('/mock/source/mock_file.foo')
@@ -313,7 +313,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_not_called()
@@ -335,7 +335,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_not_called()
@@ -357,7 +357,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_called_once_with('/mock/source/mock/dir/0/mock_music.foo')
@@ -378,7 +378,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_called_once_with('/mock/source/.mock_hidden')
@@ -399,7 +399,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_called_once_with('/mock/source/mock.zip')
@@ -420,7 +420,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_not_called()
@@ -442,7 +442,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_not_called()
@@ -464,23 +464,23 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_walk.return_value = mock_walk_data
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
         
         mock_os_walk.assert_called()
         mock_os_remove.assert_called_once_with('/mock/source/.mock_hidden_dir/mock.foo')
         mock_rmtree.assert_not_called()
         
-    @patch('src.batch_operations_music.prune_non_music')
+    @patch('src.music.prune_non_music')
     def test_success_cli(self, mock_prune_non_music: MagicMock) -> None:
         '''Tests that the CLI wrapper function exists and is called properly.'''
         import inspect
         
         # Assert that the expected function exists
-        self.assertTrue(inspect.isfunction(getattr(batch_operations_music, 'prune_non_music_cli', None)), 'Expected function does not exist')
+        self.assertTrue(inspect.isfunction(getattr(music, 'prune_non_music_cli', None)), 'Expected function does not exist')
         
         # Call target function and assert expectations
         mock_namespace = Namespace(input='/mock/input/', output='/mock/output/', interactive=False)
-        batch_operations_music.prune_non_music_cli(mock_namespace, set())  # type: ignore
+        music.prune_non_music_cli(mock_namespace, set())  # type: ignore
         
         mock_prune_non_music.assert_called_once_with(mock_namespace.input, set(), mock_namespace.interactive)
     
@@ -502,7 +502,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_input.return_value = 'N'
         
         # Call target function and assert expectations
-        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, True)
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, True)
         
         mock_os_walk.assert_called()
         mock_input.assert_called()
@@ -527,7 +527,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_input.return_value = 'y'
         
         # Call target function and assert expectations        
-        batch_operations_music.prune_non_music('/mock/source/', constants.EXTENSIONS, True)
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, True)
         
         mock_os_walk.assert_called()
         mock_input.assert_called()
@@ -536,13 +536,13 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         
 class TestProcess(unittest.TestCase):
     @patch('src.common.write_paths')
-    @patch('src.encode_tracks.find_missing_art_os')
-    @patch('src.batch_operations_music.standardize_lossless')
-    @patch('src.batch_operations_music.prune_non_music')
-    @patch('src.batch_operations_music.prune_empty')
-    @patch('src.batch_operations_music.flatten_hierarchy')
-    @patch('src.batch_operations_music.extract')
-    @patch('src.batch_operations_music.sweep')
+    @patch('src.encode.find_missing_art_os')
+    @patch('src.music.standardize_lossless')
+    @patch('src.music.prune_non_music')
+    @patch('src.music.prune_empty')
+    @patch('src.music.flatten_hierarchy')
+    @patch('src.music.extract')
+    @patch('src.music.sweep')
     def test_success(self,
                      mock_sweep: MagicMock,
                      mock_extract: MagicMock,
@@ -574,7 +574,7 @@ class TestProcess(unittest.TestCase):
         mock_interactive = False
         mock_valid_extensions = {'a'}
         mock_prefix_hints = {'b'}
-        batch_operations_music.process(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, mock_interactive, mock_valid_extensions, mock_prefix_hints)
+        music.process(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, mock_interactive, mock_valid_extensions, mock_prefix_hints)
         
         # Assert that the primary dependent functions are called in the correct order
         self.assertEqual(mock_call_container.mock_calls[0], call.sweep())
@@ -595,7 +595,7 @@ class TestProcess(unittest.TestCase):
         self.assertEqual(mock_call_container.find_missing_art_os(), mock_write_paths.call_args.args[0])
 
 class TestProcessCLI(unittest.TestCase):
-    @patch('src.batch_operations_music.process')
+    @patch('src.music.process')
     def test_success(self, mock_process: MagicMock) -> None:
         '''Tests that the process function is called with the expected arguments.'''
         # Call target function
@@ -603,7 +603,7 @@ class TestProcessCLI(unittest.TestCase):
         mock_valid_extensions = {'a'}
         mock_prefix_hints = {'b'}
         args = Namespace(input=MOCK_INPUT_DIR, output=MOCK_OUTPUT_DIR, interactive=mock_interactive)
-        batch_operations_music.process_cli(args, mock_valid_extensions, mock_prefix_hints) # type: ignore
+        music.process_cli(args, mock_valid_extensions, mock_prefix_hints) # type: ignore
         
         # Assert expectations
         mock_process.assert_called_once_with(MOCK_INPUT_DIR,
@@ -614,8 +614,8 @@ class TestProcessCLI(unittest.TestCase):
 
 class TestPruneEmpty(unittest.TestCase):
     @patch('shutil.rmtree')
-    @patch('src.batch_operations_music.is_empty_dir')
-    @patch('src.batch_operations_music.get_dirs')
+    @patch('src.music.is_empty_dir')
+    @patch('src.music.get_dirs')
     def test_success_remove_empty_dir(self,
                                       mock_get_dirs: MagicMock,
                                       mock_is_empty_dir: MagicMock,
@@ -625,15 +625,15 @@ class TestPruneEmpty(unittest.TestCase):
         mock_get_dirs.return_value = ['mock_empty_dir']
         
         # Call target function and assert expectations
-        batch_operations_music.prune_empty('/mock/source/', False)
+        music.prune_empty('/mock/source/', False)
         
         mock_get_dirs.assert_called()
         mock_is_empty_dir.assert_called()
         mock_rmtree.assert_called_once_with('/mock/source/mock_empty_dir')
         
     @patch('shutil.rmtree')
-    @patch('src.batch_operations_music.is_empty_dir')
-    @patch('src.batch_operations_music.get_dirs')
+    @patch('src.music.is_empty_dir')
+    @patch('src.music.get_dirs')
     def test_success_skip_non_empty_dir(self,
                                         mock_get_dirs: MagicMock,
                                         mock_is_empty_dir: MagicMock,
@@ -644,52 +644,52 @@ class TestPruneEmpty(unittest.TestCase):
         mock_is_empty_dir.return_value = False
         
         # Call target function and assert expectations
-        batch_operations_music.prune_empty('/mock/source/', False)
+        music.prune_empty('/mock/source/', False)
         
         mock_get_dirs.assert_called()
         mock_is_empty_dir.assert_called()
         mock_rmtree.assert_not_called()
         
-    @patch('src.batch_operations_music.prune_empty')
+    @patch('src.music.prune_empty')
     def test_success_cli(self, mock_prune_empty: MagicMock) -> None:
         '''Tests that the CLI wrapper calls the correct function.'''
-        batch_operations_music.prune_empty('/mock/source/', False)
+        music.prune_empty('/mock/source/', False)
         mock_prune_empty.assert_called_once_with('/mock/source/', False)
         
 class TestRecordCollection(unittest.TestCase):
-    '''Tests for batch_operations_music.record_collection.'''
+    '''Tests for music.record_collection.'''
     
     @patch.object(ET.ElementTree, 'write')
-    @patch('src.batch_operations_music.ET.parse')
+    @patch('src.music.ET.parse')
+    @patch('src.tags.Tags.load')
+    @patch('src.common.collect_paths')
     @patch('os.path.exists')
-    @patch('src.common_tags.Tags.load')
-    @patch('os.walk')
-    def test_success_new_file(self,
-                              mock_walk: MagicMock,
-                              mock_tags_load: MagicMock,
+    def test_success_new_collection_file(self,
                               mock_path_exists: MagicMock,
+                              mock_collect_paths: MagicMock,
+                              mock_tags_load: MagicMock,
                               mock_xml_parse: MagicMock,
                               mock_xml_write: MagicMock) -> None:
-        '''Tests that a single music file is correctly written to a non-existent XML collection.'''
+        '''Tests that a single music file is correctly written to a newly created XML collection.'''
         # Set up mocks
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file.aiff', '03 - 暴風一族 (Remix).mp3'])]
+        MOCK_PARENT = f"{MOCK_INPUT_DIR}{os.sep}"
+        mock_path_exists.side_effect = [False, True]
+        mock_collect_paths.return_value = [f"{MOCK_PARENT}mock_file.aiff", f"{MOCK_PARENT}03 - 暴風一族 (Remix).mp3"]
         mock_tags_load.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
-        mock_path_exists.return_value = False
+        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(DJ_PLAYLISTS_XML))
         
         # Call the target function
-        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        actual = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
         
         # Assert call expectations
-        mock_path_exists.assert_called_once_with(MOCK_XML_FILE_PATH)
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        mock_xml_parse.assert_not_called()
+        mock_xml_parse.assert_called_once_with(music.COLLECTION_TEMPLATE_PATH)
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
         mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
         
         # Assert that the function reads the file tags
-        FILE_PATH_MUSIC = f"{MOCK_INPUT_DIR}{os.sep}"
         mock_tags_load.assert_has_calls([
-            call(f"{FILE_PATH_MUSIC}mock_file.aiff"),
-            call(f"{FILE_PATH_MUSIC}03 - 暴風一族 (Remix).mp3")
+            call(mock_collect_paths.return_value[0]),
+            call(mock_collect_paths.return_value[1])
         ])
         
         # Assert that the XML contents are expected
@@ -796,50 +796,50 @@ class TestRecordCollection(unittest.TestCase):
         self.assertRegex(track.attrib[constants.ATTR_TRACK_KEY], r'\d+')
 
     @patch.object(ET.ElementTree, 'write')
-    @patch('src.batch_operations_music.ET.parse')
+    @patch('src.music.ET.parse')
+    @patch('src.tags.Tags.load')
+    @patch('src.common.collect_paths')
     @patch('os.path.exists')
-    @patch('src.common_tags.Tags.load')
-    @patch('os.walk')
-    def test_success_file_exists(self,
-                                 mock_walk: MagicMock,
-                                 mock_tags_load: MagicMock,
+    def test_success_collection_file_exists(self,
                                  mock_path_exists: MagicMock,
+                                 mock_collect_paths: MagicMock,
+                                 mock_tags_load: MagicMock,
                                  mock_xml_parse: MagicMock,
                                  mock_xml_write: MagicMock) -> None:
         '''Tests that a single music file is correctly added to an existing XML collection that contains an entry.'''
         # Set up mocks
+        FILE_PATH_MUSIC = f"{MOCK_INPUT_DIR}{os.sep}"
+        
         mock_path_exists.return_value = True
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file_0.aiff'])]
+        mock_collect_paths.return_value = [f"{MOCK_INPUT_DIR}{os.sep}mock_file_0.aiff"]
         mock_tags_load.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
         mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(DJ_PLAYLISTS_XML))
         
         # Insert the first track
-        first_call = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        first_call = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
         
         # Reset mocks from first call
-        mock_walk.reset_mock()
-        mock_tags_load.reset_mock()
         mock_path_exists.reset_mock()
+        mock_collect_paths.reset_mock()
+        mock_tags_load.reset_mock()
         mock_xml_parse.reset_mock()
         mock_xml_write.reset_mock()
         
         # Set up mocks for second call
         mock_path_exists.return_value = True
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file_1.aiff', '03 - 暴風一族 (Remix).mp3'])]
+        mock_collect_paths.return_value = [f"{FILE_PATH_MUSIC}mock_file_1.aiff", f"{FILE_PATH_MUSIC}03 - 暴風一族 (Remix).mp3"]
         mock_tags_load.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
         mock_xml_parse.return_value = first_call
         
         # Call the target function to check that 'mock_file_1' was inserted
-        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        actual = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
             
         # Assert call expectations
-        mock_path_exists.assert_called_once_with(MOCK_XML_FILE_PATH)
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
         mock_xml_parse.assert_called_with(MOCK_XML_FILE_PATH)
         mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
         
         # Assert that the function reads the file tags
-        FILE_PATH_MUSIC = f"{MOCK_INPUT_DIR}{os.sep}"
         mock_tags_load.assert_has_calls([
             call(f"{FILE_PATH_MUSIC}mock_file_1.aiff"),
             call(f"{FILE_PATH_MUSIC}03 - 暴風一族 (Remix).mp3")
@@ -950,14 +950,14 @@ class TestRecordCollection(unittest.TestCase):
             self.assertRegex(track.attrib[constants.ATTR_TRACK_KEY], r'\d+')
             
     @patch.object(ET.ElementTree, 'write')
-    @patch('src.batch_operations_music.ET.parse')
+    @patch('src.music.ET.parse')
+    @patch('src.tags.Tags.load')
+    @patch('src.common.collect_paths')
     @patch('os.path.exists')
-    @patch('src.common_tags.Tags.load')
-    @patch('os.walk')
     def test_success_track_exists_same_metadata(self,
-                                                mock_walk: MagicMock,
-                                                mock_tags_load: MagicMock,
                                                 mock_path_exists: MagicMock,
+                                                mock_collect_paths: MagicMock,
+                                                mock_tags_load: MagicMock,
                                                 mock_xml_parse: MagicMock,
                                                 mock_xml_write: MagicMock) -> None:
         '''Tests that a track is not added to the collection XML if it already exists and the metadata is the same.'''
@@ -974,7 +974,7 @@ class TestRecordCollection(unittest.TestCase):
                 {constants.ATTR_ARTIST}="{MOCK_ARTIST}"
                 {constants.ATTR_ALBUM}="{MOCK_ALBUM}"
                 {constants.ATTR_GENRE}="{MOCK_GENRE}"
-                {'Tonality'}="{MOCK_TONALITY}"
+                {constants.ATTR_KEY}="{MOCK_TONALITY}"
                 {constants.ATTR_DATE_ADDED}="{MOCK_DATE_ADDED}"
                 {constants.ATTR_PATH}="file://localhost{MOCK_INPUT_DIR}/{mock_file}" />
             </COLLECTION>
@@ -989,15 +989,15 @@ class TestRecordCollection(unittest.TestCase):
         </DJ_PLAYLISTS>
         '''.strip()
         
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], [mock_file])]
         mock_path_exists.return_value = True
+        mock_collect_paths.return_value = [f"{MOCK_INPUT_DIR}{os.sep}{mock_file}"]
         mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(existing_track_xml))
         
         # Call target function
-        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        actual = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
         
         # Assert call expectations
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
         mock_tags_load.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_file}")
         mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
@@ -1007,14 +1007,14 @@ class TestRecordCollection(unittest.TestCase):
                          ET.tostring(cast(ET.Element, mock_xml_parse.return_value.getroot()), encoding="UTF-8"))
             
     @patch.object(ET.ElementTree, 'write')
-    @patch('src.batch_operations_music.ET.parse')
+    @patch('src.music.ET.parse')
+    @patch('src.tags.Tags.load')
+    @patch('src.common.collect_paths')
     @patch('os.path.exists')
-    @patch('src.common_tags.Tags.load')
-    @patch('os.walk')
     def test_success_track_exists_update_metadata(self,
-                                                  mock_walk: MagicMock,
-                                                  mock_tags_load: MagicMock,
                                                   mock_path_exists: MagicMock,
+                                                  mock_collect_paths: MagicMock,
+                                                  mock_tags_load: MagicMock,
                                                   mock_xml_parse: MagicMock,
                                                   mock_xml_write: MagicMock) -> None:
         '''Tests that the tag metadata is updated for an existing track.'''
@@ -1031,7 +1031,7 @@ class TestRecordCollection(unittest.TestCase):
                 {constants.ATTR_ARTIST}="{MOCK_ARTIST}"
                 {constants.ATTR_ALBUM}="{MOCK_ALBUM}"
                 {constants.ATTR_GENRE}="{MOCK_GENRE}"
-                {'Tonality'}="{MOCK_TONALITY}"
+                {constants.ATTR_KEY}="{MOCK_TONALITY}"
                 {constants.ATTR_DATE_ADDED}="{MOCK_DATE_ADDED}"
                 {constants.ATTR_PATH}="file://localhost{MOCK_INPUT_DIR}/{mock_file}" />
             </COLLECTION>
@@ -1046,8 +1046,8 @@ class TestRecordCollection(unittest.TestCase):
         </DJ_PLAYLISTS>
         '''.strip()
         
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], [mock_file])]
         mock_path_exists.return_value = True
+        mock_collect_paths.return_value = [f"{MOCK_INPUT_DIR}{os.sep}{mock_file}"]
         mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(existing_track_xml))
         
         # Mock updated tag metadata
@@ -1058,10 +1058,10 @@ class TestRecordCollection(unittest.TestCase):
                                            f"{MOCK_TONALITY}_update")]
         
         # Call target function
-        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        actual = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
         
         # Assert call expectations
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
         mock_tags_load.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_file}")
         mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
@@ -1102,29 +1102,29 @@ class TestRecordCollection(unittest.TestCase):
         self.assertEqual(track.get('Tonality'), f"{MOCK_TONALITY}_update")
         
     @patch.object(ET.ElementTree, 'write')
-    @patch('src.batch_operations_music.ET.parse')
+    @patch('src.music.ET.parse')
+    @patch('src.tags.Tags.load')
+    @patch('src.common.collect_paths')
     @patch('os.path.exists')
-    @patch('src.common_tags.Tags.load')
-    @patch('os.walk')
     def test_success_missing_metadata(self,
-                                      mock_walk: MagicMock,
-                                      mock_tags_load: MagicMock,
                                       mock_path_exists: MagicMock,
+                                      mock_collect_paths: MagicMock,
+                                      mock_tags_load: MagicMock,
                                       mock_xml_parse: MagicMock,
                                       mock_xml_write: MagicMock) -> None:
-        '''Tests that a single music file is correctly written to a non-existent XML collection.'''
+        '''Tests that empty metadata values are written for a track without any Tags metadata.'''
         # Set up mocks
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file.aiff'])]
+        mock_path_exists.side_effect = [False, True]
+        mock_collect_paths.return_value = [f"{MOCK_INPUT_DIR}{os.sep}mock_file.aiff"]
         mock_tags_load.return_value = Tags() # mock empty tag data
-        mock_path_exists.return_value = False
+        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(DJ_PLAYLISTS_XML))
         
         # Call the target function
-        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        actual = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
         
         # Assert call expectations
-        mock_path_exists.assert_called_once_with(MOCK_XML_FILE_PATH)
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        mock_xml_parse.assert_not_called()
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_xml_parse.assert_called_once_with(music.COLLECTION_TEMPLATE_PATH)
         mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
         
         # Assert that the function reads the file tags
@@ -1183,33 +1183,30 @@ class TestRecordCollection(unittest.TestCase):
         self.assertIn('Tonality', track.attrib)
         self.assertEqual(track.attrib['Tonality'], '')
 
-    # ----------------
-    # Begin edge cases
-    # ----------------
     @patch.object(ET.ElementTree, 'write')
-    @patch('src.batch_operations_music.ET.parse')
+    @patch('src.music.ET.parse')
+    @patch('src.tags.Tags.load')
+    @patch('src.common.collect_paths')
     @patch('os.path.exists')
-    @patch('src.common_tags.Tags.load')
-    @patch('os.walk')
     def test_success_no_music_files(self,
-                                    mock_walk: MagicMock,
-                                    mock_tags_load: MagicMock,
                                     mock_path_exists: MagicMock,
+                                    mock_collect_paths: MagicMock,
+                                    mock_tags_load: MagicMock,
                                     mock_xml_parse: MagicMock,
                                     mock_xml_write: MagicMock) -> None:
         '''Tests that the XML collection contains no Tracks when no music files are in the input directory.'''
         # Setup mocks
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_file.foo'])]
-        mock_path_exists.return_value = False
+        mock_path_exists.side_effect = [False, True]
+        mock_collect_paths.return_value = ['mock_file.foo']
+        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(DJ_PLAYLISTS_XML))
         
         # Call target function
-        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        actual = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
         
         # Assert call expectations: all files should be skipped
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
         mock_tags_load.assert_not_called()
         mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
-        mock_xml_parse.assert_not_called()
         
         # Empty playlist still expected to be written
         # Check root 'DJ_PLAYLISTS' node
@@ -1271,19 +1268,18 @@ class TestRecordCollection(unittest.TestCase):
         self.assertEqual(len(pruned), 0)
         
     @patch.object(ET.ElementTree, 'write')
-    @patch('src.batch_operations_music.ET.parse')
+    @patch('src.music.ET.parse')
+    @patch('src.tags.Tags.load')
+    @patch('src.common.collect_paths')
     @patch('os.path.exists')
-    @patch('src.common_tags.Tags.load')
-    @patch('os.walk')
     def test_success_unreadable_tags(self,
-                                     mock_walk: MagicMock,
-                                     mock_tags_load: MagicMock,
                                      mock_path_exists: MagicMock,
+                                     mock_collect_paths: MagicMock,
+                                     mock_tags_load: MagicMock,
                                      mock_xml_parse: MagicMock,
                                      mock_xml_write: MagicMock) -> None:
         '''Tests that a track is not added to the collection XML if its tags are invalid.'''
         # Setup mocks
-        mock_tags_load.return_value = None # Mock tag reading failure
         mock_bad_file = 'mock_bad_file.mp3'
         existing_track_xml = f'''
         <?xml version="1.0" encoding="UTF-8"?>
@@ -1309,15 +1305,16 @@ class TestRecordCollection(unittest.TestCase):
         </DJ_PLAYLISTS>
         '''.strip()
         
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], [mock_bad_file])]
         mock_path_exists.return_value = True
+        mock_collect_paths.return_value = [f"{MOCK_INPUT_DIR}{os.sep}{mock_bad_file}"]
+        mock_tags_load.return_value = None # Mock tag reading failure
         mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(existing_track_xml))
         
         # Call target function
-        actual = batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        actual = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
         
         # Assert call expectations
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
         mock_tags_load.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_bad_file}")
         mock_xml_write.assert_called_once_with(MOCK_XML_FILE_PATH, encoding='UTF-8', xml_declaration=True)
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
@@ -1328,48 +1325,45 @@ class TestRecordCollection(unittest.TestCase):
     
     @patch('logging.error')
     @patch.object(ET.ElementTree, 'write')
-    @patch('src.batch_operations_music.ET.parse')
+    @patch('src.music.ET.parse')
+    @patch('src.tags.Tags.load')
+    @patch('src.common.collect_paths')
     @patch('os.path.exists')
-    @patch('src.common_tags.Tags.load')
-    @patch('os.walk')
     def test_collection_exists_invalid_content(self,
-                                               mock_walk: MagicMock,
-                                               mock_tags_load: MagicMock,
                                                mock_path_exists: MagicMock,
+                                               mock_collect_paths: MagicMock,
+                                               mock_tags_load: MagicMock,
                                                mock_xml_parse: MagicMock,
                                                mock_xml_write: MagicMock,
                                                mock_log_error: MagicMock) -> None:
         '''Tests that the expected exception is raised when the collection file is invalid.'''
         # Setup mocks
-        mock_exception_message = 'mock_parse_error'
         mock_path_exists.return_value = True
+        mock_exception_message = 'mock_parse_error'
         mock_xml_parse.side_effect = Exception(mock_exception_message) # mock a parsing error
         
         # Call target function and assert expectations
         with self.assertRaisesRegex(Exception, mock_exception_message):
-            batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+            music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
             
         # Assert expectations: Code should only check that path exists and attempt to parse
-        mock_walk.assert_not_called()
+        mock_collect_paths.assert_not_called()
         mock_tags_load.assert_not_called()
-        mock_path_exists.assert_called_once_with(MOCK_XML_FILE_PATH)
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
         mock_xml_write.assert_not_called()
         self.assertRegex(mock_log_error.call_args.args[0], r'^Error loading collection file.+$')
         
-    @patch('logging.error')
     @patch.object(ET.ElementTree, 'write')
-    @patch('src.batch_operations_music.ET.parse')
+    @patch('src.music.ET.parse')
     @patch('os.path.exists')
-    @patch('src.common_tags.Tags.load')
-    @patch('os.walk')
+    @patch('src.tags.Tags.load')
+    @patch('src.common.collect_paths')
     def test_collection_exists_missing_collection_tag(self,
-                                                      mock_walk: MagicMock,
+                                                      mock_collect_paths: MagicMock,
                                                       mock_tags_load: MagicMock,
                                                       mock_path_exists: MagicMock,
                                                       mock_xml_parse: MagicMock,
-                                                      mock_xml_write: MagicMock,
-                                                      mock_log_error: MagicMock) -> None:
+                                                      mock_xml_write: MagicMock) -> None:
         '''Tests that the expected exception is raised when the collection file is missing a COLLECTION tag.'''
         # Setup mocks
         mock_path_exists.return_value = True
@@ -1377,27 +1371,50 @@ class TestRecordCollection(unittest.TestCase):
         
         # Call target function and assert expectations
         with self.assertRaisesRegex(ValueError, 'Invalid collection file format: missing COLLECTION element'):
-            batch_operations_music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+            music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
             
         # Assert expectations: Code should only check that path exists and attempt to parse
-        mock_walk.assert_not_called()
+        mock_collect_paths.assert_not_called()
         mock_tags_load.assert_not_called()
-        mock_path_exists.assert_called_once_with(MOCK_XML_FILE_PATH)
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
         mock_xml_write.assert_not_called()
-        self.assertRegex(mock_log_error.call_args.args[0], r'^Error loading collection file.+$')
+        
+    @patch.object(ET.ElementTree, 'write')
+    @patch('src.music.ET.parse')
+    @patch('src.tags.Tags.load')
+    @patch('src.common.collect_paths')
+    @patch('os.path.exists')
+    def test_template_file_invalid(self,
+                                   mock_path_exists: MagicMock,
+                                   mock_collect_paths: MagicMock,
+                                   mock_tags_load: MagicMock,
+                                   mock_xml_parse: MagicMock,
+                                   mock_xml_write: MagicMock) -> None:
+        '''Tests that an exception is raised when the template file is not present.'''
+        # Setup mocks
+        mock_path_exists.return_value = False
+        mock_xml_parse.side_effect = Exception() # mock a parsing error due to missing file
+        
+        # Call target function and assert expectations
+        with self.assertRaises(Exception):
+            music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+            
+        # Assert expectations: nothing should be called
+        mock_collect_paths.assert_not_called()
+        mock_tags_load.assert_not_called()
+        mock_xml_write.assert_not_called()
 
 class TestUpdateLibrary(unittest.TestCase):
     def create_mock_file_mapping(self, index: int) -> tuple[str, str]:
         create_mock_path: Callable[[str, int], str] = lambda p, n: os.path.join(p, f"mock_file_{n}")
         return (create_mock_path(MOCK_INPUT_DIR, index), create_mock_path(MOCK_OUTPUT_DIR, index))
     
-    @patch('src.sync_media_server.run_sync_mappings')
-    @patch('src.sync_media_server.create_sync_mappings')
+    @patch('src.sync.run_sync_mappings')
+    @patch('src.sync.create_sync_mappings')
     @patch('src.tags_info.compare_tags')
-    @patch('src.batch_operations_music.record_collection')
-    @patch('src.batch_operations_music.sweep')
-    @patch('src.batch_operations_music.process')
+    @patch('src.music.record_collection')
+    @patch('src.music.sweep')
+    @patch('src.music.process')
     @patch('tempfile.TemporaryDirectory')
     def test_success(self,
                      mock_temp_dir: MagicMock,
@@ -1425,12 +1442,12 @@ class TestUpdateLibrary(unittest.TestCase):
         mock_interactive = False
         mock_extensions = {'.mock_ext'}
         mock_hints = {'mock_hint'}
-        batch_operations_music.update_library(MOCK_INPUT_DIR,
-                                              mock_library,
-                                              mock_client_mirror,
-                                              mock_interactive,
-                                              mock_extensions,
-                                              mock_hints)
+        music.update_library(MOCK_INPUT_DIR,
+                             mock_library,
+                             mock_client_mirror,
+                             mock_interactive,
+                             mock_extensions,
+                             mock_hints)
         
         # Assert expectations
         ## Call parameters: process
@@ -1440,7 +1457,7 @@ class TestUpdateLibrary(unittest.TestCase):
         mock_sweep.assert_called_once_with(mock_temp_dir_path, mock_library, mock_interactive, mock_extensions, mock_hints)
         
         ## Call parameters: record_collection
-        mock_record_collection.assert_called_once_with(mock_library, batch_operations_music.COLLECTION_PATH)
+        mock_record_collection.assert_called_once_with(mock_library, music.COLLECTION_PATH)
 
         ## Call parameters: compare_tags
         mock_compare_tags.assert_called_once_with(mock_library, mock_client_mirror)
@@ -1452,10 +1469,10 @@ class TestUpdateLibrary(unittest.TestCase):
         expected_mappings = mock_created_mappings + mock_changed_mappings
         mock_run_sync_mappings.assert_called_once_with(expected_mappings)
         
-    @patch('src.sync_media_server.run_sync_mappings')
-    @patch('src.batch_operations_music.sweep')
-    @patch('src.batch_operations_music.record_collection')
-    @patch('src.batch_operations_music.process')
+    @patch('src.sync.run_sync_mappings')
+    @patch('src.music.sweep')
+    @patch('src.music.record_collection')
+    @patch('src.music.process')
     def test_error_sync(self,
                         mock_process: MagicMock,
                         mock_record_collection: MagicMock,
@@ -1475,12 +1492,12 @@ class TestUpdateLibrary(unittest.TestCase):
         
         # Assert expectations
         with self.assertRaises(Exception) as e:
-            batch_operations_music.update_library(MOCK_INPUT_DIR,
-                                                  mock_library,
-                                                  mock_client_mirror,
-                                                  mock_interactive,
-                                                  mock_extensions,
-                                                  mock_hints)
+            music.update_library(MOCK_INPUT_DIR,
+                                 mock_library,
+                                 mock_client_mirror,
+                                 mock_interactive,
+                                 mock_extensions,
+                                 mock_hints)
             self.assertEqual(e.msg, 'Mock error')
         
         # Functions should be called before exception

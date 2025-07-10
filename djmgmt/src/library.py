@@ -271,7 +271,7 @@ def move_files(args: type[Namespace], path_mappings: list[str]) -> None:
         shutil.move(source, dest)
 
 def collect_identifiers(collection: ET.Element, playlist_ids: set[str] = set()) -> list[str]:
-    from .common_tags import Tags
+    from .tags import Tags
     
     identifiers: list[str] = []
     

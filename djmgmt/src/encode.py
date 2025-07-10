@@ -420,7 +420,7 @@ def encode_lossy_cli(args: type[Namespace]) -> None:
     path_mappings = common.add_output_path(args.output, path_mappings, args.input)
     asyncio.run(encode_lossy(path_mappings, args.extension))
 
-async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4, skip_existing=True) -> None:
+async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4, skip_existing: bool=True) -> None:
     '''Encodes the given input, output mappings in lossy format with the given extension. Uses FFMPEG as backend.
     Encoding operations are parallelized.'''
     tasks: list[Task[tuple[int, str]]] = []
@@ -474,6 +474,7 @@ async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, thr
     logging.info('finished lossy encoding')
 
 async def run_missing_art_tasks(tasks: list[tuple[str, Task[tuple[int, str]]]]) -> list[str]:
+    '''Outputs a list of system file paths that are missing artwork.'''
     import json
     
     results: list[str] = []
@@ -498,13 +499,13 @@ async def run_missing_art_tasks(tasks: list[tuple[str, Task[tuple[int, str]]]]) 
             logging.error(f"unable to determine missing art for '{source}':\n{output}")
     return results
 
-async def find_missing_art_os(source_dir, threads=24) -> list[str]:
+async def find_missing_art_os(input_dir: str, threads: int=24) -> list[str]:
     # output data and command tasks
     missing: list[str] = []
     tasks: list[tuple[str, Task[tuple[int, str]]]] = []
     
     # iterate over the source dir paths
-    for path in common.collect_paths(source_dir):
+    for path in common.collect_paths(input_dir):
         # collect task batch
         task = asyncio.create_task(run_command_async(command_ffprobe_json(path)))
         tasks.append((path, task))
@@ -519,8 +520,8 @@ async def find_missing_art_os(source_dir, threads=24) -> list[str]:
     missing += await run_missing_art_tasks(tasks)
     return missing
 
-async def find_missing_art_xml(collection_file_path: str, collection_xpath: str, playlist_xpath: str, threads=24) -> list[str]:
-    from . import organize_library_dates as library
+async def find_missing_art_xml(collection_file_path: str, collection_xpath: str, playlist_xpath: str, threads: int=24) -> list[str]:
+    from . import library
     
     tree = library.load_collection(collection_file_path)
     collection = library.find_node(tree, collection_xpath)
@@ -548,6 +549,8 @@ async def find_missing_art_xml(collection_file_path: str, collection_xpath: str,
     # run remaining tasks
     missing += await run_missing_art_tasks(tasks)
     return missing
+
+# def missing_art(input_dir)
 
 def missing_art_cli(args: type[Namespace]) -> None:
     # TODO: add timing

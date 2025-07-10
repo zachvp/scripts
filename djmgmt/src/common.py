@@ -7,12 +7,12 @@ from . import constants
 # TODO: use project path as root for logs, they shouldn't be in src/
 DEFAULT_PATH = os.path.abspath(__file__)
 
-def configure_log(level=logging.DEBUG, path=DEFAULT_PATH) -> None:
+def configure_log(level: int=logging.DEBUG, path: str=DEFAULT_PATH) -> None:
     '''Standard log configuration.'''
     if path == DEFAULT_PATH:
         logs_path = os.path.join(os.path.dirname(DEFAULT_PATH), 'logs')
     else:
-        logs_path = os.path.join(os.path.dirname(os.path.abspath(path)), 'logs') # todo: update to write relative to this script dir
+        logs_path = os.path.join(os.path.dirname(os.path.abspath(path)), 'logs')
     if not os.path.exists(logs_path):
         os.makedirs(logs_path)
 

@@ -25,14 +25,14 @@ MAPPING_MONTH = {
 # delimiters
 FILE_OPERATION_DELIMITER = '->'
 
-# corevega server
-COREVEGA_HOST = 'corevega.local'
-COREVEGA_USER = 'zachvp'
+# PI server
+PI_HOST = 'pi.local'
+PI_USER = 'user'
 
 RSYNC_PORT = '12000'
 RSYNC_PROTOCOL = 'rsync://'
 RSYNC_MODULE_NAVIDROME = 'navidrome'
-RSYNC_URL = f"{RSYNC_PROTOCOL}{COREVEGA_USER}@{COREVEGA_HOST}:{RSYNC_PORT}"
+RSYNC_URL = f"{RSYNC_PROTOCOL}{PI_USER}@{PI_HOST}:{RSYNC_PORT}"
 
 # Rekordbox
 ATTR_DATE_ADDED = 'DateAdded'

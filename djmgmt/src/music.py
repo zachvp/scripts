@@ -24,12 +24,13 @@ from typing import cast
 
 from . import constants
 from . import common
-from . import encode_tracks
-from .common_tags import Tags
+from . import encode
+from .tags import Tags
 
 # constants
 PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
 COLLECTION_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'processed-collection.xml')
+COLLECTION_TEMPLATE_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'collection-template.xml')
 
 # classes
 class Namespace(argparse.Namespace):
@@ -160,7 +161,7 @@ def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: 
     # create a temporary directory to place the encoded files.
     with TemporaryDirectory() as temp_dir:
         # encode all non-standard lossless files
-        result = run(encode_tracks.encode_lossless(source, temp_dir, '.aiff', interactive=interactive))
+        result = run(encode.encode_lossless(source, temp_dir, '.aiff', interactive=interactive))
         
         # remove all of the original non-standard files that have been encoded.
         for input_path, _ in result:
@@ -168,138 +169,113 @@ def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: 
         # sweep all the encoded files from the temporary directory to the original source directory
         sweep(temp_dir, source, False, valid_extensions, prefix_hints)
 
-# TODO: refactor to use template file as foundation for new file
 # TODO: extend to save backup of previous X versions
 def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     TAG_TRACK     = 'TRACK'
     TAG_NODE      = 'NODE'
     TAG_PLAYLISTS = 'PLAYLISTS'
-    TAG_ROOT      = 'DJ_PLAYLISTS'
     
     NAME_PLAYLIST_ROOT = 'ROOT'
+    NAME_PRUNED        = "_pruned"
     
-    # Create or read the collection path
+    # load the existing collection path if present, otherwise load the template file
     if os.path.exists(collection_path):
-        try:
-            tree = ET.parse(collection_path)
-            root = tree.getroot()
-            collection = root.find(constants.XPATH_COLLECTION)
-            if collection is None:
-                raise ValueError('Invalid collection file format: missing COLLECTION element')
-        except Exception as e:
-            logging.error(f"Error loading collection file: {e}")
-            raise
+        xml_path = collection_path
     else:
-        # Create a new collection file with the basic structure
-        root = ET.Element(TAG_ROOT, {'Version': '1.0.0'})
-        product_attrs = {'Name': 'rekordbox', 'Version': '6.8.5', 'Company': 'AlphaTheta'}
-        ET.SubElement(root, 'PRODUCT', product_attrs)
-        collection = ET.SubElement(root, 'COLLECTION', {'Entries': '0'})
+        xml_path = COLLECTION_TEMPLATE_PATH
+    try:
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+    except Exception as e:
+        logging.error(f"Error loading collection file: {e}")
+        raise
     
-    # Ensure PLAYLISTS structure exists with ROOT node child
-    playlists = root.find(TAG_PLAYLISTS)
-    if playlists is None:
-        playlists = ET.SubElement(root, TAG_PLAYLISTS)
+    # ensure that the 'COLLECTION' element exists
+    collection = root.find(constants.XPATH_COLLECTION)
+    if collection is None:
+        raise ValueError('Invalid collection file format: missing COLLECTION element')
     
-    # Find or create the ROOT node under PLAYLISTS
-    root_node = playlists.find(f"./{TAG_NODE}[@Name=\"{NAME_PLAYLIST_ROOT}\"]")
-    
-    if root_node is None:
-        root_node = ET.SubElement(playlists, TAG_NODE, {
-            'Type' : '0',
-            'Name' : NAME_PLAYLIST_ROOT,
-            'Count': '0'  # Init to 0, update later
-        })
-    
-    # Ensure a default 'CUE Analysis Playlist' exists
-    cue_playlist = root_node.find(f"./{TAG_NODE}[@Name=\"CUE Analysis Playlist\"]")
-    if cue_playlist is None:
-        ET.SubElement(root_node, TAG_NODE, {
-            'Name'   : 'CUE Analysis Playlist',
-            'Type'   : '1',
-            'KeyType': '0',
-            'Entries': '0'
-        })
-    
-    # Ensure _pruned playlist exists under ROOT
-    pruned_node = root_node.find(f"./{TAG_NODE}[@Name=\"_pruned\"]")
+    # ensure that the "_pruned" playlist exists
+    pruned_node = root.find(f"./{TAG_PLAYLISTS}//{TAG_NODE}[@Name=\"{NAME_PRUNED}\"]")
     if pruned_node is None:
-        pruned_attrs = {'Name': '_pruned', 'Type': '1', 'KeyType': '0', 'Entries': '0'}
-        pruned_node = ET.SubElement(root_node, TAG_NODE, pruned_attrs)
+        raise ValueError('Invalid collection file format: missing _pruned element')
     
-    # Count existing tracks
+    # ensure that the 'PLAYLISTS.ROOT' exists
+    playlist_root = root.find(f"./{TAG_PLAYLISTS}//{TAG_NODE}[@Name=\"{NAME_PLAYLIST_ROOT}\"]")
+    if playlist_root is None:
+        raise ValueError('Invalid collection file format: missing PLAYLISTS.ROOT element')
+    
+    # count existing tracks
     existing_tracks = len(collection.findall(TAG_TRACK))
     new_tracks = 0
     updated_tracks = 0
     
-    # Process all music files in the source directory
-    # TODO: refactor to use common.collect_paths
-    for working_dir, _, filenames in os.walk(source):
-        for name in filenames:
-            file_path = os.path.join(working_dir, name)
-            name_split = os.path.splitext(name)
+    # process all music files in the source directory
+    paths = common.collect_paths(source)
+    for file_path in paths:
+        extension = os.path.splitext(file_path)[1]
+        
+        # Only process music files
+        if extension and extension in constants.EXTENSIONS:
+            file_url = f"file://localhost{quote(file_path, safe='()/')}"
             
-            # Only process music files
-            if name_split[1] in constants.EXTENSIONS:
-                file_url = f"file://localhost{quote(file_path, safe='()/')}"
-                
-                # Check if track already exists
-                existing_track = collection.find(f"./{TAG_TRACK}[@Location=\"{file_url}\"]")
-                
-                tags = Tags.load(file_path)
-                if not tags:
-                    continue
-                
-                today = datetime.now().strftime('%Y-%m-%d')
-                fallback_value = ''
-                
-                track_attrs = {
-                    constants.ATTR_TITLE      : tags.title or fallback_value,
-                    constants.ATTR_ARTIST     : tags.artist or fallback_value,
-                    constants.ATTR_ALBUM      : tags.album or fallback_value,
-                    constants.ATTR_GENRE      : tags.genre or fallback_value,
-                    constants.ATTR_KEY        : tags.key or fallback_value,
-                    constants.ATTR_PATH       : file_url
-                }
-                
-                if existing_track is not None:
-                    # Update existing track with latest metadata
-                    track_id = cast(str, existing_track.get(constants.ATTR_TRACK_ID)) 
-                    track_attrs[constants.ATTR_TRACK_ID] = track_id
-                    # Keep original date added if it exists
-                    original_date = existing_track.get(constants.ATTR_DATE_ADDED)
-                    if original_date:
-                        track_attrs[constants.ATTR_DATE_ADDED] = original_date
-                    else:
-                        track_attrs[constants.ATTR_DATE_ADDED] = today
-                        logging.warning(f"No date present for existing track: '{file_path}', using '{today}'")
-                    
-                    # Update all attributes
-                    for attr_name, attr_value in track_attrs.items():
-                        existing_track.set(attr_name, attr_value)
-                    
-                    updated_tracks += 1
-                    logging.debug(f"Updated existing track: '{file_path}'")
+            # Check if track already exists
+            existing_track = collection.find(f"./{TAG_TRACK}[@Location=\"{file_url}\"]")
+            
+            tags = Tags.load(file_path)
+            if not tags:
+                continue
+            
+            today = datetime.now().strftime('%Y-%m-%d')
+            fallback_value = ''
+            
+            track_attrs = {
+                constants.ATTR_TITLE      : tags.title or fallback_value,
+                constants.ATTR_ARTIST     : tags.artist or fallback_value,
+                constants.ATTR_ALBUM      : tags.album or fallback_value,
+                constants.ATTR_GENRE      : tags.genre or fallback_value,
+                constants.ATTR_KEY        : tags.key or fallback_value,
+                constants.ATTR_PATH       : file_url
+            }
+            
+            if existing_track is not None:
+                # Update existing track with latest metadata
+                track_id = cast(str, existing_track.get(constants.ATTR_TRACK_ID)) 
+                track_attrs[constants.ATTR_TRACK_ID] = track_id
+                # Keep original date added if it exists
+                original_date = existing_track.get(constants.ATTR_DATE_ADDED)
+                if original_date:
+                    track_attrs[constants.ATTR_DATE_ADDED] = original_date
                 else:
-                    # Create new track
-                    track_id = str(uuid.uuid4().int)[:9]
-                    track_attrs[constants.ATTR_TRACK_ID] = track_id
                     track_attrs[constants.ATTR_DATE_ADDED] = today
-                    
-                    ET.SubElement(collection, TAG_TRACK, track_attrs)
-                    new_tracks += 1
-                    logging.debug(f"Added new track: '{file_path}'")
-                    
-                    # Add to pruned playlist
-                    ET.SubElement(pruned_node, TAG_TRACK, {'Key': track_id})
+                    logging.warning(f"No date present for existing track: '{file_path}', using '{today}'")
+                
+                # Update all attributes
+                for attr_name, attr_value in track_attrs.items():
+                    existing_track.set(attr_name, attr_value)
+                
+                updated_tracks += 1
+                logging.debug(f"Updated existing track: '{file_path}'")
+            else:
+                # Create new track
+                track_id = str(uuid.uuid4().int)[:9]
+                track_attrs[constants.ATTR_TRACK_ID] = track_id
+                track_attrs[constants.ATTR_DATE_ADDED] = today
+                
+                ET.SubElement(collection, TAG_TRACK, track_attrs)
+                new_tracks += 1
+                logging.debug(f"Added new track: '{file_path}'")
+                
+                # Add to pruned playlist
+                ET.SubElement(pruned_node, TAG_TRACK, {'Key': track_id})
     
     # Update the 'Entries' attributes
     collection.set('Entries', str(existing_tracks + new_tracks))
     pruned_node.set('Entries', str(len(pruned_node.findall(TAG_TRACK))))
     
     # Update ROOT node's Count based on its child nodes
-    root_node_children = len(root_node.findall(TAG_NODE))
-    root_node.set('Count', str(root_node_children))
+    root_node_children = len(playlist_root.findall(TAG_NODE))
+    playlist_root.set('Count', str(root_node_children))
     
     # Write the tree to the XML file
     tree = ET.ElementTree(root)
@@ -525,6 +501,7 @@ def process(source: str, output: str, interactive: bool, valid_extensions: set[s
         3. Standardizes lossless encodings.
         4. Removes all non-music files, archives, and folders in the target directory.
         5. Records the processed files to a Rekordbox-like XML file.
+        6. Records the paths of the tracks that are missing artwork to a text file.
         
         The source and target directories may be the same for effectively in-place processing.
     '''
@@ -538,7 +515,7 @@ def process(source: str, output: str, interactive: bool, valid_extensions: set[s
     prune_empty(output, interactive)
     
     missing_art_path = os.path.join(constants.PROJECT_ROOT, 'state', 'missing-art.txt')
-    missing = run(encode_tracks.find_missing_art_os(output, threads=72))
+    missing = run(encode.find_missing_art_os(output, threads=72))
     common.write_paths(missing, missing_art_path)
 
 def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
@@ -559,7 +536,7 @@ def update_library(source: str,
         The source, library, and client_mirror_path parameters should all be distinct directories.
     '''
     from tempfile import TemporaryDirectory
-    from . import sync_media_server
+    from . import sync
     from . import tags_info
     
     # Create a temporary directory to process the files from source
@@ -573,12 +550,12 @@ def update_library(source: str,
 
         # combine any changed mappings with the standard filtered collection mappings
         changed = tags_info.compare_tags(library, client_mirror_path)
-        mappings = sync_media_server.create_sync_mappings(collection, client_mirror_path)
+        mappings = sync.create_sync_mappings(collection, client_mirror_path)
         if changed:
             mappings += changed
         
         # run the sync
-        sync_media_server.run_sync_mappings(mappings)
+        sync.run_sync_mappings(mappings)
 
 if __name__ == '__main__':
     common.configure_log(path=__file__)

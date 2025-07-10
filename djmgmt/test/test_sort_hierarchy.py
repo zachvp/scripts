@@ -4,10 +4,10 @@ from unittest.mock import patch, MagicMock
 from PIL import Image
 
 from src import constants
-from src.common_tags import Tags
+from src.tags import Tags
 
 # Test targets
-from src import tags_sort_hierarchy
+from src import tags_sort
 
 # Constants
 MOCK_ARTIST        = 'mock_artist'
@@ -31,15 +31,15 @@ def create_full_mock_tags() -> Tags:
                 MOCK_IMAGE)
 
 # Test classes
-class TestPromptSortHierarchy(unittest.TestCase):
-    '''Tests for tags_sort_hierarchy.sort_hierarchy.'''
+class TestSortHierarchy(unittest.TestCase):
+    '''Tests for tags_sort.sort_hierarchy.'''
     
     @patch('shutil.move')
     @patch('os.makedirs')
     @patch('os.path.exists')
-    @patch('src.tags_sort_hierarchy.clean_dirname_simple')
-    @patch('src.common_tags.Tags.load')
-    @patch('src.batch_operations_music.prune')
+    @patch('src.tags_sort.clean_dirname_simple')
+    @patch('src.tags.Tags.load')
+    @patch('src.music.prune')
     @patch('os.walk')
     def test_success_default_args(self,
                                   mock_walk: MagicMock,
@@ -59,7 +59,7 @@ class TestPromptSortHierarchy(unittest.TestCase):
         mock_path_exists.return_value = False
         
         # Call target function
-        tags_sort_hierarchy.sort_hierarchy(MOCK_INPUT_DIR, False, False, False, constants.MAPPING_MONTH)
+        tags_sort.sort_hierarchy(MOCK_INPUT_DIR, False, False, False, constants.MAPPING_MONTH)
         
         # Assert expectations
         mock_prune.assert_called_once()
@@ -70,10 +70,10 @@ class TestPromptSortHierarchy(unittest.TestCase):
     @patch('shutil.move')
     @patch('os.makedirs')
     @patch('os.path.exists')
-    @patch('src.tags_sort_hierarchy.date_path')
-    @patch('src.tags_sort_hierarchy.clean_dirname_simple')
-    @patch('src.common_tags.Tags.load')
-    @patch('src.batch_operations_music.prune')
+    @patch('src.tags_sort.date_path')
+    @patch('src.tags_sort.clean_dirname_simple')
+    @patch('src.tags.Tags.load')
+    @patch('src.music.prune')
     @patch('os.walk')
     def test_success_date(self,
                           mock_walk: MagicMock,
@@ -95,7 +95,7 @@ class TestPromptSortHierarchy(unittest.TestCase):
         mock_path_exists.return_value = False
         
         # Call target function
-        tags_sort_hierarchy.sort_hierarchy(MOCK_INPUT_DIR, False, True, False, constants.MAPPING_MONTH)
+        tags_sort.sort_hierarchy(MOCK_INPUT_DIR, False, True, False, constants.MAPPING_MONTH)
         
         # Assert expectations
         mock_prune.assert_called_once()
@@ -107,9 +107,9 @@ class TestPromptSortHierarchy(unittest.TestCase):
     @patch('shutil.move')
     @patch('os.makedirs')
     @patch('os.path.exists')
-    @patch('src.tags_sort_hierarchy.clean_dirname_simple')
-    @patch('src.common_tags.Tags.load')
-    @patch('src.batch_operations_music.prune')
+    @patch('src.tags_sort.clean_dirname_simple')
+    @patch('src.tags.Tags.load')
+    @patch('src.music.prune')
     @patch('os.walk')
     def test_success_skip_non_music(self,
                                     mock_walk: MagicMock,
@@ -126,7 +126,7 @@ class TestPromptSortHierarchy(unittest.TestCase):
         mock_walk.return_value = [(MOCK_INPUT_DIR, [], [mock_filename])]
         
         # Call target function
-        tags_sort_hierarchy.sort_hierarchy(MOCK_INPUT_DIR, False, False, False, constants.MAPPING_MONTH)
+        tags_sort.sort_hierarchy(MOCK_INPUT_DIR, False, False, False, constants.MAPPING_MONTH)
         
         # Assert expectations
         mock_walk.assert_called_once()
@@ -141,9 +141,9 @@ class TestPromptSortHierarchy(unittest.TestCase):
     @patch('shutil.move')
     @patch('os.makedirs')
     @patch('os.path.exists')
-    @patch('src.tags_sort_hierarchy.clean_dirname_simple')
-    @patch('src.common_tags.Tags.load')
-    @patch('src.batch_operations_music.prune')
+    @patch('src.tags_sort.clean_dirname_simple')
+    @patch('src.tags.Tags.load')
+    @patch('src.music.prune')
     @patch('os.walk')
     def test_success_skip_tags_load_fail(self,
                                          mock_walk: MagicMock,
@@ -160,7 +160,7 @@ class TestPromptSortHierarchy(unittest.TestCase):
         mock_load.return_value = None
         
         # Call target function
-        tags_sort_hierarchy.sort_hierarchy(MOCK_INPUT_DIR, False, False, False, constants.MAPPING_MONTH)
+        tags_sort.sort_hierarchy(MOCK_INPUT_DIR, False, False, False, constants.MAPPING_MONTH)
         
         # Assert expectations
         mock_walk.assert_called_once()

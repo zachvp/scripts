@@ -7,7 +7,7 @@ import argparse
 import logging
 from typing import Callable
 
-from .common_tags import Tags
+from .tags import Tags
 from . import common
 
 # command support

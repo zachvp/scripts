@@ -13,7 +13,7 @@ class TestPromptLogDuplicates(unittest.TestCase):
     '''Tests for tags_info.log_duplicates'''
     
     @patch('logging.info')
-    @patch('src.common_tags.Tags.load')
+    @patch('src.tags.Tags.load')
     @patch('src.common.collect_paths')
     def test_success_duplicates(self,
                                 mock_collect_paths: MagicMock,
@@ -33,7 +33,7 @@ class TestPromptLogDuplicates(unittest.TestCase):
         mock_log_info.assert_called_once()
         
     @patch('logging.info')
-    @patch('src.common_tags.Tags.load')
+    @patch('src.tags.Tags.load')
     @patch('src.common.collect_paths')
     def test_success_unique(self,
                                 mock_collect_paths: MagicMock,
@@ -52,7 +52,7 @@ class TestPromptLogDuplicates(unittest.TestCase):
         mock_log_info.assert_not_called()
         
     @patch('logging.info')
-    @patch('src.common_tags.Tags.load')
+    @patch('src.tags.Tags.load')
     @patch('src.common.collect_paths')
     def test_error_tag_load(self,
                             mock_collect_paths: MagicMock,
@@ -73,7 +73,7 @@ class TestPromptLogDuplicates(unittest.TestCase):
 class TestPromptTagsInfoCollectIdentifiers(unittest.TestCase):
     '''Tests for tags_info.collect_identifiers.'''
     
-    @patch('src.common_tags.Tags.load')
+    @patch('src.tags.Tags.load')
     @patch('src.common.collect_paths')
     def test_success(self,
                      mock_collect_paths: MagicMock,
@@ -93,7 +93,7 @@ class TestPromptTagsInfoCollectIdentifiers(unittest.TestCase):
         self.assertEqual(actual, [mock_identifier])
     
     @patch('logging.error')
-    @patch('src.common_tags.Tags.load')
+    @patch('src.tags.Tags.load')
     @patch('src.common.collect_paths')
     def test_error_tags_load(self,
                              mock_collect_paths: MagicMock,
@@ -114,7 +114,7 @@ class TestPromptTagsInfoCollectIdentifiers(unittest.TestCase):
 class TestPromptCompareTags(unittest.TestCase):
     '''Tests for src.tags_info.compare_tags.'''
     
-    @patch('src.common_tags.Tags.load')
+    @patch('src.tags.Tags.load')
     @patch('src.common.collect_paths')
     def test_success_file_match(self, mock_collect_paths: MagicMock, mock_load_tags: MagicMock) -> None:
         '''Tests that matching filenames are returned.'''
@@ -133,7 +133,7 @@ class TestPromptCompareTags(unittest.TestCase):
         self.assertEqual(mock_collect_paths.call_count, 2)
         self.assertEqual(mock_load_tags.call_count, 2)
         
-    @patch('src.common_tags.Tags.load')
+    @patch('src.tags.Tags.load')
     @patch('src.common.collect_paths')
     def test_success_file_difference(self, mock_collect_paths: MagicMock, mock_load_tags: MagicMock) -> None:
         '''Tests that non-matching filenames return no results.'''
@@ -152,7 +152,7 @@ class TestPromptCompareTags(unittest.TestCase):
         self.assertEqual(mock_collect_paths.call_count, 2)
         mock_load_tags.assert_not_called()
         
-    @patch('src.common_tags.Tags.load')
+    @patch('src.tags.Tags.load')
     @patch('src.common.collect_paths')
     def test_success_load_tags_fail(self, mock_collect_paths: MagicMock, mock_load_tags: MagicMock) -> None:
         '''Tests that no results are returned if tag loading fails.'''

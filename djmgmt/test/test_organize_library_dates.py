@@ -2,7 +2,7 @@ import unittest
 import xml.etree.ElementTree as ET
 from unittest.mock import patch, MagicMock
 
-from src import organize_library_dates as library
+from src import library
 from src import constants
 
 # Constants
@@ -28,9 +28,9 @@ COLLECTION_XML = f'''
 class TestGenerateDatePaths(unittest.TestCase):
     @patch('src.common.remove_subpath')
     @patch('src.common.find_date_context')
-    @patch('src.organize_library_dates.full_path')
-    @patch('src.organize_library_dates.swap_root')
-    @patch('src.organize_library_dates.collection_path_to_syspath')
+    @patch('src.library.full_path')
+    @patch('src.library.swap_root')
+    @patch('src.library.collection_path_to_syspath')
     def test_success_default_parameters(self,
                                         mock_collection_path_to_syspath: MagicMock,
                                         mock_swap_root: MagicMock,
@@ -67,9 +67,9 @@ class TestGenerateDatePaths(unittest.TestCase):
     
     @patch('src.common.remove_subpath')
     @patch('src.common.find_date_context')
-    @patch('src.organize_library_dates.full_path')
-    @patch('src.organize_library_dates.swap_root')
-    @patch('src.organize_library_dates.collection_path_to_syspath')
+    @patch('src.library.full_path')
+    @patch('src.library.swap_root')
+    @patch('src.library.collection_path_to_syspath')
     def test_success_metadata_path(self,
                                    mock_collection_path_to_syspath: MagicMock,
                                    mock_swap_root: MagicMock,
@@ -106,9 +106,9 @@ class TestGenerateDatePaths(unittest.TestCase):
         
     @patch('src.common.remove_subpath')
     @patch('src.common.find_date_context')
-    @patch('src.organize_library_dates.full_path')
-    @patch('src.organize_library_dates.swap_root')
-    @patch('src.organize_library_dates.collection_path_to_syspath')
+    @patch('src.library.full_path')
+    @patch('src.library.swap_root')
+    @patch('src.library.collection_path_to_syspath')
     def test_success_playlist_ids_include(self,
                                           mock_collection_path_to_syspath: MagicMock,
                                           mock_swap_root: MagicMock,
@@ -145,9 +145,9 @@ class TestGenerateDatePaths(unittest.TestCase):
         
     @patch('src.common.remove_subpath')
     @patch('src.common.find_date_context')
-    @patch('src.organize_library_dates.full_path')
-    @patch('src.organize_library_dates.swap_root')
-    @patch('src.organize_library_dates.collection_path_to_syspath')
+    @patch('src.library.full_path')
+    @patch('src.library.swap_root')
+    @patch('src.library.collection_path_to_syspath')
     def test_success_playlist_ids_exclude(self,
                                           mock_collection_path_to_syspath: MagicMock,
                                           mock_swap_root: MagicMock,
@@ -178,7 +178,7 @@ class TestGenerateDatePaths(unittest.TestCase):
         mock_remove_subpath.assert_not_called()
 
 class TestFullPath(unittest.TestCase):
-    @patch('src.organize_library_dates.date_path')
+    @patch('src.library.date_path')
     def test_success_default_parameters(self, mock_date_path: MagicMock) -> None:
         '''Tests for expected output with only required positional arguments provided.'''
         # Set up input
@@ -194,7 +194,7 @@ class TestFullPath(unittest.TestCase):
         expected = '/Users/user/Music/DJ/2020/02 february/03/MOCK_FILE.aiff'
         self.assertEqual(actual, expected)
         
-    @patch('src.organize_library_dates.date_path')
+    @patch('src.library.date_path')
     def test_success_include_metadata(self, mock_date_path: MagicMock) -> None:
         '''Tests for expected output with metadata included paramter.'''
         # Set up input
@@ -408,10 +408,10 @@ class TestFilterPathMappings(unittest.TestCase):
         self.assertEqual(len(actual), 0)
 
 class TestLibraryCollectIdentifiers(unittest.TestCase):
-    '''Tests for organize_library_dates.collect_identifiers.'''
+    '''Tests for library.collect_identifiers.'''
     
-    @patch('src.common_tags.Tags.load')
-    @patch('src.organize_library_dates.collection_path_to_syspath')
+    @patch('src.tags.Tags.load')
+    @patch('src.library.collection_path_to_syspath')
     def test_success_no_filter(self,
                                mock_to_syspath: MagicMock,
                                mock_tags_load: MagicMock) -> None:
@@ -430,8 +430,8 @@ class TestLibraryCollectIdentifiers(unittest.TestCase):
         self.assertEqual(actual, [mock_identifier])
         mock_to_syspath.assert_called_once()
         
-    @patch('src.common_tags.Tags.load')
-    @patch('src.organize_library_dates.collection_path_to_syspath')
+    @patch('src.tags.Tags.load')
+    @patch('src.library.collection_path_to_syspath')
     def test_success_filter_included(self,
                                      mock_to_syspath: MagicMock,
                                      mock_tags_load: MagicMock) -> None:
@@ -450,8 +450,8 @@ class TestLibraryCollectIdentifiers(unittest.TestCase):
         self.assertEqual(actual, [mock_identifier])
         mock_to_syspath.assert_called_once()
         
-    @patch('src.common_tags.Tags.load')
-    @patch('src.organize_library_dates.collection_path_to_syspath')
+    @patch('src.tags.Tags.load')
+    @patch('src.library.collection_path_to_syspath')
     def test_success_filter_excluded(self,
                                      mock_to_syspath: MagicMock,
                                      mock_tags_load: MagicMock) -> None:
@@ -471,8 +471,8 @@ class TestLibraryCollectIdentifiers(unittest.TestCase):
         mock_to_syspath.assert_called_once()
     
     @patch('logging.error')
-    @patch('src.common_tags.Tags.load')
-    @patch('src.organize_library_dates.collection_path_to_syspath')
+    @patch('src.tags.Tags.load')
+    @patch('src.library.collection_path_to_syspath')
     def test_error_tags_load(self,
                              mock_to_syspath: MagicMock,
                              mock_tags_load: MagicMock,

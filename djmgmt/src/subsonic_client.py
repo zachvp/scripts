@@ -39,7 +39,7 @@ def parse_args(valid_endpoints: set[str]) -> argparse.Namespace:
 def create_token(password: str, salt: str) -> str:
     return hashlib.md5((password + salt).encode()).hexdigest()
 
-def create_salt(length) -> str:
+def create_salt(length: int) -> str:
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
 def create_query(params: dict[str, str] = {}) -> str:
@@ -52,7 +52,7 @@ def create_query(params: dict[str, str] = {}) -> str:
         't': f'{create_token(password, salt)}', # token
         's': f'{salt}',                         # salt
         'v': '1.16.1',                          # version
-        'c': 'corevega_client'                  # client id
+        'c': 'pi_client'                  # client id
     }
     # add any params
     for key, value in params.items():
@@ -62,8 +62,8 @@ def create_query(params: dict[str, str] = {}) -> str:
 def call_endpoint(endpoint: str, params: dict[str, str] = {}) -> Response:
     # call the endpoint
     query_string = create_query(params)
-    # base_url = f"http://corevega.local:4533/rest"
-    base_url = f"https://corevega.net/rest"
+    # base_url = f"http://pi.local:4533/rest"
+    base_url = f"https://pi.net/rest"
     url = f"{base_url}/{endpoint}.view?{query_string}"
     logging.debug(f'send request: {url}')
     return requests.get(url)
