@@ -77,12 +77,12 @@ def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> typ
     if args.function == Namespace.FUNCTION_UPDATE_LIBRARY and not args.client_mirror_path:
         parser.error(f"the '--client-mirror-path argument' is required for {Namespace.FUNCTION_UPDATE_LIBRARY}")
 
-    # Normalize path arguments
+    # normalize path arguments
     args.input = os.path.normpath(args.input)
     if args.client_mirror_path:
         args.client_mirror_path = os.path.normpath(args.client_mirror_path)
 
-    # Handle input and output for single vs. multiple arg functions
+    # handle input and output for single vs. multiple arg functions
     if args.output:
         args.output = os.path.normpath(args.output)
     else:
@@ -90,11 +90,12 @@ def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> typ
 
     return args
 
-def compress_dir(input_path: str, output_path: str):
+# TODO: return list of compressed files
+def compress_dir(input_path: str, output_path: str) -> None:
     with zipfile.ZipFile(output_path + '.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
-        for working_dir, _, names in os.walk(input_path):
-            for name in names:
-                archive.write(os.path.join(working_dir, name), arcname=name)
+        for file_path in common.collect_paths(input_path):
+            name = os.path.basename(file_path)
+            archive.write(file_path, arcname=name)
 
 def is_prefix_match(value: str, prefixes: set[str]) -> bool:
     for prefix in prefixes:
@@ -119,10 +120,9 @@ def flatten_zip(zip_path: str, extract_path: str) -> None:
         file.extractall(os.path.normpath(extract_path))
 
     unzipped_path = os.path.join(extract_path, output_directory)
-    for working_dir, _, filenames in os.walk(unzipped_path):
-        for name in filenames:
-            logging.debug(f"move from {os.path.join(working_dir, name)} to {extract_path}")
-            shutil.move(os.path.join(working_dir, name), extract_path)
+    for file_path in common.collect_paths(unzipped_path):
+        logging.debug(f"move from {file_path} to {extract_path}")
+        shutil.move(file_path, extract_path)
     if os.path.exists(unzipped_path) and len(os.listdir(unzipped_path)) < 1:
         logging.info(f"remove empty unzipped path {unzipped_path}")
         shutil.rmtree(unzipped_path)
@@ -154,6 +154,7 @@ def get_dirs(top: str) -> list[str]:
             dirs.append(path)
     return dirs
 
+# TODO: return encoded files
 def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: set[str], interactive: bool) -> None:
     from tempfile import TemporaryDirectory
     from asyncio import run
@@ -215,11 +216,11 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     for file_path in paths:
         extension = os.path.splitext(file_path)[1]
         
-        # Only process music files
+        # only process music files
         if extension and extension in constants.EXTENSIONS:
             file_url = f"file://localhost{quote(file_path, safe='()/')}"
             
-            # Check if track already exists
+            # check if track already exists
             existing_track = collection.find(f"./{TAG_TRACK}[@Location=\"{file_url}\"]")
             
             tags = Tags.load(file_path)
@@ -239,10 +240,10 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
             }
             
             if existing_track is not None:
-                # Update existing track with latest metadata
+                # update existing track with latest metadata
                 track_id = cast(str, existing_track.get(constants.ATTR_TRACK_ID)) 
                 track_attrs[constants.ATTR_TRACK_ID] = track_id
-                # Keep original date added if it exists
+                # keep original date added if it exists
                 original_date = existing_track.get(constants.ATTR_DATE_ADDED)
                 if original_date:
                     track_attrs[constants.ATTR_DATE_ADDED] = original_date
@@ -250,14 +251,14 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
                     track_attrs[constants.ATTR_DATE_ADDED] = today
                     logging.warning(f"No date present for existing track: '{file_path}', using '{today}'")
                 
-                # Update all attributes
+                # update all attributes
                 for attr_name, attr_value in track_attrs.items():
                     existing_track.set(attr_name, attr_value)
                 
                 updated_tracks += 1
                 logging.debug(f"Updated existing track: '{file_path}'")
             else:
-                # Create new track
+                # create new track
                 track_id = str(uuid.uuid4().int)[:9]
                 track_attrs[constants.ATTR_TRACK_ID] = track_id
                 track_attrs[constants.ATTR_DATE_ADDED] = today
@@ -266,18 +267,18 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
                 new_tracks += 1
                 logging.debug(f"Added new track: '{file_path}'")
                 
-                # Add to pruned playlist
+                # add to pruned playlist
                 ET.SubElement(pruned_node, TAG_TRACK, {'Key': track_id})
     
-    # Update the 'Entries' attributes
+    # update the 'Entries' attributes
     collection.set('Entries', str(existing_tracks + new_tracks))
     pruned_node.set('Entries', str(len(pruned_node.findall(TAG_TRACK))))
     
-    # Update ROOT node's Count based on its child nodes
+    # update ROOT node's Count based on its child nodes
     root_node_children = len(playlist_root.findall(TAG_NODE))
     playlist_root.set('Count', str(root_node_children))
     
-    # Write the tree to the XML file
+    # write the tree to the XML file
     tree = ET.ElementTree(root)
     tree.write(collection_path, encoding='UTF-8', xml_declaration=True)
     logging.info(f"Collection updated: {new_tracks} new tracks, {updated_tracks} updated tracks at {collection_path}")
@@ -285,141 +286,140 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     return tree
 
 # Primary functions
+# TODO: return list of swept file mappings
 def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> None:
-    for working_dir, _, filenames in os.walk(source):
-        for name in filenames:
-            # loop state
-            input_path = os.path.join(working_dir, name)
-            output_path = os.path.join(output, name)
-            name_split = os.path.splitext(name)
+    for input_path in common.collect_paths(source):
+        # loop state
+        name = os.path.basename(input_path)
+        output_path = os.path.join(output, name)
+        name_split = os.path.splitext(name)
 
-            if os.path.exists(output_path):
-                logging.info(f"skip: path '{output_path}' exists in destination")
-                continue
+        if os.path.exists(output_path):
+            logging.info(f"skip: path '{output_path}' exists in destination")
+            continue
 
-            # handle zip archive
-            # TODO: refactor so that is_music_archive is its own function
-            is_valid_archive = False
-            if name_split[1] == '.zip':
-                is_valid_archive = True
-                
-                # inspect zip archive to determine if this is likely a music container
-                if not is_prefix_match(name, prefix_hints):
-                    valid_files = 0
-                    with zipfile.ZipFile(input_path, 'r') as archive:
-                        for archive_file in archive.namelist():
-                            if not is_valid_archive:
-                                logging.debug(f"invalid archive: '{input_path}''")
+        # handle zip archive
+        # TODO: refactor so that is_music_archive is its own function
+        is_valid_archive = False
+        if name_split[1] == '.zip':
+            is_valid_archive = True
+            
+            # inspect zip archive to determine if this is likely a music container
+            if not is_prefix_match(name, prefix_hints):
+                valid_files = 0
+                with zipfile.ZipFile(input_path, 'r') as archive:
+                    for archive_file in archive.namelist():
+                        if not is_valid_archive:
+                            logging.debug(f"invalid archive: '{input_path}''")
+                            break
+
+                        # ignore archive that contains an app
+                        filepath_split = os.path.split(archive_file)
+                        for f in filepath_split:
+                            if '.app' in os.path.splitext(f)[1]:
+                                logging.info(f"app {archive_file} detected, skipping")
+                                is_valid_archive = False
                                 break
+                        
+                        # only the given valid extensions and images are allowed
+                        file_ext = os.path.splitext(archive_file)[1]
+                        if file_ext in valid_extensions:
+                            valid_files += 1
+                        else:
+                            is_valid_archive &= file_ext in {'.jpg', '.png', '.jpeg'}
+                is_valid_archive &= valid_files > 0
+                logging.debug(f"archive '{input_path}' valid = '{is_valid_archive}'")
 
-                            # ignore archive that contains an app
-                            filepath_split = os.path.split(archive_file)
-                            for f in filepath_split:
-                                if '.app' in os.path.splitext(f)[1]:
-                                    logging.info(f"app {archive_file} detected, skipping")
-                                    is_valid_archive = False
-                                    break
-                            
-                            # only the given valid extensions and images are allowed
-                            file_ext = os.path.splitext(archive_file)[1]
-                            if file_ext in valid_extensions:
-                                valid_files += 1
-                            else:
-                                is_valid_archive &= file_ext in {'.jpg', '.png', '.jpeg'}
-                    is_valid_archive &= valid_files > 0
-                    logging.debug(f"archive '{input_path}' valid = '{is_valid_archive}'")
-
-            # move input file if it has a supported extension or is a valid archive
-            if name_split[1] in valid_extensions or is_valid_archive:
-                logging.debug(f"filter matched file '{input_path}'")
-                if interactive:
-                    logging.info(f"move from '{input_path}' to '{output_path}'")
-                    choice = input('Continue? [y/N/q]')
-                    if choice == 'q':
-                        logging.info('user quit')
-                        return
-                    if choice != 'y' or choice in 'nN':
-                        logging.info('skip: user skipped file')
-                        continue
-                shutil.move(input_path, output_path)
+        # move input file if it has a supported extension or is a valid archive
+        if name_split[1] in valid_extensions or is_valid_archive:
+            logging.debug(f"filter matched file '{input_path}'")
+            if interactive:
+                logging.info(f"move from '{input_path}' to '{output_path}'")
+                choice = input('Continue? [y/N/q]')
+                if choice == 'q':
+                    logging.info('user quit')
+                    return
+                if choice != 'y' or choice in 'nN':
+                    logging.info('skip: user skipped file')
+                    continue
+            shutil.move(input_path, output_path)
     logging.info("swept all files")
     
 def sweep_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
     sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
 
+# TODO: return list of moved file mappings
 def flatten_hierarchy(source: str, output: str, interactive: bool) -> None:
-    for working_dir, _, filenames in os.walk(source):
-        for name in filenames:
-            input_path = os.path.join(working_dir, name)
-            output_path = os.path.join(output, name)
-            name_split = os.path.splitext(name)
+    for input_path in common.collect_paths(source):
+        name = os.path.basename(input_path)
+        output_path = os.path.join(output, name)
+        name_split = os.path.splitext(name)
 
-            # Handle zip files
-            if name_split[1] == '.zip':
-                logging.info(f"extracting and flattening zip: '{input_path}'")
-                if interactive:
-                    choice = input('Extract and flatten zip? [y/N/q]')
-                    if choice == 'q':
-                        logging.info('info: user quit')
-                        return
-                    if choice != 'y' or choice in 'nN':
-                        logging.info(f"skip: {input_path}")
-                        continue
-                try:
-                    flatten_zip(input_path, output)
-                except Exception as e:
-                    logging.error(f"Error extracting zip '{input_path}': {str(e)}")
-                continue
+        # Handle zip files
+        if name_split[1] == '.zip':
+            logging.info(f"extracting and flattening zip: '{input_path}'")
+            if interactive:
+                choice = input('Extract and flatten zip? [y/N/q]')
+                if choice == 'q':
+                    logging.info('info: user quit')
+                    return
+                if choice != 'y' or choice in 'nN':
+                    logging.info(f"skip: {input_path}")
+                    continue
+            try:
+                flatten_zip(input_path, output)
+            except Exception as e:
+                logging.error(f"Error extracting zip '{input_path}': {str(e)}")
+            continue
 
-            # Handle regular files
-            if not os.path.exists(output_path):
-                logging.info(f"move '{input_path}' to '{output_path}'")
-                if interactive:
-                    choice = input('Continue? [y/N/q]')
-                    if choice == 'q':
-                        logging.info('info: user quit')
-                        return
-                    if choice != 'y' or choice in 'nN':
-                        logging.info(f"skip: {input_path}")
-                        continue
-                try:
-                    shutil.move(input_path, output_path)
-                except FileNotFoundError as error:
-                    if error.filename == input_path:
-                        logging.info(f"skip: encountered ghost file: '{input_path}'")
-                        continue
-            else:
-                logging.debug(f"skip: {input_path}")
+        # handle regular files
+        if not os.path.exists(output_path):
+            logging.info(f"move '{input_path}' to '{output_path}'")
+            if interactive:
+                choice = input('Continue? [y/N/q]')
+                if choice == 'q':
+                    logging.info('info: user quit')
+                    return
+                if choice != 'y' or choice in 'nN':
+                    logging.info(f"skip: {input_path}")
+                    continue
+            try:
+                shutil.move(input_path, output_path)
+            except FileNotFoundError as error:
+                if error.filename == input_path:
+                    logging.info(f"skip: encountered ghost file: '{input_path}'")
+                    continue
+        else:
+            logging.debug(f"skip: {input_path}")
 
 def flatten_hierarchy_cli(args: type[Namespace]) -> None:
     flatten_hierarchy(args.input, args.output, args.interactive)
 
+# TODO: return list of file mappings
 def extract(source: str, output: str, interactive: bool) -> None:
-    for working_dir, _, filenames in os.walk(source):
-        for name in filenames:
-            input_path = os.path.join(working_dir, name)
-            name_split = os.path.splitext(name)
-            if name_split[1] == '.zip':
-                zip_input_path = os.path.join(working_dir, name)
-                zip_output_path = os.path.join(output, name_split[0])
+    for input_path in common.collect_paths(source):
+        name = os.path.basename(input_path)
+        name_split = os.path.splitext(name)
+        if name_split[1] == '.zip':
+            zip_output_path = os.path.join(output, name_split[0])
 
-                if os.path.exists(zip_output_path) and os.path.isdir(zip_output_path):
-                    logging.info(f"skip: existing ouput path '{zip_output_path}'")
+            if os.path.exists(zip_output_path) and os.path.isdir(zip_output_path):
+                logging.info(f"skip: existing ouput path '{zip_output_path}'")
+                continue
+
+            logging.info(f"extract {input_path} to {output}")
+            if interactive:
+                choice = input('Continue? [y/N/q]')
+                if choice == 'q':
+                    logging.info('user quit')
+                    return
+                if choice != 'y' or choice in 'nN':
+                    logging.info(f"skip: {input_path}")
                     continue
-
-                logging.info(f"extract {zip_input_path} to {output}")
-                if interactive:
-                    choice = input('Continue? [y/N/q]')
-                    if choice == 'q':
-                        logging.info('user quit')
-                        return
-                    if choice != 'y' or choice in 'nN':
-                        logging.info(f"skip: {input_path}")
-                        continue
-                with zipfile.ZipFile(zip_input_path, 'r') as file:
-                    file.extractall(os.path.normpath(output))
-            else:
-                logging.debug(f"skip: non-zip file '{input_path}'")
+            with zipfile.ZipFile(input_path, 'r') as file:
+                file.extractall(os.path.normpath(output))
+        else:
+            logging.debug(f"skip: non-zip file '{input_path}'")
 
 def extract_cli(args: type[Namespace]) -> None:
     extract(args.input, args.output, args.interactive)
@@ -469,27 +469,25 @@ def prune_empty_cli(args: type[Namespace]) -> None:
     
 def prune_non_music(source: str, valid_extensions: set[str], interactive: bool) -> None:
     '''Removes all files that don't have a valid music extension from the given directory.'''
-    for working_dir, _, filenames in os.walk(source):
-        for name in filenames:
-            input_path = os.path.join(working_dir, name)
-            name_split = os.path.splitext(name)
-            
-            # Check extension
-            if name_split[1] not in valid_extensions:
-                logging.info(f"non-music file found: '{input_path}'")
-                if interactive:
-                    choice = input("continue? [y/N]")
-                    if choice != 'y':
-                        logging.info('skip: user skipped')
-                        continue
-                try:
-                    if name_split[1] == '.app':
-                        shutil.rmtree(input_path)
-                    else:
-                        os.remove(input_path)
-                    logging.info(f"removed: '{input_path}'")
-                except OSError as e:
-                    logging.error(f"Error removing file '{input_path}': {str(e)}")
+    for input_path in common.collect_paths(source):
+        name_split = os.path.splitext(input_path)
+        
+        # check extension
+        if name_split[1] not in valid_extensions:
+            logging.info(f"non-music file found: '{input_path}'")
+            if interactive:
+                choice = input("continue? [y/N]")
+                if choice != 'y':
+                    logging.info('skip: user skipped')
+                    continue
+            try:
+                if name_split[1] == '.app':
+                    shutil.rmtree(input_path)
+                else:
+                    os.remove(input_path)
+                logging.info(f"removed: '{input_path}'")
+            except OSError as e:
+                logging.error(f"Error removing file '{input_path}': {str(e)}")
 
 def prune_non_music_cli(args: type[Namespace], valid_extensions: set[str]) -> None:
     prune_non_music(args.input, valid_extensions, args.interactive)
@@ -539,7 +537,7 @@ def update_library(source: str,
     from . import sync
     from . import tags_info
     
-    # Create a temporary directory to process the files from source
+    # create a temporary directory to process the files from source
     with TemporaryDirectory() as processing_dir:
         # process all of the source files into the temp dir
         process(source, processing_dir, interactive, valid_extensions, prefix_hints)

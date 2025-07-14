@@ -1,5 +1,6 @@
 import unittest
 import os
+import zipfile
 from typing import cast, Callable
 from argparse import Namespace
 import xml.etree.ElementTree as ET
@@ -38,619 +39,60 @@ DJ_PLAYLISTS_XML = f'''
 </DJ_PLAYLISTS>
 '''.strip()
 
-# Primary test class
-class TestSweepMusic(unittest.TestCase):
-    @patch('shutil.move')
+# Primary test classes
+class TestCompressDir(unittest.TestCase):
+    @patch('src.common.collect_paths')
     @patch('zipfile.ZipFile')
-    @patch('src.music.is_prefix_match')
-    @patch('os.path.exists')
-    @patch('os.walk')
-    def test_sweep_music_files(self,
-                                  mock_walk: MagicMock,
-                                  mock_path_exists: MagicMock,
-                                  mock_is_prefix_match: MagicMock,
-                                  mock_zipfile: MagicMock,
-                                  mock_move: MagicMock) -> None:
-        '''Test that loose music files are swept.'''
-        # Set up mocks
-        mock_filenames = [f"mock_file{ext}" for ext in constants.EXTENSIONS]
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], mock_filenames)]
-        mock_path_exists.return_value = False
-        mock_is_prefix_match.return_value = False
-        
-        # Call target function
-        music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
-                                     False,
-                                     constants.EXTENSIONS,
-                                     music.PREFIX_HINTS)
-        
-        # Assert expectations
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        self.assertEqual(mock_path_exists.call_count, len(mock_filenames))
-        mock_is_prefix_match.assert_not_called()
-        mock_zipfile.assert_not_called()
-        mock_move.assert_has_calls([
-            call(f"{MOCK_INPUT_DIR}{os.sep}{mock_filenames[i]}",
-                 f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filenames[i]}")
-            for i in range(len(mock_filenames))
-        ])
-    
-    @patch('shutil.move')
-    @patch('zipfile.ZipFile')
-    @patch('src.music.is_prefix_match')
-    @patch('os.path.exists')
-    @patch('os.walk')
-    def test_no_sweep_non_music_files(self,
-                                  mock_walk: MagicMock,
-                                  mock_path_exists: MagicMock,
-                                  mock_is_prefix_match: MagicMock,
-                                  mock_zipfile: MagicMock,
-                                  mock_move: MagicMock) -> None:
-        '''Test that loose, non-music files are not swept.'''
-        mock_filenames = [
-            'track_0.foo',
-            'img_0.jpg'  ,
-            'img_1.jpeg' ,
-            'img_2.png'  ,
-        ]
-        # Set up mocks
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], mock_filenames)]
-        mock_path_exists.return_value = False
-        mock_is_prefix_match.return_value = False
-        
-        # Call target function
-        music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
-                                     False,
-                                     constants.EXTENSIONS,
-                                     music.PREFIX_HINTS)
-        
-        # Assert expectations
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        self.assertEqual(mock_path_exists.call_count, len(mock_filenames))
-        mock_is_prefix_match.assert_not_called()
-        mock_zipfile.assert_not_called()
-        mock_move.assert_not_called()
-    
-    @patch('shutil.move')
-    @patch('zipfile.ZipFile')
-    @patch('src.music.is_prefix_match')
-    @patch('os.path.exists')
-    @patch('os.walk')
-    def test_sweep_prefix_archive(self,
-                                  mock_walk: MagicMock,
-                                  mock_path_exists: MagicMock,
-                                  mock_is_prefix_match: MagicMock,
-                                  mock_zipfile: MagicMock,
-                                  mock_move: MagicMock) -> None:
-        '''Test that a prefix zip archive is swept to the output directory.'''
-        # Set up mocks
-        mock_filename = 'mock_valid_prefix.zip'
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], [mock_filename])]
-        mock_path_exists.return_value = False
-        mock_is_prefix_match.return_value = True
-        
-        # Call target function
-        music.sweep(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR,
-                                     False,
-                                     constants.EXTENSIONS,
-                                     music.PREFIX_HINTS)
-        
-        # Assert expectations
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        mock_path_exists.assert_called_once_with(f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
-        mock_is_prefix_match.assert_called_once_with(mock_filename, music.PREFIX_HINTS)
-        mock_zipfile.assert_not_called()
-        mock_move.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}",
-                                          f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
-
-    @patch('shutil.move')
-    @patch('zipfile.ZipFile')
-    @patch('src.music.is_prefix_match')
-    @patch('os.path.exists')
-    @patch('os.walk')
-    def test_sweep_music_archive(self,
-                                 mock_walk: MagicMock,
-                                 mock_path_exists: MagicMock,
-                                 mock_is_prefix_match: MagicMock,
-                                 mock_zipfile: MagicMock,
-                                 mock_move: MagicMock) -> None:
-        '''Test that a zip containing only music files is swept to the output directory.'''
-        # Set up mocks
-        mock_filename = 'mock_music_archive.zip'
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], [mock_filename])]
-        mock_path_exists.return_value = False
-        mock_is_prefix_match.return_value = False
-        
-        # Mock archive content
-        mock_archive = MagicMock()
-        mock_archive.namelist.return_value = [f"mock_file{ext}" for ext in constants.EXTENSIONS]
-        mock_zipfile.return_value.__enter__.return_value = mock_archive
-
-        # Call target function        
-        music.sweep(MOCK_INPUT_DIR,
-                                     MOCK_OUTPUT_DIR,
-                                     False,
-                                     constants.EXTENSIONS,
-                                     music.PREFIX_HINTS)
-        
-        # Assert expectations
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        mock_path_exists.assert_called_once_with(f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
-        mock_is_prefix_match.assert_called_once_with(mock_filename, music.PREFIX_HINTS)
-        mock_zipfile.assert_called_once()
-        mock_move.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}",
-                                          f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
-    
-    @patch('shutil.move')
-    @patch('zipfile.ZipFile')
-    @patch('src.music.is_prefix_match')
-    @patch('os.path.exists')
-    @patch('os.walk')
-    def test_sweep_album_archive(self,
-                                 mock_walk: MagicMock,
-                                 mock_path_exists: MagicMock,
-                                 mock_is_prefix_match: MagicMock,
-                                 mock_zipfile: MagicMock,
-                                 mock_move: MagicMock) -> None:
-        '''Test that a zip containing music files and a cover photo is swept to the output directory.'''
-        # Set up mocks
-        mock_filename = 'mock_album_archive.zip'
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], [mock_filename])]
-        mock_path_exists.return_value = False
-        mock_is_prefix_match.return_value = False
-        
-        # Mock archive content
-        mock_archive = MagicMock()
-        mock_archive.namelist.return_value =  [f"mock_file{ext}" for ext in constants.EXTENSIONS]
-        mock_archive.namelist.return_value += ['mock_cover.jpg']
-        mock_zipfile.return_value.__enter__.return_value = mock_archive
-
-        # Call target function        
-        music.sweep(MOCK_INPUT_DIR,
-                                     MOCK_OUTPUT_DIR,
-                                     False,
-                                     constants.EXTENSIONS,
-                                     music.PREFIX_HINTS)
-        
-        # Assert expectations
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        mock_path_exists.assert_called_once_with(f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
-        mock_is_prefix_match.assert_called_once_with(mock_filename, music.PREFIX_HINTS)
-        mock_zipfile.assert_called_once()
-        mock_move.assert_called_once_with(f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}",
-                                          f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filename}")
-
-# Primary test class
-class TestFlattenHierarchy(unittest.TestCase):
-    @patch('shutil.move')
-    @patch('src.music.flatten_zip')
-    @patch('os.walk')
-    def test_success_loose_files(self,
-                                 mock_walk: MagicMock,
-                                 mock_flatten_zip: MagicMock,
-                                 mock_move: MagicMock) -> None:
-        '''Tests that all loose files at the input root are flattened to output.'''
-        # Set up mocks
-        mock_filenames = [
-            'file_0.foo',
-            'file_1.foo',
-            'file_2.foo',
-        ]
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], mock_filenames)]
-
-        # Call target function        
-        music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
-        
-        # Assert expectations
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        mock_flatten_zip.assert_not_called()
-        mock_move.assert_has_calls([
-            call(f"{MOCK_INPUT_DIR}{os.sep}{mock_filenames[i]}",
-                 f"{MOCK_OUTPUT_DIR}{os.sep}{mock_filenames[i]}")
-            for i in range(len(mock_filenames))
-        ])
-    
-    @patch('shutil.move')
-    @patch('src.music.flatten_zip')
-    @patch('os.walk')
-    def test_success_zip_files(self,
-                               mock_walk: MagicMock,
-                               mock_flatten_zip: MagicMock,
-                               mock_move: MagicMock) -> None:
-        '''Tests that flatten zip is called for a zip archive.'''
-        # Set up mocks
-        mock_filename = 'mock_archive.zip'
-        mock_walk.return_value = [(MOCK_INPUT_DIR, [], ['mock_archive.zip'])]
-        
-        # Call target function        
-        music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
-        
-        # Assert expectations
-        input_filepath = f"{MOCK_INPUT_DIR}{os.sep}{mock_filename}"
-        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
-        mock_flatten_zip.assert_called_once_with(input_filepath, MOCK_OUTPUT_DIR)
-        mock_move.assert_not_called()
-        
-class TestPruneNonMusicFiles(unittest.TestCase):
-    @patch('shutil.rmtree')
-    @patch('os.remove')
-    @patch('os.walk')
-    def test_success_remove_non_music(self,
-                                      mock_os_walk: MagicMock,
-                                      mock_os_remove: MagicMock,
-                                      mock_rmtree: MagicMock) -> None:
-        '''Tests that non-music files are removed.'''
-        # Setup mocks
-        mock_walk_data = [
-            ('/mock/source', ['mock/dir/0'], ['mock_file.foo'])
-        ]
-        mock_os_walk.return_value = mock_walk_data
-        
-        # Call target function and assert expectations
-        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
-        
-        mock_os_walk.assert_called()
-        mock_os_remove.assert_called_once_with('/mock/source/mock_file.foo')
-        mock_rmtree.assert_not_called()
-    
-    @patch('shutil.rmtree')
-    @patch('os.remove')
-    @patch('os.walk')
-    def test_success_skip_music(self,
-                                mock_os_walk: MagicMock,
-                                mock_os_remove: MagicMock,
-                                mock_rmtree: MagicMock) -> None:
-        '''Tests that music files are not removed.'''
-        # Setup mocks
-        mock_walk_data = [
-            ('/mock/source', ['mock/dir/0'], ['mock_music.mp3'])
-        ]
-        mock_os_walk.return_value = mock_walk_data
-        
-        # Call target function and assert expectations
-        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
-        
-        mock_os_walk.assert_called()
-        mock_os_remove.assert_not_called()
-        mock_rmtree.assert_not_called()
-    
-    @patch('shutil.rmtree')
-    @patch('os.remove')
-    @patch('os.walk')
-    def test_success_skip_music_subdirectory(self,
-                                             mock_os_walk: MagicMock,
-                                             mock_os_remove: MagicMock,
-                                             mock_rmtree: MagicMock) -> None:
-        '''Tests that nested music files are not removed.'''
-        # Setup mocks
-        mock_walk_data = [
-            ('/mock/source', ['mock/dir/0'], []),
-            ('/mock/source/mock/dir/0', [], ['mock_music.mp3'])
-        ]
-        mock_os_walk.return_value = mock_walk_data
-        
-        # Call target function and assert expectations
-        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
-        
-        mock_os_walk.assert_called()
-        mock_os_remove.assert_not_called()
-        mock_rmtree.assert_not_called()
-    
-    @patch('shutil.rmtree')
-    @patch('os.remove')
-    @patch('os.walk')
-    def test_success_remove_non_music_subdirectory(self,
-                                                   mock_os_walk: MagicMock,
-                                                   mock_os_remove: MagicMock,
-                                                   mock_rmtree: MagicMock) -> None:
-        '''Tests that nested non-music files are removed.'''
-        # Setup mocks
-        mock_walk_data = [
-            ('/mock/source', ['mock/dir/0'], []),
-            ('/mock/source/mock/dir/0', [], ['mock_music.foo'])
-        ]
-        mock_os_walk.return_value = mock_walk_data
-        
-        # Call target function and assert expectations
-        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
-        
-        mock_os_walk.assert_called()
-        mock_os_remove.assert_called_once_with('/mock/source/mock/dir/0/mock_music.foo')
-        mock_rmtree.assert_not_called()
-    
-    @patch('shutil.rmtree')
-    @patch('os.remove')
-    @patch('os.walk')
-    def test_success_remove_hidden_file(self,
-                                        mock_os_walk: MagicMock,
-                                        mock_os_remove: MagicMock,
-                                        mock_rmtree: MagicMock) -> None:
-        '''Tests that hidden files are removed.'''
-        # Setup mocks
-        mock_walk_data = [
-            ('/mock/source', ['mock/dir/0'], ['.mock_hidden'])
-        ]
-        mock_os_walk.return_value = mock_walk_data
-        
-        # Call target function and assert expectations
-        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
-        
-        mock_os_walk.assert_called()
-        mock_os_remove.assert_called_once_with('/mock/source/.mock_hidden')
-        mock_rmtree.assert_not_called()
-    
-    @patch('shutil.rmtree')
-    @patch('os.remove')
-    @patch('os.walk')
-    def test_success_remove_zip_archive(self,
-                                        mock_os_walk: MagicMock,
-                                        mock_os_remove: MagicMock,
-                                        mock_rmtree: MagicMock) -> None:
-        '''Tests that zip archives are removed.'''
-        # Setup mocks
-        mock_walk_data = [
-            ('/mock/source', ['mock/dir/0'], ['mock.zip'])
-        ]
-        mock_os_walk.return_value = mock_walk_data
-        
-        # Call target function and assert expectations
-        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
-        
-        mock_os_walk.assert_called()
-        mock_os_remove.assert_called_once_with('/mock/source/mock.zip')
-        mock_rmtree.assert_not_called()
-    
-    @patch('shutil.rmtree')
-    @patch('os.remove')
-    @patch('os.walk')
-    def test_success_remove_app(self,
-                                mock_os_walk: MagicMock,
-                                mock_os_remove: MagicMock,
-                                mock_rmtree: MagicMock) -> None:
-        '''Tests that .app archives are removed.'''
-        # Setup mocks
-        mock_walk_data = [
-            ('/mock/source', ['mock/dir/0'], ['mock.app'])
-        ]
-        mock_os_walk.return_value = mock_walk_data
-        
-        # Call target function and assert expectations
-        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
-        
-        mock_os_walk.assert_called()
-        mock_os_remove.assert_not_called()
-        mock_rmtree.assert_called_once_with('/mock/source/mock.app')
-    
-    @patch('shutil.rmtree')
-    @patch('os.remove')
-    @patch('os.walk')
-    def test_success_skip_music_hidden_dir(self,
-                                           mock_os_walk: MagicMock,
-                                           mock_os_remove: MagicMock,
-                                           mock_rmtree: MagicMock) -> None:
-        '''Tests that music files in a hidden directory are not removed.'''
-        # Setup mocks
-        mock_walk_data = [
-            ('/mock/source/mock/', ['.mock_hidden_dir'], []),
-            ('/mock/source/mock/.mock_hidden_dir', [], ['mock_music.mp3'])
-        ]
-        mock_os_walk.return_value = mock_walk_data
-        
-        # Call target function and assert expectations
-        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
-        
-        mock_os_walk.assert_called()
-        mock_os_remove.assert_not_called()
-        mock_rmtree.assert_not_called()
-    
-    @patch('shutil.rmtree')
-    @patch('os.remove')
-    @patch('os.walk')
-    def test_success_remove_non_music_hidden_dir(self,
-                                                 mock_os_walk: MagicMock,
-                                                 mock_os_remove: MagicMock,
-                                                 mock_rmtree: MagicMock) -> None:
-        '''Tests that non-music files in a hidden directory are removed.'''
-        # Setup mocks
-        mock_walk_data = [
-            ('/mock/source/', ['.mock_hidden_dir'], []),
-            ('/mock/source/.mock_hidden_dir', [], ['mock.foo'])
-        ]
-        mock_os_walk.return_value = mock_walk_data
-        
-        # Call target function and assert expectations
-        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
-        
-        mock_os_walk.assert_called()
-        mock_os_remove.assert_called_once_with('/mock/source/.mock_hidden_dir/mock.foo')
-        mock_rmtree.assert_not_called()
-        
-    @patch('src.music.prune_non_music')
-    def test_success_cli(self, mock_prune_non_music: MagicMock) -> None:
-        '''Tests that the CLI wrapper function exists and is called properly.'''
-        import inspect
-        
-        # Assert that the expected function exists
-        self.assertTrue(inspect.isfunction(getattr(music, 'prune_non_music_cli', None)), 'Expected function does not exist')
-        
-        # Call target function and assert expectations
-        mock_namespace = Namespace(input='/mock/input/', output='/mock/output/', interactive=False)
-        music.prune_non_music_cli(mock_namespace, set())  # type: ignore
-        
-        mock_prune_non_music.assert_called_once_with(mock_namespace.input, set(), mock_namespace.interactive)
-    
-    @patch('shutil.rmtree')
-    @patch('builtins.input')
-    @patch('os.remove')
-    @patch('os.walk')
-    def test_success_interactive_skip(self,
-                                      mock_os_walk: MagicMock,
-                                      mock_os_remove: MagicMock,
-                                      mock_input: MagicMock,
-                                      mock_rmtree: MagicMock) -> None:
-        '''Tests that an interactive prune prompts the user to remove the non-music file and skips removal.'''
-        # Setup mocks
-        mock_walk_data = [
-            ('/mock/source', ['mock/dir/0'], ['mock_file.foo'])
-        ]
-        mock_os_walk.return_value = mock_walk_data
-        mock_input.return_value = 'N'
-        
-        # Call target function and assert expectations
-        music.prune_non_music('/mock/source/', constants.EXTENSIONS, True)
-        
-        mock_os_walk.assert_called()
-        mock_input.assert_called()
-        mock_os_remove.assert_not_called()
-        mock_rmtree.assert_not_called()
-        
-    @patch('shutil.rmtree')
-    @patch('builtins.input')
-    @patch('os.remove')
-    @patch('os.walk')
-    def test_success_interactive_remove(self,
-                                        mock_os_walk: MagicMock,
-                                        mock_os_remove: MagicMock,
-                                        mock_input: MagicMock,
-                                        mock_rmtree: MagicMock) -> None:
-        '''Tests that an interactive prune prompts the user to remove the non-music file and performs removal.'''
-        # Setup mocks
-        mock_walk_data = [
-            ('/mock/source', ['mock/dir/0'], ['mock_file.foo'])
-        ]
-        mock_os_walk.return_value = mock_walk_data
-        mock_input.return_value = 'y'
-        
-        # Call target function and assert expectations        
-        music.prune_non_music('/mock/source/', constants.EXTENSIONS, True)
-        
-        mock_os_walk.assert_called()
-        mock_input.assert_called()
-        mock_os_remove.assert_called_once()
-        mock_rmtree.assert_not_called()
-        
-class TestProcess(unittest.TestCase):
-    @patch('src.common.write_paths')
-    @patch('src.encode.find_missing_art_os')
-    @patch('src.music.standardize_lossless')
-    @patch('src.music.prune_non_music')
-    @patch('src.music.prune_empty')
-    @patch('src.music.flatten_hierarchy')
-    @patch('src.music.extract')
-    @patch('src.music.sweep')
     def test_success(self,
-                     mock_sweep: MagicMock,
-                     mock_extract: MagicMock,
-                     mock_flatten: MagicMock,
-                     mock_prune_empty: MagicMock,
-                     mock_prune_non_music: MagicMock,
-                     mock_standardize_lossless: MagicMock,
-                     mock_find_missing_art_os: MagicMock,
-                     mock_write_paths: MagicMock) -> None:
-        '''Tests that the process function calls the expected functions in the the correct order.'''
+                     mock_zipfile: MagicMock,
+                     mock_collect_paths: MagicMock) -> None:
+        '''Tests that a single file in the given directory is written to an archive.'''
         # Set up mocks
-        mock_call_container = MagicMock()
-        mock_sweep.side_effect = lambda *_, **__: mock_call_container.sweep()
-        mock_extract.side_effect = lambda *_, **__: mock_call_container.extract()
-        mock_flatten.side_effect = lambda *_, **__: mock_call_container.flatten()
-        mock_prune_empty.side_effect = lambda *_, **__: mock_call_container.prune_empty()
-        mock_prune_non_music.side_effect = lambda *_, **__: mock_call_container.prune_non_music()
-        mock_standardize_lossless.side_effect = lambda *_, **__: mock_call_container.standardize_lossless()
-        mock_find_missing_art_os.side_effect = lambda *_, **__: mock_call_container.find_missing_art_os()
-        mock_write_paths.side_effect = lambda *_, **__: mock_call_container.write_paths()
-        
-        # Mock the result of the lossless function
-        mock_standardize_lossless.return_value = [
-            ('/mock/input/file_0.aif', '/mock/output/file_0.aiff'),
-            ('/mock/input/file_1.wav', '/mock/output/file_1.aiff')
-        ]
+        mock_archive = MagicMock()
+        mock_zipfile.return_value.__enter__.return_value = mock_archive
+        mock_filepath = f"{MOCK_INPUT_DIR}/mock_file.foo"
+        mock_collect_paths.return_value = [mock_filepath]
         
         # Call target function
-        mock_interactive = False
-        mock_valid_extensions = {'a'}
-        mock_prefix_hints = {'b'}
-        music.process(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, mock_interactive, mock_valid_extensions, mock_prefix_hints)
-        
-        # Assert that the primary dependent functions are called in the correct order
-        self.assertEqual(mock_call_container.mock_calls[0], call.sweep())
-        self.assertEqual(mock_call_container.mock_calls[1], call.extract())
-        self.assertEqual(mock_call_container.mock_calls[2], call.flatten())
-        self.assertEqual(mock_call_container.mock_calls[3], call.standardize_lossless())
-        self.assertEqual(mock_call_container.mock_calls[4], call.prune_non_music())
-        self.assertEqual(mock_call_container.mock_calls[5], call.prune_empty())
-        self.assertEqual(mock_call_container.mock_calls[6], call.find_missing_art_os())
-        self.assertEqual(mock_call_container.mock_calls[7], call.write_paths())
-        
-        # Assert call counts and parameters
-        mock_sweep.assert_called_once()
-        mock_extract.assert_called_once()
-        mock_flatten.assert_called_once()
-        mock_standardize_lossless.assert_called_once_with(MOCK_OUTPUT_DIR, mock_valid_extensions, mock_prefix_hints, mock_interactive)
-        self.assertEqual(MOCK_OUTPUT_DIR, mock_find_missing_art_os.call_args.args[0])
-        self.assertEqual(mock_call_container.find_missing_art_os(), mock_write_paths.call_args.args[0])
-
-class TestProcessCLI(unittest.TestCase):
-    @patch('src.music.process')
-    def test_success(self, mock_process: MagicMock) -> None:
-        '''Tests that the process function is called with the expected arguments.'''
-        # Call target function
-        mock_interactive = False
-        mock_valid_extensions = {'a'}
-        mock_prefix_hints = {'b'}
-        args = Namespace(input=MOCK_INPUT_DIR, output=MOCK_OUTPUT_DIR, interactive=mock_interactive)
-        music.process_cli(args, mock_valid_extensions, mock_prefix_hints) # type: ignore
+        music.compress_dir(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR)
         
         # Assert expectations
-        mock_process.assert_called_once_with(MOCK_INPUT_DIR,
-                                             MOCK_OUTPUT_DIR,
-                                             mock_interactive,
-                                             mock_valid_extensions,
-                                             mock_prefix_hints)
+        mock_zipfile.assert_called_once_with(f"{MOCK_OUTPUT_DIR}.zip", 'w', zipfile.ZIP_DEFLATED)
+        mock_archive.write.assert_called_once_with(mock_filepath, arcname='mock_file.foo')
 
-class TestPruneEmpty(unittest.TestCase):
+class TestFlattenZip(unittest.TestCase):
     @patch('shutil.rmtree')
-    @patch('src.music.is_empty_dir')
-    @patch('src.music.get_dirs')
-    def test_success_remove_empty_dir(self,
-                                      mock_get_dirs: MagicMock,
-                                      mock_is_empty_dir: MagicMock,
-                                      mock_rmtree: MagicMock) -> None:
-        '''Test that prune removes an empty directory.'''
-        # Setup mocks
-        mock_get_dirs.return_value = ['mock_empty_dir']
+    @patch('os.listdir')
+    @patch('os.path.exists')
+    @patch('shutil.move')
+    @patch('src.common.collect_paths')
+    @patch('zipfile.ZipFile')
+    def test_success(self,
+                     mock_zipfile: MagicMock,
+                     mock_collect_paths: MagicMock,
+                     mock_move: MagicMock,
+                     mock_path_exists: MagicMock,
+                     mock_listdir: MagicMock,
+                     mock_rmtree: MagicMock) -> None:
+        '''Tests that all contents of the given zip archive are extracted, flattened into loose files, and the empty directory is removed.'''
+        # Set up mocks
+        mock_archive_path = f"{MOCK_INPUT_DIR}/file.zip"
+        mock_filepath = f"{MOCK_INPUT_DIR}/mock_file.foo"
+        mock_archive = MagicMock()
+        mock_zipfile.return_value.__enter__.return_value = mock_archive
+        mock_collect_paths.return_value = [mock_filepath]
+        mock_path_exists.return_value = True
+        mock_listdir.return_value = []
         
-        # Call target function and assert expectations
-        music.prune_empty('/mock/source/', False)
+        # Call target function
+        music.flatten_zip(mock_archive_path, MOCK_OUTPUT_DIR)
         
-        mock_get_dirs.assert_called()
-        mock_is_empty_dir.assert_called()
-        mock_rmtree.assert_called_once_with('/mock/source/mock_empty_dir')
-        
-    @patch('shutil.rmtree')
-    @patch('src.music.is_empty_dir')
-    @patch('src.music.get_dirs')
-    def test_success_skip_non_empty_dir(self,
-                                        mock_get_dirs: MagicMock,
-                                        mock_is_empty_dir: MagicMock,
-                                        mock_rmtree: MagicMock) -> None:
-        '''Test that prune does not remove a non-empty directory.'''
-        # Setup mocks
-        mock_get_dirs.side_effect = [['mock_non_empty_dir'], []]
-        mock_is_empty_dir.return_value = False
-        
-        # Call target function and assert expectations
-        music.prune_empty('/mock/source/', False)
-        
-        mock_get_dirs.assert_called()
-        mock_is_empty_dir.assert_called()
-        mock_rmtree.assert_not_called()
-        
-    @patch('src.music.prune_empty')
-    def test_success_cli(self, mock_prune_empty: MagicMock) -> None:
-        '''Tests that the CLI wrapper calls the correct function.'''
-        music.prune_empty('/mock/source/', False)
-        mock_prune_empty.assert_called_once_with('/mock/source/', False)
-        
+        # Assert expectations
+        mock_zipfile.assert_called_once_with(mock_archive_path, 'r')
+        mock_archive.extractall.assert_called_once_with(MOCK_OUTPUT_DIR)
+        mock_move.assert_called_once_with(mock_filepath, MOCK_OUTPUT_DIR)
+        mock_rmtree.assert_called_once_with(f"{MOCK_OUTPUT_DIR}/file")
+
 class TestRecordCollection(unittest.TestCase):
     '''Tests for music.record_collection.'''
     
@@ -1398,6 +840,743 @@ class TestRecordCollection(unittest.TestCase):
         mock_collect_paths.assert_not_called()
         mock_tags_load.assert_not_called()
         mock_xml_write.assert_not_called()
+
+class TestSweep(unittest.TestCase):
+    @patch('shutil.move')
+    @patch('zipfile.ZipFile')
+    @patch('src.music.is_prefix_match')
+    @patch('os.path.exists')
+    @patch('src.common.collect_paths')
+    def test_sweep_music_files(self,
+                               mock_collect_paths: MagicMock,
+                               mock_path_exists: MagicMock,
+                               mock_is_prefix_match: MagicMock,
+                               mock_zipfile: MagicMock,
+                               mock_move: MagicMock) -> None:
+        '''Test that loose music files are swept.'''
+        # Set up mocks
+        mock_filenames = [f"mock_file{ext}" for ext in constants.EXTENSIONS]
+        mock_paths = [f"{MOCK_INPUT_DIR}/{p}" for p in mock_filenames]
+        mock_collect_paths.return_value = mock_paths
+        mock_path_exists.return_value = False
+        mock_is_prefix_match.return_value = False
+        
+        # Call target function
+        music.sweep(MOCK_INPUT_DIR,
+                    MOCK_OUTPUT_DIR,
+                    False,
+                    constants.EXTENSIONS,
+                    music.PREFIX_HINTS)
+        
+        # Assert expectations
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
+        self.assertEqual(mock_path_exists.call_count, len(mock_filenames))
+        mock_is_prefix_match.assert_not_called()
+        mock_zipfile.assert_not_called()
+        mock_move.assert_has_calls([
+            call(f"{MOCK_INPUT_DIR}/{mock_filenames[i]}",
+                 f"{MOCK_OUTPUT_DIR}/{mock_filenames[i]}")
+            for i in range(len(mock_filenames))
+        ])
+    
+    @patch('shutil.move')
+    @patch('zipfile.ZipFile')
+    @patch('src.music.is_prefix_match')
+    @patch('os.path.exists')
+    @patch('src.common.collect_paths')
+    def test_no_sweep_non_music_files(self,
+                                  mock_collect_paths: MagicMock,
+                                  mock_path_exists: MagicMock,
+                                  mock_is_prefix_match: MagicMock,
+                                  mock_zipfile: MagicMock,
+                                  mock_move: MagicMock) -> None:
+        '''Test that loose, non-music files are not swept.'''
+        mock_filenames = [
+            'track_0.foo',
+            'img_0.jpg'  ,
+            'img_1.jpeg' ,
+            'img_2.png'  ,
+        ]
+        # Set up mocks
+        mock_collect_paths.return_value = mock_filenames
+        mock_path_exists.return_value = False
+        mock_is_prefix_match.return_value = False
+        
+        # Call target function
+        music.sweep(MOCK_INPUT_DIR,
+                    MOCK_OUTPUT_DIR,
+                    False,
+                    constants.EXTENSIONS,
+                    music.PREFIX_HINTS)
+        
+        # Assert expectations
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
+        self.assertEqual(mock_path_exists.call_count, len(mock_filenames))
+        mock_is_prefix_match.assert_not_called()
+        mock_zipfile.assert_not_called()
+        mock_move.assert_not_called()
+    
+    @patch('shutil.move')
+    @patch('zipfile.ZipFile')
+    @patch('src.music.is_prefix_match')
+    @patch('os.path.exists')
+    @patch('src.common.collect_paths')
+    def test_sweep_prefix_archive(self,
+                                  mock_collect_paths: MagicMock,
+                                  mock_path_exists: MagicMock,
+                                  mock_is_prefix_match: MagicMock,
+                                  mock_zipfile: MagicMock,
+                                  mock_move: MagicMock) -> None:
+        '''Test that a prefix zip archive is swept to the output directory.'''
+        # Set up mocks
+        mock_filename = 'mock_valid_prefix.zip'
+        mock_collect_paths.return_value = [f"{MOCK_INPUT_DIR}/{mock_filename}"]
+        mock_path_exists.return_value = False
+        mock_is_prefix_match.return_value = True
+        
+        # Call target function
+        music.sweep(MOCK_INPUT_DIR,
+                    MOCK_OUTPUT_DIR,
+                    False,
+                    constants.EXTENSIONS,
+                    music.PREFIX_HINTS)
+        
+        # Assert expectations
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_path_exists.assert_called_once_with(f"{MOCK_OUTPUT_DIR}/{mock_filename}")
+        mock_is_prefix_match.assert_called_once_with(mock_filename, music.PREFIX_HINTS)
+        mock_zipfile.assert_not_called()
+        mock_move.assert_called_once_with(f"{MOCK_INPUT_DIR}/{mock_filename}",
+                                          f"{MOCK_OUTPUT_DIR}/{mock_filename}")
+
+    @patch('shutil.move')
+    @patch('zipfile.ZipFile')
+    @patch('src.music.is_prefix_match')
+    @patch('os.path.exists')
+    @patch('src.common.collect_paths')
+    def test_sweep_music_archive(self,
+                                 mock_collect_paths: MagicMock,
+                                 mock_path_exists: MagicMock,
+                                 mock_is_prefix_match: MagicMock,
+                                 mock_zipfile: MagicMock,
+                                 mock_move: MagicMock) -> None:
+        '''Test that a zip containing only music files is swept to the output directory.'''
+        # Set up mocks
+        mock_filename = 'mock_music_archive.zip'
+        mock_collect_paths.return_value = [f"{MOCK_INPUT_DIR}/{mock_filename}"]
+        mock_path_exists.return_value = False
+        mock_is_prefix_match.return_value = False
+        
+        # Mock archive content
+        mock_archive = MagicMock()
+        mock_archive.namelist.return_value = [f"mock_file{ext}" for ext in constants.EXTENSIONS]
+        mock_zipfile.return_value.__enter__.return_value = mock_archive
+
+        # Call target function        
+        music.sweep(MOCK_INPUT_DIR,
+                    MOCK_OUTPUT_DIR,
+                    False,
+                    constants.EXTENSIONS,
+                    music.PREFIX_HINTS)
+        
+        # Assert expectations
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_path_exists.assert_called_once_with(f"{MOCK_OUTPUT_DIR}/{mock_filename}")
+        mock_is_prefix_match.assert_called_once_with(mock_filename, music.PREFIX_HINTS)
+        mock_zipfile.assert_called_once()
+        mock_move.assert_called_once_with(f"{MOCK_INPUT_DIR}/{mock_filename}",
+                                          f"{MOCK_OUTPUT_DIR}/{mock_filename}")
+    
+    @patch('shutil.move')
+    @patch('zipfile.ZipFile')
+    @patch('src.music.is_prefix_match')
+    @patch('os.path.exists')
+    @patch('src.common.collect_paths')
+    def test_sweep_album_archive(self,
+                                 mock_collect_paths: MagicMock,
+                                 mock_path_exists: MagicMock,
+                                 mock_is_prefix_match: MagicMock,
+                                 mock_zipfile: MagicMock,
+                                 mock_move: MagicMock) -> None:
+        '''Test that a zip containing music files and a cover photo is swept to the output directory.'''
+        # Set up mocks
+        mock_filename = 'mock_album_archive.zip'
+        mock_collect_paths.return_value = [f"{MOCK_INPUT_DIR}/{mock_filename}"]
+        mock_path_exists.return_value = False
+        mock_is_prefix_match.return_value = False
+        
+        # Mock archive content
+        mock_archive = MagicMock()
+        mock_archive.namelist.return_value =  [f"mock_file{ext}" for ext in constants.EXTENSIONS]
+        mock_archive.namelist.return_value += ['mock_cover.jpg']
+        mock_zipfile.return_value.__enter__.return_value = mock_archive
+
+        # Call target function        
+        music.sweep(MOCK_INPUT_DIR,
+                    MOCK_OUTPUT_DIR,
+                    False,
+                    constants.EXTENSIONS,
+                    music.PREFIX_HINTS)
+        
+        # Assert expectations
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_path_exists.assert_called_once_with(f"{MOCK_OUTPUT_DIR}/{mock_filename}")
+        mock_is_prefix_match.assert_called_once_with(mock_filename, music.PREFIX_HINTS)
+        mock_zipfile.assert_called_once()
+        mock_move.assert_called_once_with(f"{MOCK_INPUT_DIR}/{mock_filename}",
+                                          f"{MOCK_OUTPUT_DIR}/{mock_filename}")
+
+class TestFlattenHierarchy(unittest.TestCase):
+    @patch('shutil.move')
+    @patch('src.music.flatten_zip')
+    @patch('src.common.collect_paths')
+    def test_success_loose_files(self,
+                                 mock_collect_paths: MagicMock,
+                                 mock_flatten_zip: MagicMock,
+                                 mock_move: MagicMock) -> None:
+        '''Tests that all loose files at the input root are flattened to output.'''
+        # Set up mocks
+        mock_filenames = [
+            f"file_{i}.foo"
+            for i in range(3)
+        ]
+        mock_collect_paths.return_value = [f"{MOCK_INPUT_DIR}/{f}" for f in mock_filenames]
+
+        # Call target function        
+        music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
+        
+        # Assert expectations
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_flatten_zip.assert_not_called()
+        mock_move.assert_has_calls([
+            call(f"{MOCK_INPUT_DIR}/{mock_filenames[i]}",
+                 f"{MOCK_OUTPUT_DIR}/{mock_filenames[i]}")
+            for i in range(len(mock_filenames))
+        ])
+    
+    @patch('shutil.move')
+    @patch('src.music.flatten_zip')
+    @patch('src.common.collect_paths')
+    def test_success_zip_files(self,
+                               mock_collect_paths: MagicMock,
+                               mock_flatten_zip: MagicMock,
+                               mock_move: MagicMock) -> None:
+        '''Tests that flatten zip is called for a zip archive.'''
+        # Set up mocks
+        mock_filename = f"{MOCK_INPUT_DIR}/mock_archive.zip"
+        mock_collect_paths.return_value = [mock_filename]
+        
+        # Call target function        
+        music.flatten_hierarchy(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
+        
+        # Assert expectations
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_flatten_zip.assert_called_once_with(mock_filename, MOCK_OUTPUT_DIR)
+        mock_move.assert_not_called()
+
+class TestExtract(unittest.TestCase):
+    @patch('zipfile.ZipFile')
+    @patch('builtins.input')
+    @patch('os.path.isdir')
+    @patch('os.path.exists')
+    @patch('src.common.collect_paths')
+    def test_success_interactive_false(self,
+                                       mock_collect_paths: MagicMock,
+                                       mock_path_exists: MagicMock,
+                                       mock_isdir: MagicMock,
+                                       mock_input: MagicMock,
+                                       mock_zipfile: MagicMock) -> None:
+        '''Tests that all zip archives are extracted without requesting user input.'''
+        # Set up mocks
+        mock_collect_paths.return_value = [f"{MOCK_INPUT_DIR}/mock_archive.zip"]
+        mock_path_exists.return_value = False
+        mock_isdir.return_value = False
+        
+        mock_archive = MagicMock()
+        mock_zipfile.return_value.__enter__.return_value = mock_archive
+        
+        # Call target function
+        music.extract(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
+        
+        # Assert expectations
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_input.assert_not_called()
+        mock_archive.extractall.assert_called_once_with(MOCK_OUTPUT_DIR)
+        
+    @patch('zipfile.ZipFile')
+    @patch('builtins.input')
+    @patch('os.path.isdir')
+    @patch('os.path.exists')
+    @patch('src.common.collect_paths')
+    def test_success_no_zip_present(self,
+                                    mock_collect_paths: MagicMock,
+                                    mock_path_exists: MagicMock,
+                                    mock_isdir: MagicMock,
+                                    mock_input: MagicMock,
+                                    mock_zipfile: MagicMock) -> None:
+        '''Tests that nothing is extracted if there are no zip archives present in the input directory.'''
+        # Set up mocks
+        mock_filename = f"{MOCK_INPUT_DIR}/mock_non_zip.foo"
+        mock_collect_paths.return_value = [mock_filename]
+        mock_path_exists.return_value = False
+        mock_isdir.return_value = False
+        
+        # Call target function
+        music.extract(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
+        
+        # Assert expectations
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_input.assert_not_called()
+        mock_zipfile.assert_not_called()
+        
+    @patch('zipfile.ZipFile')
+    @patch('builtins.input')
+    @patch('os.path.isdir')
+    @patch('os.path.exists')
+    @patch('src.common.collect_paths')
+    def test_success_output_exists(self,
+                                   mock_collect_paths: MagicMock,
+                                   mock_path_exists: MagicMock,
+                                   mock_isdir: MagicMock,
+                                   mock_input: MagicMock,
+                                   mock_zipfile: MagicMock) -> None:
+        '''Tests that nothing is extracted if the output directory exists.'''
+        # Set up mocks
+        mock_filename = f"{MOCK_INPUT_DIR}/mock_non_zip.foo"
+        mock_collect_paths.return_value = [mock_filename]
+        mock_path_exists.return_value = True
+        mock_isdir.return_value = True
+        
+        # Call target function
+        music.extract(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, False)
+        
+        # Assert expectations
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_input.assert_not_called()
+        mock_zipfile.assert_not_called()
+
+    @patch('zipfile.ZipFile')
+    @patch('builtins.input')
+    @patch('os.path.isdir')
+    @patch('os.path.exists')
+    @patch('src.common.collect_paths')
+    def test_success_zip_interactive_true_confirm(self,
+                                                  mock_collect_paths: MagicMock,
+                                                  mock_path_exists: MagicMock,
+                                                  mock_isdir: MagicMock,
+                                                  mock_input: MagicMock,
+                                                  mock_zipfile: MagicMock) -> None:
+        '''Tests that all zip archives are extracted after user confirms.'''
+        # Set up mocks
+        mock_filename = f"{MOCK_INPUT_DIR}/mock_archive.zip"
+        mock_collect_paths.return_value = [mock_filename]
+        mock_path_exists.return_value = False
+        mock_isdir.return_value = False
+        mock_input.return_value = 'y'
+        
+        mock_archive = MagicMock()
+        mock_zipfile.return_value.__enter__.return_value = mock_archive
+        
+        # Call target function
+        music.extract(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, True)
+        
+        # Assert expectations
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_input.assert_called_once()
+        mock_zipfile.assert_called_once_with(mock_filename, 'r')
+        mock_archive.extractall.assert_called_once_with(MOCK_OUTPUT_DIR)
+        
+    @patch('zipfile.ZipFile')
+    @patch('builtins.input')
+    @patch('os.path.isdir')
+    @patch('os.path.exists')
+    @patch('src.common.collect_paths')
+    def test_success_zip_interactive_true_decline(self,
+                                                  mock_collect_paths: MagicMock,
+                                                  mock_path_exists: MagicMock,
+                                                  mock_isdir: MagicMock,
+                                                  mock_input: MagicMock,
+                                                  mock_zipfile: MagicMock) -> None:
+        '''Tests that no zip archives are extracted after user declines.'''
+        # Set up mocks
+        mock_filename = f"{MOCK_INPUT_DIR}/mock_archive.zip"
+        mock_collect_paths.return_value = [mock_filename]
+        mock_path_exists.return_value = False
+        mock_isdir.return_value = False
+        mock_input.return_value = 'n'
+        
+        # Call target function
+        music.extract(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, True)
+        
+        # Assert expectations
+        mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_input.assert_called_once()
+        mock_zipfile.assert_not_called()
+
+class TestCompressAllCLI(unittest.TestCase):
+    '''Even though this function calls os.walk, it's not a good use case for common.collect_paths,
+    because that collects all absolute filepaths. The music.compress_all_cli function needs all directories, not file paths.'''
+    
+    @patch('src.music.compress_dir')
+    @patch('os.walk')
+    def test_success(self,
+                     mock_walk: MagicMock,
+                     mock_compress_dir: MagicMock) -> None:
+        '''Tests that all directories within a source directory are compressed.'''
+        # mock_paths = [f"{MOCK_INPUT_DIR}/mock_dir_0/file_0.foo", f"{MOCK_INPUT_DIR}/mock/nested/file_1.foo"]
+        mock_walk.return_value = [(MOCK_INPUT_DIR, ['mock_dir_0', 'mock_dir_1'], []),
+                                  (f"{MOCK_INPUT_DIR}/mock_dir_0", [], ['file_0.foo']),
+                                  (f"{MOCK_INPUT_DIR}/mock_dir_1", ['nested'], []),
+                                  (f"{MOCK_INPUT_DIR}/mock_dir_1/nested", [], ['file_1.foo'])]
+        
+        # Call target function
+        args = Namespace(input=MOCK_INPUT_DIR, output=MOCK_OUTPUT_DIR)
+        music.compress_all_cli(args) # type: ignore
+        
+        # Assert expectations: all directories and subdirectories should be compressed
+        mock_walk.assert_called_once_with(MOCK_INPUT_DIR)
+        mock_compress_dir.assert_has_calls([
+            call(f"{MOCK_INPUT_DIR}/mock_dir_0", f"{MOCK_OUTPUT_DIR}/mock_dir_0"),
+            call(f"{MOCK_INPUT_DIR}/mock_dir_1", f"{MOCK_OUTPUT_DIR}/mock_dir_1"),
+            call(f"{MOCK_INPUT_DIR}/mock_dir_1/nested", f"{MOCK_OUTPUT_DIR}/nested")
+        ])
+
+class TestPruneEmpty(unittest.TestCase):
+    @patch('shutil.rmtree')
+    @patch('src.music.is_empty_dir')
+    @patch('src.music.get_dirs')
+    def test_success_remove_empty_dir(self,
+                                      mock_get_dirs: MagicMock,
+                                      mock_is_empty_dir: MagicMock,
+                                      mock_rmtree: MagicMock) -> None:
+        '''Test that prune removes an empty directory.'''
+        # Setup mocks
+        mock_get_dirs.return_value = ['mock_empty_dir']
+        
+        # Call target function and assert expectations
+        music.prune_empty('/mock/source/', False)
+        
+        mock_get_dirs.assert_called()
+        mock_is_empty_dir.assert_called()
+        mock_rmtree.assert_called_once_with('/mock/source/mock_empty_dir')
+        
+    @patch('shutil.rmtree')
+    @patch('src.music.is_empty_dir')
+    @patch('src.music.get_dirs')
+    def test_success_skip_non_empty_dir(self,
+                                        mock_get_dirs: MagicMock,
+                                        mock_is_empty_dir: MagicMock,
+                                        mock_rmtree: MagicMock) -> None:
+        '''Test that prune does not remove a non-empty directory.'''
+        # Setup mocks
+        mock_get_dirs.side_effect = [['mock_non_empty_dir'], []]
+        mock_is_empty_dir.return_value = False
+        
+        # Call target function and assert expectations
+        music.prune_empty('/mock/source/', False)
+        
+        mock_get_dirs.assert_called()
+        mock_is_empty_dir.assert_called()
+        mock_rmtree.assert_not_called()
+        
+    @patch('src.music.prune_empty')
+    def test_success_cli(self, mock_prune_empty: MagicMock) -> None:
+        '''Tests that the CLI wrapper calls the correct function.'''
+        music.prune_empty('/mock/source/', False)
+        mock_prune_empty.assert_called_once_with('/mock/source/', False)
+
+class TestPruneNonMusicFiles(unittest.TestCase):
+    @patch('shutil.rmtree')
+    @patch('os.remove')
+    @patch('src.common.collect_paths')
+    def test_success_remove_non_music(self,
+                                      mock_collect_paths: MagicMock,
+                                      mock_os_remove: MagicMock,
+                                      mock_rmtree: MagicMock) -> None:
+        '''Tests that non-music files are removed.'''
+        # Setup mocks
+        mock_collect_paths.return_value = ['/mock/source/mock_file.foo']
+        
+        # Call target function and assert expectations
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        
+        mock_collect_paths.assert_called_once_with('/mock/source/')
+        mock_os_remove.assert_called_once_with('/mock/source/mock_file.foo')
+        mock_rmtree.assert_not_called()
+    
+    @patch('shutil.rmtree')
+    @patch('os.remove')
+    @patch('src.common.collect_paths')
+    def test_success_skip_music(self,
+                                mock_collect_paths: MagicMock,
+                                mock_os_remove: MagicMock,
+                                mock_rmtree: MagicMock) -> None:
+        '''Tests that top-level music files are not removed.'''
+        # Setup mocks
+        mock_collect_paths.return_value = ['/mock/source/mock_music.mp3']
+        
+        # Call target function and assert expectations
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        
+        mock_collect_paths.assert_called_once_with('/mock/source/')
+        mock_os_remove.assert_not_called()
+        mock_rmtree.assert_not_called()
+    
+    @patch('shutil.rmtree')
+    @patch('os.remove')
+    @patch('src.common.collect_paths')
+    def test_success_skip_music_subdirectory(self,
+                                             mock_collect_paths: MagicMock,
+                                             mock_os_remove: MagicMock,
+                                             mock_rmtree: MagicMock) -> None:
+        '''Tests that nested music files are not removed.'''
+        # Setup mocks
+        mock_collect_paths.return_value = ['/mock/source/mock_music.mp3']
+        
+        # Call target function and assert expectations
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        
+        mock_collect_paths.assert_called_once_with('/mock/source/')
+        mock_os_remove.assert_not_called()
+        mock_rmtree.assert_not_called()
+    
+    @patch('shutil.rmtree')
+    @patch('os.remove')
+    @patch('src.common.collect_paths')
+    def test_success_remove_non_music_subdirectory(self,
+                                                   mock_collect_paths: MagicMock,
+                                                   mock_os_remove: MagicMock,
+                                                   mock_rmtree: MagicMock) -> None:
+        '''Tests that nested non-music files are removed.'''
+        # Setup mocks
+        mock_collect_paths.return_value = ['/mock/source/mock/dir/0/mock_file.foo']
+        
+        # Call target function and assert expectations
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        
+        mock_collect_paths.assert_called_once_with('/mock/source/')
+        mock_os_remove.assert_called_once_with('/mock/source/mock/dir/0/mock_file.foo')
+        mock_rmtree.assert_not_called()
+    
+    @patch('shutil.rmtree')
+    @patch('os.remove')
+    @patch('src.common.collect_paths')
+    def test_success_remove_hidden_file(self,
+                                        mock_collect_paths: MagicMock,
+                                        mock_os_remove: MagicMock,
+                                        mock_rmtree: MagicMock) -> None:
+        '''Tests that hidden files are removed.'''
+        # Setup mocks
+        mock_collect_paths.return_value = ['/mock/source/.mock_hidden']
+        
+        # Call target function and assert expectations
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        
+        mock_collect_paths.assert_called_once_with('/mock/source/')
+        mock_os_remove.assert_called_once_with('/mock/source/.mock_hidden')
+        mock_rmtree.assert_not_called()
+    
+    @patch('shutil.rmtree')
+    @patch('os.remove')
+    @patch('src.common.collect_paths')
+    def test_success_remove_zip_archive(self,
+                                        mock_collect_paths: MagicMock,
+                                        mock_os_remove: MagicMock,
+                                        mock_rmtree: MagicMock) -> None:
+        '''Tests that zip archives are removed.'''
+        # Setup mocks
+        mock_collect_paths.return_value = ['/mock/source/mock.zip']
+        
+        # Call target function and assert expectations
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        
+        mock_collect_paths.assert_called_once_with('/mock/source/')
+        mock_os_remove.assert_called_once_with('/mock/source/mock.zip')
+        mock_rmtree.assert_not_called()
+    
+    @patch('shutil.rmtree')
+    @patch('os.remove')
+    @patch('src.common.collect_paths')
+    def test_success_remove_app(self,
+                                mock_collect_paths: MagicMock,
+                                mock_os_remove: MagicMock,
+                                mock_rmtree: MagicMock) -> None:
+        '''Tests that .app archives are removed.'''
+        # Setup mocks
+        mock_collect_paths.return_value = ['/mock/source/mock.app']
+        
+        # Call target function and assert expectations
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        
+        mock_collect_paths.assert_called_once_with('/mock/source/')
+        mock_os_remove.assert_not_called()
+        mock_rmtree.assert_called_once_with('/mock/source/mock.app')
+    
+    @patch('shutil.rmtree')
+    @patch('os.remove')
+    @patch('src.common.collect_paths')
+    def test_success_skip_music_hidden_dir(self,
+                                           mock_collect_paths: MagicMock,
+                                           mock_os_remove: MagicMock,
+                                           mock_rmtree: MagicMock) -> None:
+        '''Tests that music files in a hidden directory are not removed.'''
+        # Setup mocks
+        mock_collect_paths.return_value = ['/mock/source/.mock_hidden_dir/mock_music.mp3']
+        
+        # Call target function and assert expectations
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        
+        mock_collect_paths.assert_called_once_with('/mock/source/')
+        mock_os_remove.assert_not_called()
+        mock_rmtree.assert_not_called()
+    
+    @patch('shutil.rmtree')
+    @patch('os.remove')
+    @patch('src.common.collect_paths')
+    def test_success_remove_non_music_hidden_dir(self,
+                                                 mock_collect_paths: MagicMock,
+                                                 mock_os_remove: MagicMock,
+                                                 mock_rmtree: MagicMock) -> None:
+        '''Tests that non-music files in a hidden directory are removed.'''
+        # Setup mocks
+        mock_collect_paths.return_value = ['/mock/source/.mock_hidden_dir/mock.foo']
+        
+        # Call target function and assert expectations
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
+        
+        mock_collect_paths.assert_called_once_with('/mock/source/')
+        mock_os_remove.assert_called_once_with('/mock/source/.mock_hidden_dir/mock.foo')
+        mock_rmtree.assert_not_called()
+        
+    @patch('src.music.prune_non_music')
+    def test_success_cli(self, mock_prune_non_music: MagicMock) -> None:
+        '''Tests that the CLI wrapper function exists and is called properly.'''
+        # Call target function and assert expectations
+        mock_namespace = Namespace(input='/mock/input/', output='/mock/output/', interactive=False)
+        music.prune_non_music_cli(mock_namespace, set())  # type: ignore
+        mock_prune_non_music.assert_called_once_with(mock_namespace.input, set(), mock_namespace.interactive)
+    
+    @patch('shutil.rmtree')
+    @patch('builtins.input')
+    @patch('os.remove')
+    @patch('src.common.collect_paths')
+    def test_success_interactive_skip(self,
+                                      mock_collect_paths: MagicMock,
+                                      mock_os_remove: MagicMock,
+                                      mock_input: MagicMock,
+                                      mock_rmtree: MagicMock) -> None:
+        '''Tests that an interactive prune prompts the user to remove the non-music file and skips removal.'''
+        # Setup mocks
+        mock_collect_paths.return_value = ['/mock/source/mock_file.foo']
+        mock_input.return_value = 'N'
+        
+        # Call target function and assert expectations
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, True)
+        
+        mock_collect_paths.assert_called_once_with('/mock/source/')
+        mock_input.assert_called()
+        mock_os_remove.assert_not_called()
+        mock_rmtree.assert_not_called()
+        
+    @patch('shutil.rmtree')
+    @patch('builtins.input')
+    @patch('os.remove')
+    @patch('src.common.collect_paths')
+    def test_success_interactive_remove(self,
+                                        mock_collect_paths: MagicMock,
+                                        mock_os_remove: MagicMock,
+                                        mock_input: MagicMock,
+                                        mock_rmtree: MagicMock) -> None:
+        '''Tests that an interactive prune prompts the user to remove the non-music file and performs removal.'''
+        # Setup mocks
+        mock_collect_paths.return_value = ['/mock/source/mock_file.foo']
+        mock_input.return_value = 'y'
+        
+        # Call target function and assert expectations        
+        music.prune_non_music('/mock/source/', constants.EXTENSIONS, True)
+        
+        mock_collect_paths.assert_called_once_with('/mock/source/')
+        mock_input.assert_called()
+        mock_os_remove.assert_called_once()
+        mock_rmtree.assert_not_called()
+
+class TestProcess(unittest.TestCase):
+    @patch('src.common.write_paths')
+    @patch('src.encode.find_missing_art_os')
+    @patch('src.music.standardize_lossless')
+    @patch('src.music.prune_non_music')
+    @patch('src.music.prune_empty')
+    @patch('src.music.flatten_hierarchy')
+    @patch('src.music.extract')
+    @patch('src.music.sweep')
+    def test_success(self,
+                     mock_sweep: MagicMock,
+                     mock_extract: MagicMock,
+                     mock_flatten: MagicMock,
+                     mock_prune_empty: MagicMock,
+                     mock_prune_non_music: MagicMock,
+                     mock_standardize_lossless: MagicMock,
+                     mock_find_missing_art_os: MagicMock,
+                     mock_write_paths: MagicMock) -> None:
+        '''Tests that the process function calls the expected functions in the the correct order.'''
+        # Set up mocks
+        mock_call_container = MagicMock()
+        mock_sweep.side_effect = lambda *_, **__: mock_call_container.sweep()
+        mock_extract.side_effect = lambda *_, **__: mock_call_container.extract()
+        mock_flatten.side_effect = lambda *_, **__: mock_call_container.flatten()
+        mock_prune_empty.side_effect = lambda *_, **__: mock_call_container.prune_empty()
+        mock_prune_non_music.side_effect = lambda *_, **__: mock_call_container.prune_non_music()
+        mock_standardize_lossless.side_effect = lambda *_, **__: mock_call_container.standardize_lossless()
+        mock_find_missing_art_os.side_effect = lambda *_, **__: mock_call_container.find_missing_art_os()
+        mock_write_paths.side_effect = lambda *_, **__: mock_call_container.write_paths()
+        
+        # Mock the result of the lossless function
+        mock_standardize_lossless.return_value = [
+            ('/mock/input/file_0.aif', '/mock/output/file_0.aiff'),
+            ('/mock/input/file_1.wav', '/mock/output/file_1.aiff')
+        ]
+        
+        # Call target function
+        mock_interactive = False
+        mock_valid_extensions = {'a'}
+        mock_prefix_hints = {'b'}
+        music.process(MOCK_INPUT_DIR, MOCK_OUTPUT_DIR, mock_interactive, mock_valid_extensions, mock_prefix_hints)
+        
+        # Assert that the primary dependent functions are called in the correct order
+        self.assertEqual(mock_call_container.mock_calls[0], call.sweep())
+        self.assertEqual(mock_call_container.mock_calls[1], call.extract())
+        self.assertEqual(mock_call_container.mock_calls[2], call.flatten())
+        self.assertEqual(mock_call_container.mock_calls[3], call.standardize_lossless())
+        self.assertEqual(mock_call_container.mock_calls[4], call.prune_non_music())
+        self.assertEqual(mock_call_container.mock_calls[5], call.prune_empty())
+        self.assertEqual(mock_call_container.mock_calls[6], call.find_missing_art_os())
+        self.assertEqual(mock_call_container.mock_calls[7], call.write_paths())
+        
+        # Assert call counts and parameters
+        mock_sweep.assert_called_once()
+        mock_extract.assert_called_once()
+        mock_flatten.assert_called_once()
+        mock_standardize_lossless.assert_called_once_with(MOCK_OUTPUT_DIR, mock_valid_extensions, mock_prefix_hints, mock_interactive)
+        self.assertEqual(MOCK_OUTPUT_DIR, mock_find_missing_art_os.call_args.args[0])
+        self.assertEqual(mock_call_container.find_missing_art_os(), mock_write_paths.call_args.args[0])
+
+class TestProcessCLI(unittest.TestCase):
+    @patch('src.music.process')
+    def test_success(self, mock_process: MagicMock) -> None:
+        '''Tests that the process function is called with the expected arguments.'''
+        # Call target function
+        mock_interactive = False
+        mock_valid_extensions = {'a'}
+        mock_prefix_hints = {'b'}
+        args = Namespace(input=MOCK_INPUT_DIR, output=MOCK_OUTPUT_DIR, interactive=mock_interactive)
+        music.process_cli(args, mock_valid_extensions, mock_prefix_hints) # type: ignore
+        
+        # Assert expectations
+        mock_process.assert_called_once_with(MOCK_INPUT_DIR,
+                                             MOCK_OUTPUT_DIR,
+                                             mock_interactive,
+                                             mock_valid_extensions,
+                                             mock_prefix_hints)
 
 class TestUpdateLibrary(unittest.TestCase):
     def create_mock_file_mapping(self, index: int) -> tuple[str, str]:
