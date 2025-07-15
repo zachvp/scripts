@@ -45,7 +45,7 @@ def create_salt(length: int) -> str:
 def create_query(params: dict[str, str] = {}) -> str:
     # construct query params
     password = keyring.get_password('navidrome_client', 'api_client')
-    assert password, f'unable to fetch password'
+    assert password is not None, f'unable to fetch password'
     salt = create_salt(12)
     base_params = {
         'u': 'api_client',                      # user

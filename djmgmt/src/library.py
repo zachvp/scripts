@@ -64,7 +64,7 @@ def parse_args(valid_functions: set[str]) -> type[Namespace]:
     return args
 
 # helper functions
-def date_path(date: str, mapping: dict) -> str:
+def date_path(date: str, mapping: dict[int, str]) -> str:
     '''Returns a date-formatted directory path string. e.g:
         YYYY/MM MONTH_NAME / DD
         2024/ 01 january / 02
@@ -77,7 +77,7 @@ def date_path(date: str, mapping: dict) -> str:
 
     return f"{year}/{month} {mapping[int(month)]}/{day}"
 
-def full_path(node: ET.Element, library_root: str, mapping: dict, include_metadata: bool=False) -> str:
+def full_path(node: ET.Element, library_root: str, mapping: dict[int, str], include_metadata: bool=False) -> str:
     '''Returns a formatted directory path based on the node's DateAdded field.
 
     Arguments:
@@ -131,7 +131,7 @@ def swap_root(path: str, old_root: str, root: str) -> str:
 
 def load_collection(path: str) -> ET.ElementTree:
     collection = ET.parse(path)
-    assert collection, f"unable to parse collection at '{path}'"
+    assert collection is not None, f"unable to parse collection at '{path}'"
     return cast(ET.ElementTree, collection)
 
 def find_node(collection: ET.ElementTree, xpath: str) -> ET.Element:
@@ -142,7 +142,7 @@ def find_node(collection: ET.ElementTree, xpath: str) -> ET.Element:
         The XML node according to the given arguments.
     '''
     node = collection.find(xpath)
-    assert node, f"unable to find {xpath} for collection"
+    assert node is not None, f"unable to find {xpath} for collection"
     return node
 
 def filter_path_mappings(mappings: list[tuple[str, str]], collection: ET.Element, playlist_xpath: str) -> list[tuple[str, str]]:

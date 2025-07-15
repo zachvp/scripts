@@ -14,8 +14,6 @@ Definitions
     audio.file: must be an audio file type
 '''
 
-# TODO: refactor to support sync from path in addition to XML collection
-
 import argparse
 import os
 import shutil
@@ -29,24 +27,24 @@ from . import constants
 
 # Classes
 class Namespace(argparse.Namespace):
-    # Script Arguments
-    ## Required
+    # script Arguments
+    ## required
     function: str
     input: str
     output: str
     scan_mode: str
     
-    ## Optional
+    ## optional
     path_0: str
     
-    # Functions
+    # functions
     FUNCTION_COPY = 'copy'
     FUNCTION_MOVE = 'move'
     FUNCTION_SYNC = 'sync'
     
     FUNCTIONS = {FUNCTION_COPY, FUNCTION_MOVE, FUNCTION_SYNC}
     
-    # Scan modes
+    # scan modes
     SCAN_QUICK = 'quick'
     SCAN_FULL = 'full'
     
@@ -56,8 +54,6 @@ class SavedDateContext:
     FILE_SYNC =f"{constants.PROJECT_ROOT}{os.sep}state{os.sep}sync_state.txt"
     FILE_SYNC_KEY = 'sync_date'
     
-    override_context = ''
-    
     @staticmethod
     def save(context: str) -> None:
         '''Persists the date context to disk.'''
@@ -66,22 +62,14 @@ class SavedDateContext:
     
     @staticmethod
     def load() -> str:
-        '''Returns the override context if present, otherwise will load the saved context from disk.'''
-        if SavedDateContext.override_context:
-            return SavedDateContext.override_context
-        
+        '''Loads the saved context from disk.'''
         with open(SavedDateContext.FILE_SYNC, encoding='utf-8', mode='r') as state: # todo: optimize to only open if recent change
             saved_state = state.readline()
             if saved_state:
                 return saved_state.split(':')[1].strip()
         return ''
-    
-    @staticmethod
-    def override(context: str) -> None:
-        '''Memory-only override that will take priority over the disk date context.'''
-        SavedDateContext.override_context = context
 
-    @staticmethod        
+    @staticmethod
     def is_processed(date_context: str) -> bool:
         date_context_processed = SavedDateContext.load()
         if date_context_processed:
@@ -201,12 +189,12 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, ful
     from . import subsonic_client
     from . import encode
     
-    # Return flag
+    # return flag
     success = True
     
     # encode the current batch to MP3 format
     logging.info(f"encoding batch in date context {date_context}:\n{batch}")
-    run(encode.encode_lossy(batch, '.mp3', threads=28, skip_existing=False))
+    run(encode.encode_lossy(batch, '.mp3', threads=28))
     logging.info(f"finished encoding batch in date context {date_context}")
     
     # transfer batch to the media server
@@ -217,7 +205,7 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, ful
         returncode, _ = transfer_files(transfer_path, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
         success = returncode == 0
         
-        # Check if file transfer succeeded
+        # check if file transfer succeeded
         if success:
             logging.info('file transfer succeeded, initiating remote scan')
             # tell the media server new files are available
@@ -239,11 +227,11 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, ful
                         logging.info('remote scan complete')
                         break
                     logging.debug("remote scan in progress, waiting...")
-                    time.sleep(1) # TODO: sleep for more time if full scan
+                    sleep_time = 5 if full_scan else 1
+                    time.sleep(sleep_time)
     return success
 
-# TODO: Support file updates (e.g. if metadata changes)
-def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
+def sync_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
     # core data
     batch: list[tuple[str, str]] = []
     dest_previous = mappings[0][1]
@@ -289,7 +277,8 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
             logging.debug(f"add new context mapping: {mapping}")
             
             # persist the latest processed context
-            SavedDateContext.save(date_context_previous)
+            if not SavedDateContext.is_processed(date_context_previous):
+                SavedDateContext.save(date_context_previous)
             logging.info(f"processed batch in date context '{date_context_previous}'")
             logging.info(f"sync progress: {progressFormat(index + 1)}")
         else:
@@ -307,8 +296,8 @@ def sync_from_mappings(mappings:list[tuple[str, str]], full_scan: bool) -> None:
             raise RuntimeError(f"Batch sync failed for date context '{date_context}'")
         
         # persist the latest processed context
-        SavedDateContext.save(date_context)
-        
+        if not SavedDateContext.is_processed(date_context):
+            SavedDateContext.save(date_context)
         logging.info(f"processed batch in date context '{date_context}'")
         logging.info(f"sync progress: {progressFormat(index + 1)}")
 
@@ -330,7 +319,7 @@ def rsync_healthcheck() -> bool:
 def create_sync_mappings(collection: ET.ElementTree, output_dir: str) -> list[tuple[str, str]]:
     '''Creates a mapping list of system paths based on the given XML collection and output directory.
     Each list entry maps from a source collection file path to a target date context + metadata-structured file path.
-    See library.generate_date_paths for more info.'''
+    See organize_library_dates.generate_date_paths for more info.'''
     from . import library
     
     # collect the target playlist IDs to sync
@@ -353,6 +342,7 @@ def create_sync_mappings(collection: ET.ElementTree, output_dir: str) -> list[tu
         context = common.find_date_context(output_path)
         if context and not SavedDateContext.is_processed(context[0]):
             filtered_mappings.append((input_path, output_path))
+    
     return filtered_mappings
 
 # Primary functions
@@ -363,13 +353,13 @@ def sync_from_path(args: type[Namespace]):
         args -- The parsed command-line arguments.
     '''
 
-    # Collect the sorted input paths relative to the input directory.
+    # collect the sorted input paths relative to the input directory
     input_paths = sorted(normalize_paths(common.collect_paths(args.input), args.input))
 
-    # Define the date context tracker to determine when a new date context is entered.
+    # define the date context tracker to determine when a new date context is entered
     previous_date_context = ''
 
-    # Assign the action based on the given mode.
+    # assign the action based on the given mode
     action: Callable[[str, str], str] = shutil.copy
     if args.function == Namespace.FUNCTION_MOVE:
         action = shutil.move
@@ -377,10 +367,10 @@ def sync_from_path(args: type[Namespace]):
         print(f"error: unrecognized mode: {args.function}. Exiting.")
         return
 
-    # Performs the configured action for each input and output path
-    # Waits for user input when input path date context changes
+    # performs the configured action for each input and output path
+    # waits for user input when input path date context changes
     for path in input_paths:
-        # Skip any existing valid output paths.
+        # skip any existing valid output paths.
         output_path_full = os.path.join(args.output, path)
         if os.path.exists(output_path_full):
             print(f"info: skip: output path exists: '{output_path_full}'")
@@ -388,7 +378,7 @@ def sync_from_path(args: type[Namespace]):
         input_path_full = os.path.join(args.input, path)
         print(f"info: {args.function}: '{input_path_full}' -> {output_path_full}")
 
-        # Notify the user if the current date context is different from the previous date context,
+        # notify the user if the current date context is different from the previous date context
         date_context = '/'.join(os.path.split(path)[:3]) # format: 'year/month/day'
         if len(previous_date_context) > 0 and previous_date_context != date_context:
             choice = input(f"info: date context changed from '{previous_date_context}' to '{date_context}' continue? [y/N]")
@@ -397,7 +387,7 @@ def sync_from_path(args: type[Namespace]):
                 return
         previous_date_context = date_context
 
-        # Copy or move the input file to the output path, creating the output directories if needed.
+        # copy or move the input file to the output path, creating the output directories if needed
         output_parent_path = os.path.split(output_path_full)[0]
         if not os.path.exists(output_parent_path):
             os.makedirs(output_parent_path)
@@ -407,7 +397,7 @@ def run_sync_mappings(mappings: list[tuple[str, str]], full_scan: bool = True) -
     # record initial run timestamp
     timestamp = time.time()
     
-    # Only attempt sync if remote is accessible
+    # only attempt sync if remote is accessible
     if not rsync_healthcheck():
         raise RuntimeError("rsync unhealthy, abort sync")
     
@@ -416,7 +406,7 @@ def run_sync_mappings(mappings: list[tuple[str, str]], full_scan: bool = True) -
     
     # initialize timing and run the sync
     try:
-        sync_from_mappings(mappings, full_scan)
+        sync_mappings(mappings, full_scan)
     except Exception as e:
         logging.error(e)
         raise

@@ -246,5 +246,5 @@ def dev_inspect_tags(path: str) -> None:
     except mutagen.MutagenError as e:
         logging.error(f"mutagen.MutagenError:\n{e}\npath: '{path}'")
         return None
-    assert track, "track not loaded"
+    assert track is not None, "track not loaded"
     print(dev_extract_tags(track, dev_determine_relevant_keys(track)))

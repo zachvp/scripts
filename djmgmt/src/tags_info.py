@@ -128,7 +128,7 @@ def compare_tags(source: str, comparison: str) -> list[tuple[str, str]]:
                 logging.error(f"Unable to read tags from '{source_path}' or '{compare_path}'")
                 continue
             
-            # compare relevant tags (including genre); add to list if any differ
+            # compare relevant tags (title, artist, cover image, genre, etc) add to list if any differ
             if source_tags != compare_tags:
                 changed_paths.append((os.path.abspath(source_path), os.path.abspath(compare_path)))
                 logging.info(f"Detected tag difference in '{source_path}'")

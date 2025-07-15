@@ -3,7 +3,7 @@
 import unittest
 import subprocess
 import xml.etree.ElementTree as ET
-from unittest.mock import patch, MagicMock, mock_open, call
+from unittest.mock import patch, MagicMock, call
 
 from src import sync, constants, subsonic_client
 
@@ -40,28 +40,35 @@ COLLECTION_XML = f'''
 # Primary test clas
 class TestIsProcessed(unittest.TestCase):
     # Past dates
-    @patch('builtins.open', new_callable=mock_open, read_data=f"sync_date: {DATE_PROCESSED_CURRENT}")
-    def test_is_processed_past(self, mock_sync_state: MagicMock) -> None:
+    @patch('src.sync.SavedDateContext.load')
+    def test_is_processed_past(self, mock_load: MagicMock) -> None:
         '''Tests that matching date contexts before the processed date are considered processed.'''
+        mock_load.return_value = DATE_PROCESSED_CURRENT
+        
         actual = sync.SavedDateContext.is_processed(DATE_PROCESSED_PAST)
+        
         self.assertTrue(actual, f"Date context '{DATE_PROCESSED_PAST}' is expected to be already processed.")
-        mock_sync_state.assert_called_once()
+        mock_load.assert_called_once()
     
     # Current dates
-    @patch('builtins.open', new_callable=mock_open, read_data=f"sync_date: {DATE_PROCESSED_CURRENT}")
-    def test_is_processed_current(self, mock_sync_state: MagicMock) -> None:
+    @patch('src.sync.SavedDateContext.load')
+    def test_is_processed_current(self, mock_load: MagicMock) -> None:
         '''Tests that matching date contexts equal to the processed date are considered processed.'''
+        mock_load.return_value = DATE_PROCESSED_CURRENT
+        
         actual = sync.SavedDateContext.is_processed(DATE_PROCESSED_CURRENT)
         self.assertTrue(actual, f"Date context '{DATE_PROCESSED_CURRENT}' is expected to be already processed.")
-        mock_sync_state.assert_called_once()
+        mock_load.assert_called_once()
     
     # Future dates
-    @patch('builtins.open', new_callable=mock_open, read_data=f"sync_date: {DATE_PROCESSED_CURRENT}")
-    def test_is_processed_future(self, mock_sync_state: MagicMock) -> None:
+    @patch('src.sync.SavedDateContext.load')
+    def test_is_processed_future(self, mock_load: MagicMock) -> None:
         '''Tests that matching date contexts later than the processed date are NOT considered processed.'''
+        mock_load.return_value = DATE_PROCESSED_CURRENT
+        
         actual = sync.SavedDateContext.is_processed(DATE_PROCESSED_FUTURE)
         self.assertFalse(actual, f"Date context '{DATE_PROCESSED_FUTURE}' is NOT expected to be already processed.")
-        mock_sync_state.assert_called_once()
+        mock_load.assert_called_once()
 
 class TestSyncBatch(unittest.TestCase):
     @patch('src.encode.encode_lossy')
@@ -101,7 +108,7 @@ class TestSyncBatch(unittest.TestCase):
         
         # Assert that the expected functions are called with expected parameters.
         self.assertEqual(actual, True, 'Expect call to succeed')
-        mock_encode.assert_called_once_with(batch, '.mp3', threads=28, skip_existing=False)
+        mock_encode.assert_called_once_with(batch, '.mp3', threads=28)
         mock_transform.assert_called_once_with(dest)
         mock_transfer.assert_called_once_with(mock_transform.return_value, constants.RSYNC_URL, constants.RSYNC_MODULE_NAVIDROME)
         
@@ -147,7 +154,7 @@ class TestSyncBatch(unittest.TestCase):
         
         # Assertions
         self.assertEqual(actual, True, 'Expect call to succeed')
-        mock_encode.assert_called_once_with(batch, '.mp3', threads=28, skip_existing=False)
+        mock_encode.assert_called_once_with(batch, '.mp3', threads=28)
         mock_transform.assert_called_once_with(dest)
         mock_transfer.assert_called_once()
         mock_call_endpoint.assert_called()
@@ -179,7 +186,7 @@ class TestSyncBatch(unittest.TestCase):
         
         # Assertions
         self.assertEqual(actual, False, 'Expect call to fail')
-        mock_encode.assert_called_once_with(batch, '.mp3', threads=28, skip_existing=False)
+        mock_encode.assert_called_once_with(batch, '.mp3', threads=28)
         mock_transform.assert_called_once_with(dest)
         
     @patch('src.encode.encode_lossy')
@@ -282,9 +289,16 @@ class TestTransferFiles(unittest.TestCase):
     
 class TestSyncMappings(unittest.TestCase):
     @patch('src.sync.sync_batch')
-    @patch('builtins.open', new_callable=mock_open, read_data='')
-    def test_success_one_context(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
+    @patch('src.sync.SavedDateContext.save')
+    @patch('src.sync.SavedDateContext.load')
+    def test_success_one_context(self,
+                                 mock_load: MagicMock,
+                                 mock_save: MagicMock,
+                                 mock_sync_batch: MagicMock) -> None:
         '''Tests that a single batch with mappings in the same date context is synced properly.'''
+        # Set up mocks
+        mock_load.return_value = ''
+        
         # Set up call input
         mappings = [
             ('input/path/track_0.mp3', '/output/2025/05 may/20/artist/album/track_0.mp3'),
@@ -292,19 +306,25 @@ class TestSyncMappings(unittest.TestCase):
         ]
         
         # Target function
-        sync.sync_from_mappings(mappings, False)
+        sync.sync_mappings(mappings, False)
         
         # Assert expectations
-        # Expect that a single batch is synced with the given mappings
+        ## Expect that a single batch is synced with the given mappings
         mock_sync_batch.assert_called_once()
         
-        # Expect 1 call after batch is synced
-        mock_sync_state.assert_called_once()
+        ## Expect file to be written with the date context
+        mock_save.assert_called_once()
         
     @patch('src.sync.sync_batch')
-    @patch('builtins.open', new_callable=mock_open, read_data='')
-    def test_success_multiple_contexts(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
+    @patch('src.sync.SavedDateContext.save')
+    @patch('src.sync.SavedDateContext.load')
+    def test_success_multiple_contexts(self,
+                                       mock_load: MagicMock,
+                                       mock_save: MagicMock,
+                                       mock_sync_batch: MagicMock) -> None:
         '''Tests that two batches with mappings in two date contexts are synced properly.'''
+        mock_load.return_value = ''
+        
         # Set up call input
         mappings = [
             # Date context 0: 2025/05 may/20
@@ -317,35 +337,45 @@ class TestSyncMappings(unittest.TestCase):
         ]
         
         # Target function
-        sync.sync_from_mappings(mappings, False)
+        sync.sync_mappings(mappings, False)
         
         # Assert expectations
         # Expect that a single batch is synced with the given mappings
         self.assertEqual(mock_sync_batch.call_count, 2)
         
-        # Expect 1 call per batch
-        self.assertEqual(mock_sync_state.call_count, 2)
+        ## Expect file to be written for each date context
+        self.assertEqual(mock_save.call_count, 2)
         
     @patch('src.sync.sync_batch')
-    @patch('builtins.open', new_callable=mock_open, read_data='')
-    def test_error_empty_mappings(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
+    @patch('src.sync.SavedDateContext.save')
+    @patch('src.sync.SavedDateContext.load')
+    def test_error_empty_mappings(self,
+                                  mock_load: MagicMock,
+                                  mock_save: MagicMock,
+                                  mock_sync_batch: MagicMock) -> None:
         '''Tests that nothing is synced for an empty mappings list and error is raised.'''
         # Set up call input
         mappings = []
         
         # Target function
         with self.assertRaises(IndexError):
-            sync.sync_from_mappings(mappings, False)
+            sync.sync_mappings(mappings, False)
         
         # Assert expectations
         mock_sync_batch.assert_not_called()
-        mock_sync_state.assert_not_called()
+        mock_load.assert_not_called()
+        mock_save.assert_not_called()
     
     @patch('src.sync.sync_batch')
-    @patch('builtins.open', new_callable=mock_open, read_data='')
-    def test_error_sync_batch(self, mock_sync_state: MagicMock, mock_sync_batch: MagicMock) -> None:
+    @patch('src.sync.SavedDateContext.save')
+    @patch('src.sync.SavedDateContext.load')
+    def test_error_sync_batch(self,
+                                  mock_load: MagicMock,
+                                  mock_save: MagicMock,
+                              mock_sync_batch: MagicMock) -> None:
         '''Tests that an error is raised when a batch sync call fails'''
         # Set up mocks
+        mock_load.return_value = ''
         mock_sync_batch.return_value = False
         
         # Set up call input
@@ -357,18 +387,71 @@ class TestSyncMappings(unittest.TestCase):
         
         # Target function
         with self.assertRaises(Exception):
-            sync.sync_from_mappings(mappings, False)
+            sync.sync_mappings(mappings, False)
         
         # Assert expectations
         # Expect that a single batch is synced with the given mappings
         mock_sync_batch.assert_called_once()
         
         # Expect no calls to open sync state file, because no batches completed
-        mock_sync_state.assert_not_called()
+        mock_save.assert_not_called()
+    
+    @patch('src.sync.sync_batch')
+    @patch('src.sync.SavedDateContext.save')
+    @patch('src.sync.SavedDateContext.load')
+    def test_success_outdated_context_single(self,
+                                             mock_load: MagicMock,
+                                             mock_save: MagicMock,
+                                             mock_sync_batch: MagicMock) -> None:
+        '''Tests that a mapping with a date context older than the saved date context does not save any date context.'''
+        # Set up mocks
+        mock_load.return_value = '2100/01 january/ 01'
+        
+        # Set up call input
+        mappings = [
+            ('input/path/track_0.mp3', '/output/2025/05 may/20/artist/album/track_0.mp3'),
+        ]
+        
+        # Target function
+        sync.sync_mappings(mappings, False)
+        
+        # Assert expectations
+        ## Expect that a single batch is synced with the given mappings
+        mock_sync_batch.assert_called_once()
+        
+        ## Expect no save call
+        mock_save.assert_not_called()
+        
+    @patch('src.sync.sync_batch')
+    @patch('src.sync.SavedDateContext.save')
+    @patch('src.sync.SavedDateContext.load')
+    def test_success_outdated_context_multiple(self,
+                                               mock_load: MagicMock,
+                                               mock_save: MagicMock,
+                                               mock_sync_batch: MagicMock) -> None:
+        '''Tests that a mapping with a date context older than the saved date context does not save any date context.'''
+        # Set up mocks
+        mock_load.return_value = '2100/01 january/ 01'
+        
+        # Set up call input
+        mappings = [
+            ('input/path/track_0.mp3', '/output/2025/05 may/20/artist/album/track_0.mp3'),
+            ('input/path/track_0.mp3', '/output/2025/05 may/21/artist/album/track_0.mp3'),
+        ]
+        
+        # Target function
+        sync.sync_mappings(mappings, False)
+        
+        # Assert expectations
+        ## Expect that a single batch is synced with the given mappings
+        self.assertEqual(mock_sync_batch.call_count, 2)
+        
+        ## Expect no save call
+        mock_save.assert_not_called()
 
 class TestRunSyncMappings(unittest.TestCase):
     @patch('src.sync.rsync_healthcheck')
-    @patch('src.sync.sync_from_mappings')
+    @patch('src.sync.sync_mappings')
     def test_success(self,
                      mock_sync_from_mappings: MagicMock,
                      mock_rsync_healthcheck: MagicMock) -> None:
@@ -384,7 +467,7 @@ class TestRunSyncMappings(unittest.TestCase):
         mock_rsync_healthcheck.assert_called_once()
     
     @patch('src.sync.rsync_healthcheck')
-    @patch('src.sync.sync_from_mappings')
+    @patch('src.sync.sync_mappings')
     def test_exception_sync_from_mappings(self,
                                           mock_sync_from_mappings: MagicMock,
                                           mock_rsync_healthcheck: MagicMock) -> None:
@@ -404,7 +487,7 @@ class TestRunSyncMappings(unittest.TestCase):
         mock_rsync_healthcheck.assert_called_once()
         
     @patch('src.sync.rsync_healthcheck')
-    @patch('src.sync.sync_from_mappings')
+    @patch('src.sync.sync_mappings')
     def test_rsync_healthcheck_fail(self,
                                     mock_sync_from_mappings: MagicMock,
                                     mock_rsync_healthcheck: MagicMock) -> None:

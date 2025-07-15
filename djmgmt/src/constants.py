@@ -44,6 +44,8 @@ ATTR_GENRE = 'Genre'
 ATTR_KEY = 'Tonality'
 ATTR_TRACK_KEY = 'Key'
 ATTR_TRACK_ID = 'TrackID'
+ATTR_TOTAL_TIME = 'TotalTime'
+ATTR_AVG_BPM = 'AverageBpm'
 
 REKORDBOX_ROOT = 'file://localhost'
 XPATH_COLLECTION = './/COLLECTION'

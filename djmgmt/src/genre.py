@@ -188,12 +188,12 @@ def script(args: type[Namespace]) -> None:
     # read data from the collection and determine source
     tree = ET.parse(args.input).getroot()
     collection = tree.find(constants.XPATH_COLLECTION)
-    assert collection, f"invalid node search for '{constants.XPATH_COLLECTION}'"
+    assert collection is not None, f"invalid node search for '{constants.XPATH_COLLECTION}'"
     source = collection
     
     if args.source == Namespace.SOURCE_PRUNED:
         pruned = tree.find(constants.XPATH_PRUNED)
-        assert pruned, f"invalid node search for '{constants.XPATH_PRUNED}'"
+        assert pruned is not None, f"invalid node search for '{constants.XPATH_PRUNED}'"
         source = pruned
 
     # collect the playlist IDs

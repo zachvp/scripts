@@ -1579,11 +1579,8 @@ class TestProcessCLI(unittest.TestCase):
                                              mock_prefix_hints)
 
 class TestUpdateLibrary(unittest.TestCase):
-    def create_mock_file_mapping(self, index: int) -> tuple[str, str]:
-        create_mock_path: Callable[[str, int], str] = lambda p, n: os.path.join(p, f"mock_file_{n}")
-        return (create_mock_path(MOCK_INPUT_DIR, index), create_mock_path(MOCK_OUTPUT_DIR, index))
-    
     @patch('src.sync.run_sync_mappings')
+    @patch('src.library.filter_path_mappings')
     @patch('src.sync.create_sync_mappings')
     @patch('src.tags_info.compare_tags')
     @patch('src.music.record_collection')
@@ -1597,18 +1594,21 @@ class TestUpdateLibrary(unittest.TestCase):
                      mock_record_collection: MagicMock,
                      mock_compare_tags: MagicMock,
                      mock_create_sync_mappings: MagicMock,
+                     mock_filter_mappings: MagicMock,
                      mock_run_sync_mappings: MagicMock) -> None:
         '''Tests that dependent functions are called with expected parameters.'''
         # Set up mocks
         mock_temp_dir_path = '/mock/temp/dir'
         mock_collection = MagicMock()
-        mock_changed_mappings = [self.create_mock_file_mapping(0)]
-        mock_created_mappings = [self.create_mock_file_mapping(1)]
+        mock_mappings_changed = [self.create_mock_file_mapping(0), self.create_mock_file_mapping(1)]
+        mock_mappings_created = [self.create_mock_file_mapping(2)]
+        mock_mappings_filtered = [self.create_mock_file_mapping(0)]
         
-        mock_compare_tags.return_value = mock_changed_mappings.copy()
-        mock_create_sync_mappings.return_value = mock_created_mappings.copy()
         mock_temp_dir.return_value.__enter__.return_value = mock_temp_dir_path
         mock_record_collection.return_value = mock_collection
+        mock_compare_tags.return_value = mock_mappings_changed.copy()
+        mock_create_sync_mappings.return_value = mock_mappings_created.copy()
+        mock_filter_mappings.return_value = mock_mappings_filtered.copy()
         
         # Call target function
         mock_library = '/mock/library'
@@ -1639,18 +1639,27 @@ class TestUpdateLibrary(unittest.TestCase):
         ## Call parameters: create_sync_mappings
         mock_create_sync_mappings.assert_called_once_with(mock_collection, mock_client_mirror)
         
+        ## Call: filter_path_mappings
+        mock_filter_mappings.assert_called_once_with(mock_mappings_changed, mock_collection.getroot(), constants.XPATH_PRUNED)
+        
         ## Call parameters: run_sync_mappings
-        expected_mappings = mock_created_mappings + mock_changed_mappings
+        expected_mappings = mock_mappings_created + mock_mappings_filtered
         mock_run_sync_mappings.assert_called_once_with(expected_mappings)
         
     @patch('src.sync.run_sync_mappings')
-    @patch('src.music.sweep')
+    @patch('src.library.filter_path_mappings')
+    @patch('src.tags_info.compare_tags')
+    @patch('src.sync.create_sync_mappings')
     @patch('src.music.record_collection')
+    @patch('src.music.sweep')
     @patch('src.music.process')
     def test_error_sync(self,
                         mock_process: MagicMock,
-                        mock_record_collection: MagicMock,
                         mock_sweep: MagicMock,
+                        mock_record_collection: MagicMock,
+                        mock_create_sync_mappings: MagicMock,
+                        mock_compare_tags: MagicMock,
+                        mock_filter_path_mappings: MagicMock,
                         mock_run_sync_mappings: MagicMock) -> None:
         '''Test that if sync fails, the expected functions are still called and the exception is seen.'''
         # Set up mocks
@@ -1665,17 +1674,23 @@ class TestUpdateLibrary(unittest.TestCase):
         mock_hints = {'mock_hint'}
         
         # Assert expectations
-        with self.assertRaises(Exception) as e:
+        with self.assertRaisesRegex(Exception, mock_error):
             music.update_library(MOCK_INPUT_DIR,
                                  mock_library,
                                  mock_client_mirror,
                                  mock_interactive,
                                  mock_extensions,
                                  mock_hints)
-            self.assertEqual(e.msg, 'Mock error')
         
         # Functions should be called before exception
         mock_process.assert_called_once()
-        mock_record_collection.assert_called_once()
         mock_sweep.assert_called_once()
+        mock_record_collection.assert_called_once()
+        mock_create_sync_mappings.assert_called_once()
+        mock_compare_tags.assert_called_once()
+        mock_filter_path_mappings.assert_called_once()
         mock_run_sync_mappings.assert_called_once()
+        
+    def create_mock_file_mapping(self, index: int) -> tuple[str, str]:
+        create_mock_path: Callable[[str, int], str] = lambda p, n: os.path.join(p, f"mock_file_{n}")
+        return (create_mock_path(MOCK_INPUT_DIR, index), create_mock_path(MOCK_OUTPUT_DIR, index))

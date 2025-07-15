@@ -10,14 +10,7 @@ The following Track attributes will be corrected:
 import sys
 import xml.etree.ElementTree as ET
 
-# Constants - TODO: move to constants file
-XPATH_COLLECTION = './/COLLECTION'
-
-ATTR_NAME = 'Name'
-ATTR_ARTIST = 'Artist'
-ATTR_TOTAL_TIME = 'TotalTime'
-ATTR_AVG_BPM = 'AverageBpm'
-ATTR_DATE_ADDED = 'DateAdded'
+from . import constants
 
 # Helper functions
 def generate_id(node: ET.Element) -> str:
@@ -26,11 +19,11 @@ def generate_id(node: ET.Element) -> str:
     # the id is the concenation of 2 shards
     # shard_0 sources from track name
     # shard_1 sources from track artist, total time, and BPM
-    len_0 = min(8, len(node.attrib[ATTR_NAME]))
-    len_1 = min(8, len(node.attrib[ATTR_ARTIST]))
-    shard_0 = f"{node.attrib[ATTR_NAME][:len_0]}{node.attrib[ATTR_NAME][-len_0:]}"
-    shard_1 = f"{node.attrib[ATTR_ARTIST][:len_1]}"
-    shard_1 += f"{node.attrib[ATTR_TOTAL_TIME]}{node.attrib[ATTR_AVG_BPM]}"
+    len_0 = min(8, len(node.attrib[constants.ATTR_TITLE]))
+    len_1 = min(8, len(node.attrib[constants.ATTR_ARTIST]))
+    shard_0 = f"{node.attrib[constants.ATTR_TITLE][:len_0]}{node.attrib[constants.ATTR_TITLE][-len_0:]}"
+    shard_1 = f"{node.attrib[constants.ATTR_ARTIST][:len_1]}"
+    shard_1 += f"{node.attrib[constants.ATTR_TOTAL_TIME]}{node.attrib[constants.ATTR_AVG_BPM]}"
 
     # print(f"generated id: {id_str}")
     return f"{shard_0}{shard_1}"
@@ -49,29 +42,29 @@ def script(
     corrected_dates: dict[str, str] = {}
 
     # associate each track with a unifying 'id' and collect all corrected dates
-    collection = tree_corrected.getroot().find(XPATH_COLLECTION)
-    assert collection, f"unable to find {XPATH_COLLECTION} for path '{path_collection_corrected}'"
+    collection = tree_corrected.getroot().find(constants.XPATH_COLLECTION)
+    assert collection is not None, f"unable to find {constants.XPATH_COLLECTION} for path '{path_collection_corrected}'"
     for node in collection:
         track_id = generate_id(node)
 
         if track_id in corrected_dates:
             print(f'''\
-                WARN: generated duplicate ID for track: {node.attrib[ATTR_NAME]};
+                WARN: generated duplicate ID for track: {node.attrib[constants.ATTR_TITLE]};
                 existing: {corrected_dates[track_id]}.
                 New entry will overwrite existing entry.''')
 
-        corrected_dates[track_id] = node.attrib[ATTR_DATE_ADDED]
+        corrected_dates[track_id] = node.attrib[constants.ATTR_DATE_ADDED]
 
     # find all tracks to correct in the current collection
-    collection = tree_corrected.getroot().find(XPATH_COLLECTION)
-    assert collection, f"unable to find {XPATH_COLLECTION} for path '{path_collection_current}'"
+    collection = tree_corrected.getroot().find(constants.XPATH_COLLECTION)
+    assert collection is not None, f"unable to find {constants.XPATH_COLLECTION} for path '{path_collection_current}'"
     for node in collection:
         track_id = generate_id(node)
         if track_id in corrected_dates:
-            if node.attrib[ATTR_DATE_ADDED] != corrected_dates[track_id]:
-                print(f"correcting track {node.attrib[ATTR_ARTIST]}-{node.attrib[ATTR_NAME]} to use\
+            if node.attrib[constants.ATTR_DATE_ADDED] != corrected_dates[track_id]:
+                print(f"correcting track {node.attrib[constants.ATTR_ARTIST]}-{node.attrib[constants.ATTR_TITLE]} to use\
                     date {corrected_dates[track_id]}")
-                node.attrib[ATTR_DATE_ADDED] = corrected_dates[track_id]
+                node.attrib[constants.ATTR_DATE_ADDED] = corrected_dates[track_id]
 
     # write the corrected collection to the specified file
     tree_incorrect.write(

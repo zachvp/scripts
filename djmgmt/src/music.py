@@ -31,6 +31,7 @@ from .tags import Tags
 PREFIX_HINTS = {'beatport_tracks', 'juno_download'}
 COLLECTION_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'processed-collection.xml')
 COLLECTION_TEMPLATE_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'collection-template.xml')
+MISSING_ART_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'missing-art.txt')
 
 # classes
 class Namespace(argparse.Namespace):
@@ -512,15 +513,14 @@ def process(source: str, output: str, interactive: bool, valid_extensions: set[s
     prune_non_music(output, valid_extensions, interactive)
     prune_empty(output, interactive)
     
-    missing_art_path = os.path.join(constants.PROJECT_ROOT, 'state', 'missing-art.txt')
     missing = run(encode.find_missing_art_os(output, threads=72))
-    common.write_paths(missing, missing_art_path)
+    common.write_paths(missing, MISSING_ART_PATH)
 
 def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
     process(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
 
 def update_library(source: str,
-                   library: str,
+                   library_path: str,
                    client_mirror_path: str,
                    interactive: bool,
                    valid_extensions: set[str],
@@ -536,6 +536,7 @@ def update_library(source: str,
     from tempfile import TemporaryDirectory
     from . import sync
     from . import tags_info
+    from . import library
     
     # create a temporary directory to process the files from source
     with TemporaryDirectory() as processing_dir:
@@ -543,11 +544,12 @@ def update_library(source: str,
         process(source, processing_dir, interactive, valid_extensions, prefix_hints)
         
         # move the processed files to the library, and update the djmgmt collection record
-        sweep(processing_dir, library, interactive, valid_extensions, prefix_hints)
-        collection = record_collection(library, COLLECTION_PATH)
+        sweep(processing_dir, library_path, interactive, valid_extensions, prefix_hints)
+        collection = record_collection(library_path, COLLECTION_PATH)
 
-        # combine any changed mappings with the standard filtered collection mappings
-        changed = tags_info.compare_tags(library, client_mirror_path)
+        # combine any changed mappings in _pruned with the standard filtered collection mappings
+        changed = tags_info.compare_tags(library_path, client_mirror_path)
+        changed = library.filter_path_mappings(changed, cast(ET.Element, collection.getroot()) , constants.XPATH_PRUNED)
         mappings = sync.create_sync_mappings(collection, client_mirror_path)
         if changed:
             mappings += changed

@@ -287,7 +287,7 @@ async def encode_lossless(input_dir: str,
         logging.error(error)
         raise error
     
-    # Core data
+    # core data
     processed_files: list[tuple[str, str]] = []
     size_diff_sum = 0.0
     tasks: list[tuple[str, str, Task[tuple[int, str]]]] = []
@@ -361,7 +361,7 @@ async def encode_lossless(input_dir: str,
             task = asyncio.create_task(run_command_async(command))
             tasks.append((input_path, output_path, task))
             
-            # Run task batch
+            # run task batch
             if len(tasks) > threads - 1:
                 run_tasks = [t[2] for t in tasks]
                 await asyncio.gather(*run_tasks)
@@ -382,7 +382,7 @@ async def encode_lossless(input_dir: str,
                 # separate entries
                 logging.info("= = = =")
     
-    # Run final batch
+    # run final batch
     if tasks:
         run_tasks = [t[2] for t in tasks]
         await asyncio.gather(*run_tasks)
@@ -420,7 +420,7 @@ def encode_lossy_cli(args: type[Namespace]) -> None:
     path_mappings = common.add_output_path(args.output, path_mappings, args.input)
     asyncio.run(encode_lossy(path_mappings, args.extension))
 
-async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4, skip_existing: bool=True) -> None:
+async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, threads: int = 4) -> None:
     '''Encodes the given input, output mappings in lossy format with the given extension. Uses FFMPEG as backend.
     Encoding operations are parallelized.'''
     tasks: list[Task[tuple[int, str]]] = []
@@ -435,12 +435,6 @@ async def encode_lossy(path_mappings: list[tuple[str, str]], extension: str, thr
         if not os.path.exists(dest_dir):
             logging.debug(f"create path: '{dest_dir}'")
             os.makedirs(dest_dir)
-        
-        # check to skip existing files
-        if skip_existing:
-            if os.path.exists(dest):
-                logging.debug(f"path exists, skipping: '{dest}'")
-                continue
         
         # determine if the source file has a cover image
         ffprobe_data = read_ffprobe_json(source)
@@ -550,10 +544,9 @@ async def find_missing_art_xml(collection_file_path: str, collection_xpath: str,
     missing += await run_missing_art_tasks(tasks)
     return missing
 
-# def missing_art(input_dir)
-
 def missing_art_cli(args: type[Namespace]) -> None:
     # TODO: add timing
+    # TODO: refactor into wrapper + internal functions
     coroutine = None
     missing = []
     if args.scan_mode == Namespace.SCAN_MODE_XML:        
