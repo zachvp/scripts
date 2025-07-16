@@ -114,11 +114,31 @@ def prune(working_dir: str, directories: list[str], filenames: list[str]) -> Non
             logging.info(f"prune: hidden file '{name}'")
             del filenames[index]
 
+def extract_all_normalized_encodings(zip_path: str, output: str) -> None:
+    with zipfile.ZipFile(zip_path, 'r') as file:
+        for info in file.infolist():
+            # default to the current filename
+            corrected = info.filename
+            
+            # try to normalize the filename encoding
+            try:
+                # attempt to encode the filename with the common zip encoding and decode as utf-8
+                corrected = info.filename.encode('cp437').decode('utf-8')
+                logging.debug(f"Corrected filename '{info.filename}' to '{corrected}' using utf-8 encoding")
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                try:
+                    # attempt universal decoding to latin1
+                    corrected = info.filename.encode('cp437').decode('latin1')
+                    logging.debug(f"Fallback filename encoding from '{info.filename}' to '{corrected}' using latin1 encoding")
+                except (UnicodeEncodeError, UnicodeDecodeError):
+                    logging.warning(f"Unable to fix encoding for filename: '{info.filename}'")
+            info.filename = corrected
+            file.extract(info, os.path.normpath(output))
+
 def flatten_zip(zip_path: str, extract_path: str) -> None:
     output_directory = os.path.splitext(os.path.basename(zip_path))[0]
     logging.debug(f"output dir: {os.path.join(extract_path, output_directory)}")
-    with zipfile.ZipFile(zip_path, 'r') as file:
-        file.extractall(os.path.normpath(extract_path))
+    extract_all_normalized_encodings(zip_path, extract_path)
 
     unzipped_path = os.path.join(extract_path, output_directory)
     for file_path in common.collect_paths(unzipped_path):
@@ -155,7 +175,7 @@ def get_dirs(top: str) -> list[str]:
             dirs.append(path)
     return dirs
 
-# TODO: return encoded files
+# TODO: return encoded source, dest files
 def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: set[str], interactive: bool) -> None:
     from tempfile import TemporaryDirectory
     from asyncio import run
@@ -354,26 +374,8 @@ def flatten_hierarchy(source: str, output: str, interactive: bool) -> None:
     for input_path in common.collect_paths(source):
         name = os.path.basename(input_path)
         output_path = os.path.join(output, name)
-        name_split = os.path.splitext(name)
 
-        # Handle zip files
-        if name_split[1] == '.zip':
-            logging.info(f"extracting and flattening zip: '{input_path}'")
-            if interactive:
-                choice = input('Extract and flatten zip? [y/N/q]')
-                if choice == 'q':
-                    logging.info('info: user quit')
-                    return
-                if choice != 'y' or choice in 'nN':
-                    logging.info(f"skip: {input_path}")
-                    continue
-            try:
-                flatten_zip(input_path, output)
-            except Exception as e:
-                logging.error(f"Error extracting zip '{input_path}': {str(e)}")
-            continue
-
-        # handle regular files
+        # move the files to the output root
         if not os.path.exists(output_path):
             logging.info(f"move '{input_path}' to '{output_path}'")
             if interactive:
@@ -396,8 +398,8 @@ def flatten_hierarchy(source: str, output: str, interactive: bool) -> None:
 def flatten_hierarchy_cli(args: type[Namespace]) -> None:
     flatten_hierarchy(args.input, args.output, args.interactive)
 
-# TODO: return list of file mappings
-def extract(source: str, output: str, interactive: bool) -> None:
+# TODO: return list; each item is a tuple of the abs zip archive path and list of extracted files
+def extract(source: str, output: str, interactive: bool) -> None:    
     for input_path in common.collect_paths(source):
         name = os.path.basename(input_path)
         name_split = os.path.splitext(name)
@@ -417,8 +419,8 @@ def extract(source: str, output: str, interactive: bool) -> None:
                 if choice != 'y' or choice in 'nN':
                     logging.info(f"skip: {input_path}")
                     continue
-            with zipfile.ZipFile(input_path, 'r') as file:
-                file.extractall(os.path.normpath(output))
+            # extract all zip contents, with normalized filename encodings
+            extract_all_normalized_encodings(input_path, output)
         else:
             logging.debug(f"skip: non-zip file '{input_path}'")
 
@@ -430,6 +432,7 @@ def compress_all_cli(args: type[Namespace]) -> None:
         for directory in directories:
             compress_dir(os.path.join(working_dir, directory), os.path.join(args.output, directory))
 
+# TODO: return removed directories
 def prune_empty(source: str, interactive: bool) -> None:
     search_dirs : list[str] = []
     pruned : set[str] = set()
@@ -468,6 +471,7 @@ def prune_empty(source: str, interactive: bool) -> None:
 def prune_empty_cli(args: type[Namespace]) -> None:
     prune_empty(args.input, args.interactive)
     
+# TODO: return pruned files
 def prune_non_music(source: str, valid_extensions: set[str], interactive: bool) -> None:
     '''Removes all files that don't have a valid music extension from the given directory.'''
     for input_path in common.collect_paths(source):
