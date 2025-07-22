@@ -1514,9 +1514,9 @@ class TestCompressAllCLI(unittest.TestCase):
             call(f"{MOCK_INPUT_DIR}/mock_dir_1/nested", f"{MOCK_OUTPUT_DIR}/nested")
         ])
 
-class TestPruneEmpty(unittest.TestCase):
+class TestPruneNonUserDirs(unittest.TestCase):
     @patch('shutil.rmtree')
-    @patch('src.music.is_empty_dir')
+    @patch('src.music.has_no_user_files')
     @patch('src.music.get_dirs')
     def test_success_remove_empty_dir(self,
                                       mock_get_dirs: MagicMock,
@@ -1527,7 +1527,7 @@ class TestPruneEmpty(unittest.TestCase):
         mock_get_dirs.return_value = ['mock_empty_dir']
         
         # Call target function
-        actual = music.prune_empty('/mock/source/', False)
+        actual = music.prune_non_user_dirs('/mock/source/', False)
         
         ## Assert expectations
         ## Check calls
@@ -1539,7 +1539,7 @@ class TestPruneEmpty(unittest.TestCase):
         self.assertIsNone(actual)
         
     @patch('shutil.rmtree')
-    @patch('src.music.is_empty_dir')
+    @patch('src.music.has_no_user_files')
     @patch('src.music.get_dirs')
     def test_success_skip_non_empty_dir(self,
                                         mock_get_dirs: MagicMock,
@@ -1551,7 +1551,7 @@ class TestPruneEmpty(unittest.TestCase):
         mock_is_empty_dir.return_value = False
         
         # Call target function
-        actual = music.prune_empty('/mock/source/', False)
+        actual = music.prune_non_user_dirs('/mock/source/', False)
         
         ## Assert expectations
         ## Check calls
@@ -1562,7 +1562,7 @@ class TestPruneEmpty(unittest.TestCase):
         ## Check output
         self.assertIsNone(actual)
         
-    @patch('src.music.prune_empty')
+    @patch('src.music.prune_non_user_dirs')
     def test_success_cli(self, mock_prune_empty: MagicMock) -> None:
         '''Tests that the CLI wrapper calls the correct function.'''
         args = Namespace(input=MOCK_INPUT_DIR, interactive=False)
@@ -1693,14 +1693,17 @@ class TestPruneNonMusicFiles(unittest.TestCase):
     
     @patch('shutil.rmtree')
     @patch('os.remove')
+    @patch('os.path.isdir')
     @patch('src.common.collect_paths')
-    def test_success_remove_app(self,
+    def test_success_remove_dir(self,
                                 mock_collect_paths: MagicMock,
+                                mock_isdir: MagicMock,
                                 mock_os_remove: MagicMock,
                                 mock_rmtree: MagicMock) -> None:
         '''Tests that .app archives are removed.'''
         # Setup mocks
         mock_collect_paths.return_value = ['/mock/source/mock.app']
+        mock_isdir.return_value = True
         
         # Call target function and assert expectations
         actual = music.prune_non_music('/mock/source/', constants.EXTENSIONS, False)
@@ -1812,7 +1815,7 @@ class TestProcess(unittest.TestCase):
     @patch('src.encode.find_missing_art_os')
     @patch('src.music.standardize_lossless')
     @patch('src.music.prune_non_music')
-    @patch('src.music.prune_empty')
+    @patch('src.music.prune_non_user_dirs')
     @patch('src.music.flatten_hierarchy')
     @patch('src.music.extract')
     @patch('src.music.sweep')
@@ -1831,7 +1834,7 @@ class TestProcess(unittest.TestCase):
         mock_sweep.side_effect = lambda *_, **__: mock_call_container.sweep()
         mock_extract.side_effect = lambda *_, **__: mock_call_container.extract()
         mock_flatten.side_effect = lambda *_, **__: mock_call_container.flatten()
-        mock_prune_empty.side_effect = lambda *_, **__: mock_call_container.prune_empty()
+        mock_prune_empty.side_effect = lambda *_, **__: mock_call_container.prune_non_user_dirs()
         mock_prune_non_music.side_effect = lambda *_, **__: mock_call_container.prune_non_music()
         mock_standardize_lossless.side_effect = lambda *_, **__: mock_call_container.standardize_lossless()
         mock_find_missing_art_os.side_effect = lambda *_, **__: mock_call_container.find_missing_art_os()
@@ -1855,7 +1858,7 @@ class TestProcess(unittest.TestCase):
         self.assertEqual(mock_call_container.mock_calls[2], call.flatten())
         self.assertEqual(mock_call_container.mock_calls[3], call.standardize_lossless())
         self.assertEqual(mock_call_container.mock_calls[4], call.prune_non_music())
-        self.assertEqual(mock_call_container.mock_calls[5], call.prune_empty())
+        self.assertEqual(mock_call_container.mock_calls[5], call.prune_non_user_dirs())
         self.assertEqual(mock_call_container.mock_calls[6], call.find_missing_art_os())
         self.assertEqual(mock_call_container.mock_calls[7], call.write_paths())
         

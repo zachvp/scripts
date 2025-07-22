@@ -151,29 +151,37 @@ def flatten_zip(zip_path: str, extract_path: str) -> None:
         logging.info(f"remove empty unzipped path {unzipped_path}")
         shutil.rmtree(unzipped_path)
 
-def is_empty_dir(top: str) -> bool:
-    if not os.path.isdir(top):
-        return False
+def has_no_user_files(dir_path: str) -> bool:
+    '''Returns True if the given path contains nothing or only hidden files and other directories.
+    Returns False if a non-hidden file exists in the directory.'''
+    if not os.path.isdir(dir_path):
+        raise TypeError(f"path '{dir_path}' is not a directory")
 
-    paths = os.listdir(top)
-    files = 0
+    # get all child paths
+    paths = os.listdir(dir_path)
+    
+    # count the number of directories and hidden files
+    non_user_files = 0
     for path in paths:
-        check_path = os.path.join(top, path)
+        check_path = os.path.join(dir_path, path)
         logging.debug(f"check path: {check_path}")
         if path.startswith('.') or os.path.isdir(check_path):
-            files += 1
+            non_user_files += 1
 
-    logging.debug(f"{files} == {len(paths)}?")
-    return files == len(paths)
+    logging.debug(f"{non_user_files} == {len(paths)}?")
+    return non_user_files == len(paths)
 
-def get_dirs(top: str) -> list[str]:
-    if not os.path.isdir(top):
-        return []
+def get_dirs(dir_path: str) -> list[str]:
+    '''Return all directory paths within the given directory, relative to that given directory.'''
+    if not os.path.isdir(dir_path):
+        # TODO: move to common function that takes Error type and message, then logs and raises the error
+        raise TypeError(f"path '{dir_path}' is not a directory")
 
+    # collect the directories
     dirs = []
-    dir_list = os.listdir(top)
+    dir_list = os.listdir(dir_path)
     for item in dir_list:
-        path = os.path.join(top, item)
+        path = os.path.join(dir_path, item)
         if os.path.isdir(path):
             dirs.append(path)
     return dirs
@@ -441,7 +449,7 @@ def compress_all_cli(args: type[Namespace]) -> None:
             compress_dir(os.path.join(working_dir, directory), os.path.join(args.output, directory))
 
 # TODO: return removed directories
-def prune_empty(source: str, interactive: bool) -> None:
+def prune_non_user_dirs(source: str, interactive: bool) -> None:
     search_dirs : list[str] = []
     pruned : set[str] = set()
 
@@ -452,7 +460,7 @@ def prune_empty(source: str, interactive: bool) -> None:
 
     while len(search_dirs) > 0:
         search_dir = search_dirs.pop(0)
-        if is_empty_dir(search_dir) and search_dir != source:
+        if has_no_user_files(search_dir) and search_dir != source:
             pruned.add(search_dir)
         else:
             logging.info(f"search_dir: {search_dir}")
@@ -472,21 +480,21 @@ def prune_empty(source: str, interactive: bool) -> None:
             shutil.rmtree(path)
         except OSError as e:
             if e.errno == 39: # directory not empty
-                logging.info(f"skip: non-empty dir {path}")
+                logging.warning(f"skip: non-empty dir {path}")
 
     logging.info(f"search_dirs, end: {search_dirs}")
 
 def prune_empty_cli(args: type[Namespace]) -> None:
-    prune_empty(args.input, args.interactive)
+    prune_non_user_dirs(args.input, args.interactive)
     
 # TODO: return pruned files
 def prune_non_music(source: str, valid_extensions: set[str], interactive: bool) -> None:
     '''Removes all files that don't have a valid music extension from the given directory.'''
     for input_path in common.collect_paths(source):
-        name_split = os.path.splitext(input_path)
+        _, extension = os.path.splitext(input_path)
         
         # check extension
-        if name_split[1] not in valid_extensions:
+        if extension not in valid_extensions:
             logging.info(f"non-music file found: '{input_path}'")
             if interactive:
                 choice = input("continue? [y/N]")
@@ -494,7 +502,7 @@ def prune_non_music(source: str, valid_extensions: set[str], interactive: bool) 
                     logging.info('skip: user skipped')
                     continue
             try:
-                if name_split[1] == '.app':
+                if os.path.isdir(input_path):
                     shutil.rmtree(input_path)
                 else:
                     os.remove(input_path)
@@ -507,14 +515,15 @@ def prune_non_music_cli(args: type[Namespace], valid_extensions: set[str]) -> No
 
 def process(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> None:
     '''Performs the following, in sequence:
-        1. Sweeps all music files and archives from a source directory into a target directory.
-        2. Flattens the files within the target directory.
-        3. Standardizes lossless encodings.
-        4. Removes all non-music files, archives, and folders in the target directory.
-        5. Records the processed files to a Rekordbox-like XML file.
+        1. Sweeps all music files and archives from a source directory into an output directory.
+        2. Extracts all zip archives within the output directory.
+        3. Flattens the files within the output directory.
+        3. Standardizes lossless file encodings.
+        4. Removes all non-music files in the output directory.
+        5. Removes all directories that contain no visible files.
         6. Records the paths of the tracks that are missing artwork to a text file.
         
-        The source and target directories may be the same for effectively in-place processing.
+        The source and output directories may be the same for effectively in-place processing.
     '''
     from asyncio import run
     
@@ -523,7 +532,7 @@ def process(source: str, output: str, interactive: bool, valid_extensions: set[s
     flatten_hierarchy(output, output, interactive)
     standardize_lossless(output, valid_extensions, prefix_hints, interactive)
     prune_non_music(output, valid_extensions, interactive)
-    prune_empty(output, interactive)
+    prune_non_user_dirs(output, interactive)
     
     missing = run(encode.find_missing_art_os(output, threads=72))
     common.write_paths(missing, MISSING_ART_PATH)
@@ -538,17 +547,17 @@ def update_library(source: str,
                    valid_extensions: set[str],
                    prefix_hints: set[str]) -> None:
     '''Performs the following, in sequence:
-        1. Processes files from source -> temp
-        2. Sweeps files from temp -> library
+        1. Processes files from source dir -> temp dir
+        2. Sweeps files from temp dir -> library
         3. Records the updated library to the XML collection
-        4. Syncs files based on the updated XML collection to the given client mirror path
+        4. Collects library -> client mirror file mappings according to the new files added to the XML collection
+        4. Adds file mappings according to metadata differences between library <-> client mirror
+        5. Syncs the new and changed files from library -> client mirror path -> media server
         
-        The source, library, and client_mirror_path parameters should all be distinct directories.
+        The source, library, and client_mirror_path arguments should all be distinct directories.
     '''
     from tempfile import TemporaryDirectory
-    from . import sync
-    from . import tags_info
-    from . import library
+    from . import sync, tags_info, library
     
     # create a temporary directory to process the files from source
     with TemporaryDirectory() as processing_dir:
