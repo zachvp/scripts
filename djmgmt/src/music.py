@@ -37,7 +37,7 @@ MISSING_ART_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'missing-art.tx
 class Namespace(argparse.Namespace):
     # arguments
     ## required
-    function : str
+    function: str
     input: str
     output: str
     
@@ -448,10 +448,9 @@ def compress_all_cli(args: type[Namespace]) -> None:
         for directory in directories:
             compress_dir(os.path.join(working_dir, directory), os.path.join(args.output, directory))
 
-# TODO: return removed directories
-def prune_non_user_dirs(source: str, interactive: bool) -> None:
-    search_dirs : list[str] = []
-    pruned : set[str] = set()
+def prune_non_user_dirs(source: str, interactive: bool) -> list[str]:
+    search_dirs: list[str] = []
+    pruned: set[str] = set()
 
     dir_list = get_dirs(source)
     search_dirs.append(source)
@@ -483,11 +482,13 @@ def prune_non_user_dirs(source: str, interactive: bool) -> None:
                 logging.warning(f"skip: non-empty dir {path}")
 
     logging.info(f"search_dirs, end: {search_dirs}")
+    
+    return list(pruned)
 
-def prune_empty_cli(args: type[Namespace]) -> None:
+def prune_non_user_dirs_cli(args: type[Namespace]) -> None:
+    '''CLI wrapper for the core `prune_non_user_dirs` function.'''
     prune_non_user_dirs(args.input, args.interactive)
     
-# TODO: return pruned files
 def prune_non_music(source: str, valid_extensions: set[str], interactive: bool) -> list[str]:
     '''Removes all files that don't have a valid music extension from the given directory.'''
     pruned = []
@@ -604,7 +605,7 @@ if __name__ == '__main__':
     elif script_args.function == Namespace.FUNCTION_COMPRESS:
         compress_all_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_PRUNE:
-        prune_empty_cli(script_args)
+        prune_non_user_dirs_cli(script_args)
     elif script_args.function == Namespace.FUNCTION_PRUNE_NON_MUSIC:
         prune_non_music_cli(script_args, constants.EXTENSIONS)
     elif script_args.function == Namespace.FUNCTION_PROCESS:

@@ -1531,12 +1531,13 @@ class TestPruneNonUserDirs(unittest.TestCase):
         
         ## Assert expectations
         ## Check calls
+        expected_path = '/mock/source/mock_empty_dir'
         mock_get_dirs.assert_called()
         mock_is_empty_dir.assert_called()
-        mock_rmtree.assert_called_once_with('/mock/source/mock_empty_dir')
+        mock_rmtree.assert_called_once_with(expected_path)
         
         ## Check output
-        self.assertIsNone(actual)
+        self.assertListEqual(actual, [expected_path])
         
     @patch('shutil.rmtree')
     @patch('src.music.has_no_user_files')
@@ -1560,13 +1561,13 @@ class TestPruneNonUserDirs(unittest.TestCase):
         mock_rmtree.assert_not_called()
         
         ## Check output
-        self.assertIsNone(actual)
+        self.assertListEqual(actual, [])
         
     @patch('src.music.prune_non_user_dirs')
     def test_success_cli(self, mock_prune_empty: MagicMock) -> None:
         '''Tests that the CLI wrapper calls the correct function.'''
         args = Namespace(input=MOCK_INPUT_DIR, interactive=False)
-        music.prune_empty_cli(args) # type: ignore
+        music.prune_non_user_dirs_cli(args) # type: ignore
         
         mock_prune_empty.assert_called_once_with(MOCK_INPUT_DIR, False)
 
