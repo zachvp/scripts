@@ -91,12 +91,16 @@ def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> typ
 
     return args
 
-# TODO: return list of compressed files
-def compress_dir(input_path: str, output_path: str) -> None:
-    with zipfile.ZipFile(output_path + '.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+# TODO: add tests
+def compress_dir(input_path: str, output_path: str) -> tuple[str, list[str]]:
+    compressed: list[str] = []
+    archive_path = f"{output_path}.zip"
+    with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as archive:
         for file_path in common.collect_paths(input_path):
             name = os.path.basename(file_path)
             archive.write(file_path, arcname=name)
+            compressed.append(file_path)
+    return (archive_path, compressed)
 
 def is_prefix_match(value: str, prefixes: set[str]) -> bool:
     for prefix in prefixes:
