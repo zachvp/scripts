@@ -114,7 +114,8 @@ def prune(working_dir: str, directories: list[str], filenames: list[str]) -> Non
             logging.info(f"prune: hidden file '{name}'")
             del filenames[index]
 
-def extract_all_normalized_encodings(zip_path: str, output: str) -> None:
+def extract_all_normalized_encodings(zip_path: str, output: str) -> tuple[str, list[str]]:
+    extracted: list[str] = []
     with zipfile.ZipFile(zip_path, 'r') as file:
         for info in file.infolist():
             # default to the current filename
@@ -134,6 +135,8 @@ def extract_all_normalized_encodings(zip_path: str, output: str) -> None:
                     logging.warning(f"Unable to fix encoding for filename: '{info.filename}'")
             info.filename = corrected
             file.extract(info, os.path.normpath(output))
+            extracted.append(info.filename)
+    return (zip_path, extracted)
 
 def flatten_zip(zip_path: str, extract_path: str) -> None:
     output_directory = os.path.splitext(os.path.basename(zip_path))[0]
@@ -307,8 +310,8 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     return tree
 
 # Primary functions
-# TODO: return list of swept file mappings
-def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> None:
+def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> list[tuple[str, str]]:
+    swept: list[tuple[str, str]] = []
     for input_path in common.collect_paths(source):
         # loop state
         name = os.path.basename(input_path)
@@ -359,18 +362,20 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
                 choice = input('Continue? [y/N/q]')
                 if choice == 'q':
                     logging.info('user quit')
-                    return
+                    return swept
                 if choice != 'y' or choice in 'nN':
                     logging.info('skip: user skipped file')
                     continue
             shutil.move(input_path, output_path)
+            swept.append((input_path, output_path))
     logging.info("swept all files")
-    
+    return swept    
+
 def sweep_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
     sweep(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
 
-# TODO: return list of moved file mappings
-def flatten_hierarchy(source: str, output: str, interactive: bool) -> None:
+def flatten_hierarchy(source: str, output: str, interactive: bool) -> list[tuple[str, str]]:
+    flattened: list[tuple[str, str]] = []
     for input_path in common.collect_paths(source):
         name = os.path.basename(input_path)
         output_path = os.path.join(output, name)
@@ -382,24 +387,26 @@ def flatten_hierarchy(source: str, output: str, interactive: bool) -> None:
                 choice = input('Continue? [y/N/q]')
                 if choice == 'q':
                     logging.info('info: user quit')
-                    return
+                    return flattened
                 if choice != 'y' or choice in 'nN':
                     logging.info(f"skip: {input_path}")
                     continue
             try:
                 shutil.move(input_path, output_path)
+                flattened.append((input_path, output_path))
             except FileNotFoundError as error:
                 if error.filename == input_path:
                     logging.info(f"skip: encountered ghost file: '{input_path}'")
                     continue
         else:
             logging.debug(f"skip: {input_path}")
+    return flattened
 
 def flatten_hierarchy_cli(args: type[Namespace]) -> None:
     flatten_hierarchy(args.input, args.output, args.interactive)
 
-# TODO: return list; each item is a tuple of the abs zip archive path and list of extracted files
-def extract(source: str, output: str, interactive: bool) -> None:    
+def extract(source: str, output: str, interactive: bool) -> list[tuple[str, list[str]]]:
+    extracted: list[tuple[str, list[str]]] = []
     for input_path in common.collect_paths(source):
         name = os.path.basename(input_path)
         name_split = os.path.splitext(name)
@@ -415,14 +422,15 @@ def extract(source: str, output: str, interactive: bool) -> None:
                 choice = input('Continue? [y/N/q]')
                 if choice == 'q':
                     logging.info('user quit')
-                    return
+                    return extracted
                 if choice != 'y' or choice in 'nN':
                     logging.info(f"skip: {input_path}")
                     continue
             # extract all zip contents, with normalized filename encodings
-            extract_all_normalized_encodings(input_path, output)
+            extracted.append(extract_all_normalized_encodings(input_path, output))
         else:
             logging.debug(f"skip: non-zip file '{input_path}'")
+    return extracted
 
 def extract_cli(args: type[Namespace]) -> None:
     extract(args.input, args.output, args.interactive)
