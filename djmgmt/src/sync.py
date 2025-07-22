@@ -185,16 +185,15 @@ def sync_batch(batch: list[tuple[str, str]], date_context: str, source: str, ful
     
     Returns True if the batch sync was successful, False otherwise.
     '''
-    from asyncio import run
-    from . import subsonic_client
-    from . import encode
+    import asyncio
+    from . import subsonic_client, encode
     
     # return flag
     success = True
     
     # encode the current batch to MP3 format
     logging.info(f"encoding batch in date context {date_context}:\n{batch}")
-    run(encode.encode_lossy(batch, '.mp3', threads=28))
+    asyncio.run(encode.encode_lossy(batch, '.mp3', threads=28))
     logging.info(f"finished encoding batch in date context {date_context}")
     
     # transfer batch to the media server

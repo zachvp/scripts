@@ -202,7 +202,7 @@ class TestStandardizeLossless(unittest.TestCase):
         mmock_sweep.assert_called_once_with(mock_temp_path, MOCK_INPUT_DIR, mock_interactive, mock_extensions, mock_hints)        
         
         ## Check output
-        self.assertIsNone(actual)
+        self.assertEqual(actual, mock_encode.return_value)
 
 class TestRecordCollection(unittest.TestCase):
     '''Tests for music.record_collection.'''
@@ -1589,7 +1589,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_remove.assert_called_once_with('/mock/source/mock_file.foo')
         mock_rmtree.assert_not_called()
         
-        self.assertIsNone(actual)
+        self.assertListEqual(actual, mock_collect_paths.return_value)
     
     @patch('shutil.rmtree')
     @patch('os.remove')
@@ -1609,7 +1609,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_remove.assert_not_called()
         mock_rmtree.assert_not_called()
         
-        self.assertIsNone(actual)
+        self.assertListEqual(actual, [])
     
     @patch('shutil.rmtree')
     @patch('os.remove')
@@ -1629,7 +1629,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_remove.assert_not_called()
         mock_rmtree.assert_not_called()
         
-        self.assertIsNone(actual)
+        self.assertListEqual(actual, [])
     
     @patch('shutil.rmtree')
     @patch('os.remove')
@@ -1649,7 +1649,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_remove.assert_called_once_with('/mock/source/mock/dir/0/mock_file.foo')
         mock_rmtree.assert_not_called()
         
-        self.assertIsNone(actual)
+        self.assertListEqual(actual, mock_collect_paths.return_value)
     
     @patch('shutil.rmtree')
     @patch('os.remove')
@@ -1669,7 +1669,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_remove.assert_called_once_with('/mock/source/.mock_hidden')
         mock_rmtree.assert_not_called()
         
-        self.assertIsNone(actual)
+        self.assertListEqual(actual, mock_collect_paths.return_value)
     
     @patch('shutil.rmtree')
     @patch('os.remove')
@@ -1689,7 +1689,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_remove.assert_called_once_with('/mock/source/mock.zip')
         mock_rmtree.assert_not_called()
         
-        self.assertIsNone(actual)
+        self.assertListEqual(actual, mock_collect_paths.return_value)
     
     @patch('shutil.rmtree')
     @patch('os.remove')
@@ -1712,7 +1712,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_remove.assert_not_called()
         mock_rmtree.assert_called_once_with('/mock/source/mock.app')
         
-        self.assertIsNone(actual)
+        self.assertListEqual(actual, mock_collect_paths.return_value)
     
     @patch('shutil.rmtree')
     @patch('os.remove')
@@ -1732,7 +1732,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_remove.assert_not_called()
         mock_rmtree.assert_not_called()
         
-        self.assertIsNone(actual)
+        self.assertListEqual(actual, [])
     
     @patch('shutil.rmtree')
     @patch('os.remove')
@@ -1752,7 +1752,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_remove.assert_called_once_with('/mock/source/.mock_hidden_dir/mock.foo')
         mock_rmtree.assert_not_called()
         
-        self.assertIsNone(actual)
+        self.assertListEqual(actual, mock_collect_paths.return_value)
     
     @patch('shutil.rmtree')
     @patch('builtins.input')
@@ -1776,7 +1776,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_remove.assert_not_called()
         mock_rmtree.assert_not_called()
         
-        self.assertIsNone(actual)
+        self.assertListEqual(actual, [])
         
     @patch('shutil.rmtree')
     @patch('builtins.input')
@@ -1800,7 +1800,7 @@ class TestPruneNonMusicFiles(unittest.TestCase):
         mock_os_remove.assert_called_once()
         mock_rmtree.assert_not_called()
         
-        self.assertIsNone(actual)
+        self.assertListEqual(actual, mock_collect_paths.return_value)
         
     @patch('src.music.prune_non_music')
     def test_success_cli(self, mock_prune_non_music: MagicMock) -> None:

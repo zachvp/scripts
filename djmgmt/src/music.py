@@ -186,21 +186,21 @@ def get_dirs(dir_path: str) -> list[str]:
             dirs.append(path)
     return dirs
 
-# TODO: return encoded source, dest files
-def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: set[str], interactive: bool) -> None:
+def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: set[str], interactive: bool) -> list[tuple[str, str]]:
     from tempfile import TemporaryDirectory
-    from asyncio import run
+    import asyncio
     
     # create a temporary directory to place the encoded files.
     with TemporaryDirectory() as temp_dir:
         # encode all non-standard lossless files
-        result = run(encode.encode_lossless(source, temp_dir, '.aiff', interactive=interactive))
+        result = asyncio.run(encode.encode_lossless(source, temp_dir, '.aiff', interactive=interactive))
         
         # remove all of the original non-standard files that have been encoded.
         for input_path, _ in result:
             os.remove(input_path)
         # sweep all the encoded files from the temporary directory to the original source directory
         sweep(temp_dir, source, False, valid_extensions, prefix_hints)
+        return result
 
 # TODO: extend to save backup of previous X versions
 def record_collection(source: str, collection_path: str) -> ET.ElementTree:
@@ -488,44 +488,53 @@ def prune_empty_cli(args: type[Namespace]) -> None:
     prune_non_user_dirs(args.input, args.interactive)
     
 # TODO: return pruned files
-def prune_non_music(source: str, valid_extensions: set[str], interactive: bool) -> None:
+def prune_non_music(source: str, valid_extensions: set[str], interactive: bool) -> list[str]:
     '''Removes all files that don't have a valid music extension from the given directory.'''
+    pruned = []
     for input_path in common.collect_paths(source):
         _, extension = os.path.splitext(input_path)
         
         # check extension
         if extension not in valid_extensions:
             logging.info(f"non-music file found: '{input_path}'")
+            
+            # check interactive mode
             if interactive:
                 choice = input("continue? [y/N]")
                 if choice != 'y':
                     logging.info('skip: user skipped')
                     continue
+            # try to remove the file/dir
             try:
                 if os.path.isdir(input_path):
                     shutil.rmtree(input_path)
+                    pruned.append(input_path)
                 else:
                     os.remove(input_path)
+                    pruned.append(input_path)
                 logging.info(f"removed: '{input_path}'")
             except OSError as e:
-                logging.error(f"Error removing file '{input_path}': {str(e)}")
+                msg = f"Error removing file '{input_path}': {str(e)}" # TODO: use helper
+                logging.error(msg)
+                raise RuntimeError(msg)
+    return pruned
 
 def prune_non_music_cli(args: type[Namespace], valid_extensions: set[str]) -> None:
     prune_non_music(args.input, valid_extensions, args.interactive)
 
 def process(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> None:
     '''Performs the following, in sequence:
-        1. Sweeps all music files and archives from a source directory into an output directory.
-        2. Extracts all zip archives within the output directory.
-        3. Flattens the files within the output directory.
-        3. Standardizes lossless file encodings.
-        4. Removes all non-music files in the output directory.
-        5. Removes all directories that contain no visible files.
-        6. Records the paths of the tracks that are missing artwork to a text file.
+        1. Sweeps all music files and archives from the `source` directory into the `output` directory.
+        2. Extracts all zip archives within the `output` directory.
+        3. Flattens the files within the `output` directory.
+        3. Standardizes lossless file encodings within the `output` directory.
+        4. Removes all non-music files in the `output` directory.
+        5. Removes all directories that contain no visible files within the `output` directory.
+        6. Records the paths of the `output` tracks that are missing artwork to a text file.
         
         The source and output directories may be the same for effectively in-place processing.
     '''
-    from asyncio import run
+    import asyncio
     
     sweep(source, output, interactive, valid_extensions, prefix_hints)
     extract(output, output, interactive)
@@ -534,10 +543,11 @@ def process(source: str, output: str, interactive: bool, valid_extensions: set[s
     prune_non_music(output, valid_extensions, interactive)
     prune_non_user_dirs(output, interactive)
     
-    missing = run(encode.find_missing_art_os(output, threads=72))
+    missing = asyncio.run(encode.find_missing_art_os(output, threads=72))
     common.write_paths(missing, MISSING_ART_PATH)
 
 def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
+    '''CLI wrapper for the core `process` function.'''
     process(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
 
 def update_library(source: str,
