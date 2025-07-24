@@ -33,6 +33,14 @@ COLLECTION_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'processed-colle
 COLLECTION_TEMPLATE_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'collection-template.xml')
 MISSING_ART_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'missing-art.txt')
 
+## xml references
+TAG_TRACK     = 'TRACK'
+TAG_NODE      = 'NODE'
+TAG_PLAYLISTS = 'PLAYLISTS'
+
+NAME_PLAYLIST_ROOT = 'ROOT'
+NAME_PRUNED        = "_pruned"
+
 # classes
 class Namespace(argparse.Namespace):
     # arguments
@@ -206,15 +214,8 @@ def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: 
         sweep(temp_dir, source, False, valid_extensions, prefix_hints)
         return result
 
-# TODO: extend to save backup of previous X versions
-def record_collection(source: str, collection_path: str) -> ET.ElementTree:
-    TAG_TRACK     = 'TRACK'
-    TAG_NODE      = 'NODE'
-    TAG_PLAYLISTS = 'PLAYLISTS'
-    
-    NAME_PLAYLIST_ROOT = 'ROOT'
-    NAME_PRUNED        = "_pruned"
-    
+def load_collection_xml(collection_path: str) -> ET.Element:
+    '''Loads the XML object from the given path and returns the root element.'''
     # load the existing collection path if present, otherwise load the template file
     if os.path.exists(collection_path):
         xml_path = collection_path
@@ -222,11 +223,13 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
         xml_path = COLLECTION_TEMPLATE_PATH
     try:
         tree = ET.parse(xml_path)
-        root = tree.getroot()
     except Exception as e:
         logging.error(f"Error loading collection file: {e}")
         raise
-    
+    return tree.getroot()
+
+def validate_collection_xml(root: ET.Element) -> tuple[ET.Element, ET.Element]:
+    '''Validates the collection root and returns the COLLECTION and PLAYLIST elements.'''
     # ensure that the 'COLLECTION' element exists
     collection = root.find(constants.XPATH_COLLECTION)
     if collection is None:
@@ -236,6 +239,12 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     playlist_root = root.find(f'./{TAG_PLAYLISTS}//{TAG_NODE}[@Name="{NAME_PLAYLIST_ROOT}"]')
     if playlist_root is None:
         raise ValueError('Invalid collection file format: missing PLAYLISTS.ROOT element')
+    return collection, playlist_root
+
+# TODO: extend to save backup of previous X versions
+def record_collection(source: str, collection_path: str) -> ET.ElementTree:
+    root = load_collection_xml(collection_path)
+    collection, playlist_root = validate_collection_xml(root)
     
     # ensure that the "_pruned" playlist exists
     pruned_node = root.find(f'./{TAG_PLAYLISTS}//{TAG_NODE}[@Name="{NAME_PRUNED}"]')
