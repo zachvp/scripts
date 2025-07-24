@@ -232,18 +232,25 @@ def find_node(root: ET.Element, query: str) -> ET.Element:
 
 def get_played_tracks(root: ET.Element) -> list[str]:
     '''Returns a list of TRACK.Key/ID strings for all playlist tracks in the 'archive' folder.'''
+    # load XML references
     archive = find_node(root, constants.XPATH_ARCHIVE)
     
     # search for and collect tracks in archive
     played_tracks = []
+    existing = set()
     track_nodes = archive.findall(f'.//{TAG_TRACK}')
     for track in track_nodes:
-        played_tracks.append(track.get(constants.ATTR_TRACK_KEY))
+        track_id = track.get(constants.ATTR_TRACK_KEY)
+        if track_id not in existing:
+            played_tracks.append(track_id)
+            existing.add(track_id)
     return played_tracks
+
+# TODO: write played tracks to XML
 
 def get_unplayed_tracks(root: ET.Element) -> list[str]:
     '''Returns a list of TRACK.Key/ID strings for all pruned tracks NOT in the 'archive' folder.'''
-    # load the XML references
+    # load XML references
     pruned = find_node(root, constants.XPATH_PRUNED)
     
     # determine unplayed tracks depending on the played tracks
@@ -259,7 +266,7 @@ def get_unplayed_tracks(root: ET.Element) -> list[str]:
 # TODO: add test coverage
 def record_unplayed_tracks(input_collection_path: str, output_collection_path: str) -> ET.ElementTree:
     '''Updates the 'dynamic.unplayed' playlist in the output XML collection.'''
-    # load the XML references
+    # load XML references
     input_root = load_collection_xml(input_collection_path)
     input_collection = find_node(input_root, constants.XPATH_COLLECTION)
     template_root = load_collection_xml(COLLECTION_TEMPLATE_PATH)
@@ -287,7 +294,7 @@ def record_unplayed_tracks(input_collection_path: str, output_collection_path: s
 def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     '''Updates the '_pruned' playlist in the given XML collection with all music files in the source directory.
     Returns the XML collection tree.'''
-    # load the primary XML nodes
+    # load XML references
     root          = load_collection_xml(collection_path)
     collection    = find_node(root, constants.XPATH_COLLECTION)
     playlist_root = find_node(root, constants.XPATH_PLAYLISTS)
