@@ -52,7 +52,7 @@ REKORDBOX_ROOT   = 'file://localhost'
 XPATH_COLLECTION = './/COLLECTION'
 XPATH_PLAYLISTS  = './PLAYLISTS//NODE[@Name="ROOT"]'
 XPATH_PRUNED     = './PLAYLISTS//NODE[@Name="_pruned"]'
-XPATH_ARCHIVE    = f'./PLAYLISTS//NODE[@Name="archive"]'
+XPATH_ARCHIVE    = './PLAYLISTS//NODE[@Name="archive"]'
 
 # file information
 EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'}

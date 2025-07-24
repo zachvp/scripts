@@ -248,10 +248,33 @@ def get_unplayed_tracks(root: ET.Element) -> list[str]:
     
     unplayed_tracks = []
     for track in pruned:
-        track_id = track.get(constants.ATTR_TRACK_ID)
-        if track_id not in played_tracks:
+        track_id = track.get(constants.ATTR_TRACK_KEY)
+        if track_id and track_id not in played_tracks:
             unplayed_tracks.append(track_id)
     return unplayed_tracks
+
+def record_unplayed_tracks(input_collection_path: str, output_collection_path: str) -> ET.ElementTree:
+    '''Updates the 'dynamic.unplayed playlist in the output XML collection.'''
+    input_root = load_collection_xml(input_collection_path)
+    input_collection = find_node(input_root, constants.XPATH_COLLECTION)
+    unplayed = get_unplayed_tracks(input_root)
+    template_root = load_collection_xml(COLLECTION_TEMPLATE_PATH)
+    
+    # replace template's collection with input's collection
+    template_collection = find_node(template_root, constants.XPATH_COLLECTION)
+    template_collection.clear()
+    template_collection.attrib = input_collection.attrib
+    for track in input_collection:
+        template_collection.append(track)
+    
+    unplayed_node = find_node(template_root, './PLAYLISTS//NODE[@Name="unplayed"]')
+    for track in unplayed:
+        ET.SubElement(unplayed_node, TAG_TRACK, {constants.ATTR_TRACK_KEY : track})
+    
+    unplayed_node.set('Entries', str(len(unplayed)))
+    tree = ET.ElementTree(template_root)
+    tree.write(output_collection_path, encoding='UTF-8', xml_declaration=True)
+    return tree
 
 # TODO: extend to save backup of previous X versions
 def record_collection(source: str, collection_path: str) -> ET.ElementTree:
@@ -323,7 +346,7 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
                 logging.debug(f"Added new track: '{file_path}'")
                 
                 # add to pruned playlist
-                ET.SubElement(pruned, TAG_TRACK, {'Key': track_id})
+                ET.SubElement(pruned, TAG_TRACK, {constants.ATTR_TRACK_KEY : track_id})
     
     # update the 'Entries' attributes
     collection.set('Entries', str(existing_tracks + new_tracks))
