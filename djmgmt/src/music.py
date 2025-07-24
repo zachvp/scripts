@@ -39,7 +39,8 @@ TAG_NODE      = 'NODE'
 TAG_PLAYLISTS = 'PLAYLISTS'
 
 NAME_PLAYLIST_ROOT = 'ROOT'
-NAME_PRUNED        = "_pruned"
+NAME_PRUNED        = '_pruned'
+NAME_ARCHIVE       = "archive"
 
 # classes
 class Namespace(argparse.Namespace):
@@ -241,15 +242,49 @@ def validate_collection_xml(root: ET.Element) -> tuple[ET.Element, ET.Element]:
         raise ValueError('Invalid collection file format: missing PLAYLISTS.ROOT element')
     return collection, playlist_root
 
+def update_played_tracks(collection_path: str) -> list[str]:
+    '''Upates the dynamic 'played' playlist with all tracks in the 'archive' folder playlists.
+    Returns a list of TRACK Key items.'''
+    from queue import Queue
+    
+    root = load_collection_xml(collection_path)
+    archive = root.find(f'./{TAG_PLAYLISTS}//{TAG_NODE}[@Name="{NAME_ARCHIVE}"]')
+    if archive is None:
+        raise ValueError("Invalid collection file format: missing 'archive' element")
+    
+    # search for and collect tracks in archive
+    archive_tracks = []
+    search_nodes = Queue()
+    search_nodes.put(archive)
+    
+    # primary search loop
+    while not search_nodes.empty():
+        node = search_nodes.get()
+        
+        # search each node within the archive
+        for sub_node in node:
+            # determine if the node is a folder or a playlist
+            type = sub_node.get(constants.ATTR_TYPE)
+            if type is None:
+                raise ValueError("Invalid collection file format: missing 'Type' attribute")
+            if type == '0':
+                # type is folder, add to search
+                search_nodes.put(sub_node)
+            elif type == '1':
+                # type is playlist, collect the tracks
+                for track in sub_node:
+                    archive_tracks.append(track.get(constants.ATTR_TRACK_KEY))
+    return archive_tracks
+
 # TODO: extend to save backup of previous X versions
 def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     root = load_collection_xml(collection_path)
     collection, playlist_root = validate_collection_xml(root)
     
     # ensure that the "_pruned" playlist exists
-    pruned_node = root.find(f'./{TAG_PLAYLISTS}//{TAG_NODE}[@Name="{NAME_PRUNED}"]')
-    if pruned_node is None:
-        raise ValueError('Invalid collection file format: missing _pruned element')
+    pruned = root.find(f'./{TAG_PLAYLISTS}//{TAG_NODE}[@Name="{NAME_PRUNED}"]')
+    if pruned is None:
+        raise ValueError("Invalid collection file format: missing '_pruned' element")
     
     # count existing tracks
     existing_tracks = len(collection.findall(TAG_TRACK))
@@ -311,11 +346,11 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
                 logging.debug(f"Added new track: '{file_path}'")
                 
                 # add to pruned playlist
-                ET.SubElement(pruned_node, TAG_TRACK, {'Key': track_id})
+                ET.SubElement(pruned, TAG_TRACK, {'Key': track_id})
     
     # update the 'Entries' attributes
     collection.set('Entries', str(existing_tracks + new_tracks))
-    pruned_node.set('Entries', str(len(pruned_node.findall(TAG_TRACK))))
+    pruned.set('Entries', str(len(pruned.findall(TAG_TRACK))))
     
     # update ROOT node's Count based on its child nodes
     root_node_children = len(playlist_root.findall(TAG_NODE))
