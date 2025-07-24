@@ -50,9 +50,12 @@ ATTR_TYPE       = 'Type'
 
 REKORDBOX_ROOT   = 'file://localhost'
 XPATH_COLLECTION = './/COLLECTION'
-XPATH_PLAYLISTS  = './PLAYLISTS//NODE[@Name="ROOT"]'
-XPATH_PRUNED     = './PLAYLISTS//NODE[@Name="_pruned"]'
-XPATH_ARCHIVE    = './PLAYLISTS//NODE[@Name="archive"]'
+
+_playlist_node = lambda x: f'./PLAYLISTS//NODE[@Name="{x}"]'
+XPATH_PLAYLISTS  = _playlist_node('ROOT')
+XPATH_PRUNED     = _playlist_node('_pruned')
+XPATH_ARCHIVE    = _playlist_node('archive')
+XPATH_UNPLAYED   = _playlist_node('unplayed')
 
 # file information
 EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'}

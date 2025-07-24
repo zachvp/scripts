@@ -256,6 +256,7 @@ def get_unplayed_tracks(root: ET.Element) -> list[str]:
     return unplayed_tracks
 
 # TODO: incorporate into update_library so the processed collection contains the dynamic playlists
+# TODO: add test coverage
 def record_unplayed_tracks(input_collection_path: str, output_collection_path: str) -> ET.ElementTree:
     '''Updates the 'dynamic.unplayed' playlist in the output XML collection.'''
     # load the XML references
@@ -272,7 +273,7 @@ def record_unplayed_tracks(input_collection_path: str, output_collection_path: s
     
     # populate the unplayed playlist
     unplayed = get_unplayed_tracks(input_root)
-    unplayed_node = find_node(template_root, './PLAYLISTS//NODE[@Name="unplayed"]')
+    unplayed_node = find_node(template_root, constants.XPATH_UNPLAYED)
     for track in unplayed:
         ET.SubElement(unplayed_node, TAG_TRACK, {constants.ATTR_TRACK_KEY : track})
     unplayed_node.set('Entries', str(len(unplayed)))
