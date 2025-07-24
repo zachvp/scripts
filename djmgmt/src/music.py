@@ -231,11 +231,8 @@ def find_node(root: ET.Element, query: str) -> ET.Element:
     return node
 
 def get_played_tracks(root: ET.Element) -> list[str]:
-    '''Upates the dynamic 'played' playlist with all tracks in the 'archive' folder playlists.
-    Returns a list of TRACK Key items.'''
-    archive = root.find(constants.XPATH_ARCHIVE)
-    if archive is None:
-        raise ValueError("Invalid collection file format: missing 'archive' element")
+    '''Returns a list of TRACK.Key/ID strings for all playlist tracks in the 'archive' folder.'''
+    archive = find_node(root, constants.XPATH_ARCHIVE)
     
     # search for and collect tracks in archive
     played_tracks = []
@@ -245,6 +242,7 @@ def get_played_tracks(root: ET.Element) -> list[str]:
     return played_tracks
 
 def get_unplayed_tracks(root: ET.Element) -> list[str]:
+    '''Returns a list of TRACK.Key/ID strings for all pruned tracks NOT in the 'archive' folder.'''
     pruned = find_node(root, constants.XPATH_PRUNED)
     played_tracks = set(get_played_tracks(root))
     
