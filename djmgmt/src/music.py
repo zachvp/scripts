@@ -232,15 +232,15 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     if collection is None:
         raise ValueError('Invalid collection file format: missing COLLECTION element')
     
-    # ensure that the "_pruned" playlist exists
-    pruned_node = root.find(f"./{TAG_PLAYLISTS}//{TAG_NODE}[@Name=\"{NAME_PRUNED}\"]")
-    if pruned_node is None:
-        raise ValueError('Invalid collection file format: missing _pruned element')
-    
     # ensure that the 'PLAYLISTS.ROOT' exists
-    playlist_root = root.find(f"./{TAG_PLAYLISTS}//{TAG_NODE}[@Name=\"{NAME_PLAYLIST_ROOT}\"]")
+    playlist_root = root.find(f'./{TAG_PLAYLISTS}//{TAG_NODE}[@Name="{NAME_PLAYLIST_ROOT}"]')
     if playlist_root is None:
         raise ValueError('Invalid collection file format: missing PLAYLISTS.ROOT element')
+    
+    # ensure that the "_pruned" playlist exists
+    pruned_node = root.find(f'./{TAG_PLAYLISTS}//{TAG_NODE}[@Name="{NAME_PRUNED}"]')
+    if pruned_node is None:
+        raise ValueError('Invalid collection file format: missing _pruned element')
     
     # count existing tracks
     existing_tracks = len(collection.findall(TAG_TRACK))
@@ -254,10 +254,10 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
         
         # only process music files
         if extension and extension in constants.EXTENSIONS:
-            file_url = f"file://localhost{quote(file_path, safe='()/')}"
+            file_url = f"{constants.REKORDBOX_ROOT}{quote(file_path, safe='()/')}"
             
             # check if track already exists
-            existing_track = collection.find(f"./{TAG_TRACK}[@Location=\"{file_url}\"]")
+            existing_track = collection.find(f'./{TAG_TRACK}[@{constants.ATTR_PATH}="{file_url}"]')
             
             tags = Tags.load(file_path)
             if not tags:
