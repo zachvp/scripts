@@ -918,7 +918,7 @@ class TestRecordCollection(unittest.TestCase):
         mock_xml_parse.return_value = ET.ElementTree(ET.fromstring('<MOCK_NO_COLLECTION></MOCK_NO_COLLECTION>'))
         
         # Call target function and assert expectations
-        with self.assertRaisesRegex(ValueError, 'Invalid collection file format: missing COLLECTION element'):
+        with self.assertRaises(ValueError):
             music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
             
         # Assert expectations: Code should only check that path exists and attempt to parse

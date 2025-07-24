@@ -36,11 +36,6 @@ MISSING_ART_PATH = os.path.join(constants.PROJECT_ROOT, 'state', 'missing-art.tx
 ## xml references
 TAG_TRACK     = 'TRACK'
 TAG_NODE      = 'NODE'
-TAG_PLAYLISTS = 'PLAYLISTS'
-
-NAME_PLAYLIST_ROOT = 'ROOT'
-NAME_PRUNED        = '_pruned'
-NAME_ARCHIVE       = "archive"
 
 # classes
 class Namespace(argparse.Namespace):
@@ -229,43 +224,46 @@ def load_collection_xml(collection_path: str) -> ET.Element:
         raise
     return tree.getroot()
 
-def validate_collection_xml(root: ET.Element) -> tuple[ET.Element, ET.Element]:
-    '''Validates the collection root and returns the COLLECTION and PLAYLIST elements.'''
-    # ensure that the 'COLLECTION' element exists
-    collection = root.find(constants.XPATH_COLLECTION)
-    if collection is None:
-        raise ValueError('Invalid collection file format: missing COLLECTION element')
-    
-    # ensure that the 'PLAYLISTS.ROOT' exists
-    playlist_root = root.find(f'./{TAG_PLAYLISTS}//{TAG_NODE}[@Name="{NAME_PLAYLIST_ROOT}"]')
-    if playlist_root is None:
-        raise ValueError('Invalid collection file format: missing PLAYLISTS.ROOT element')
-    return collection, playlist_root
+def find_node(root: ET.Element, query: str) -> ET.Element:
+    node = root.find(query)
+    if node is None:
+        raise ValueError(f"Unable to find node for query '{query}' in '{root.tag}'")
+    return node
 
-def update_played_tracks(collection_path: str) -> list[str]:
+def get_played_tracks(root: ET.Element) -> list[str]:
     '''Upates the dynamic 'played' playlist with all tracks in the 'archive' folder playlists.
     Returns a list of TRACK Key items.'''
-    root = load_collection_xml(collection_path)
-    archive = root.find(f'./{TAG_PLAYLISTS}//{TAG_NODE}[@Name="{NAME_ARCHIVE}"]')
+    archive = root.find(constants.XPATH_ARCHIVE)
     if archive is None:
         raise ValueError("Invalid collection file format: missing 'archive' element")
     
     # search for and collect tracks in archive
-    archive_tracks = []
+    played_tracks = []
     track_nodes = archive.findall(f'.//{TAG_TRACK}')
     for track in track_nodes:
-        archive_tracks.append(track.get(constants.ATTR_TRACK_KEY))
-    return archive_tracks
+        played_tracks.append(track.get(constants.ATTR_TRACK_KEY))
+    return played_tracks
+
+def get_unplayed_tracks(root: ET.Element) -> list[str]:
+    pruned = find_node(root, constants.XPATH_PRUNED)
+    played_tracks = set(get_played_tracks(root))
+    
+    unplayed_tracks = []
+    for track in pruned:
+        track_id = track.get(constants.ATTR_TRACK_ID)
+        if track_id not in played_tracks:
+            unplayed_tracks.append(track_id)
+    return unplayed_tracks
 
 # TODO: extend to save backup of previous X versions
 def record_collection(source: str, collection_path: str) -> ET.ElementTree:
-    root = load_collection_xml(collection_path)
-    collection, playlist_root = validate_collection_xml(root)
-    
-    # ensure that the "_pruned" playlist exists
-    pruned = root.find(f'./{TAG_PLAYLISTS}//{TAG_NODE}[@Name="{NAME_PRUNED}"]')
-    if pruned is None:
-        raise ValueError("Invalid collection file format: missing '_pruned' element")
+    '''Updates the '_pruned' playlist in the given XML collection with all music files in the source directory.
+    Returns the XML collection tree.'''
+    # load the primary XML nodes
+    root          = load_collection_xml(collection_path)
+    collection    = find_node(root, constants.XPATH_COLLECTION)
+    playlist_root = find_node(root, constants.XPATH_PLAYLISTS)
+    pruned        = find_node(root, constants.XPATH_PRUNED)
     
     # count existing tracks
     existing_tracks = len(collection.findall(TAG_TRACK))

@@ -48,9 +48,11 @@ ATTR_TOTAL_TIME = 'TotalTime'
 ATTR_AVG_BPM    = 'AverageBpm'
 ATTR_TYPE       = 'Type'
 
-REKORDBOX_ROOT = 'file://localhost'
+REKORDBOX_ROOT   = 'file://localhost'
 XPATH_COLLECTION = './/COLLECTION'
-XPATH_PRUNED = './PLAYLISTS//NODE[@Name="_pruned"]'
+XPATH_PLAYLISTS  = './PLAYLISTS//NODE[@Name="ROOT"]'
+XPATH_PRUNED     = './PLAYLISTS//NODE[@Name="_pruned"]'
+XPATH_ARCHIVE    = f'./PLAYLISTS//NODE[@Name="archive"]'
 
 # file information
 EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'}
