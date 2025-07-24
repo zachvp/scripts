@@ -245,8 +245,6 @@ def validate_collection_xml(root: ET.Element) -> tuple[ET.Element, ET.Element]:
 def update_played_tracks(collection_path: str) -> list[str]:
     '''Upates the dynamic 'played' playlist with all tracks in the 'archive' folder playlists.
     Returns a list of TRACK Key items.'''
-    from queue import Queue
-    
     root = load_collection_xml(collection_path)
     archive = root.find(f'./{TAG_PLAYLISTS}//{TAG_NODE}[@Name="{NAME_ARCHIVE}"]')
     if archive is None:
@@ -254,26 +252,9 @@ def update_played_tracks(collection_path: str) -> list[str]:
     
     # search for and collect tracks in archive
     archive_tracks = []
-    search_nodes = Queue()
-    search_nodes.put(archive)
-    
-    # primary search loop
-    while not search_nodes.empty():
-        node = search_nodes.get()
-        
-        # search each node within the archive
-        for sub_node in node:
-            # determine if the node is a folder or a playlist
-            type = sub_node.get(constants.ATTR_TYPE)
-            if type is None:
-                raise ValueError("Invalid collection file format: missing 'Type' attribute")
-            if type == '0':
-                # type is folder, add to search
-                search_nodes.put(sub_node)
-            elif type == '1':
-                # type is playlist, collect the tracks
-                for track in sub_node:
-                    archive_tracks.append(track.get(constants.ATTR_TRACK_KEY))
+    track_nodes = archive.findall(f'.//{TAG_TRACK}')
+    for track in track_nodes:
+        archive_tracks.append(track.get(constants.ATTR_TRACK_KEY))
     return archive_tracks
 
 # TODO: extend to save backup of previous X versions

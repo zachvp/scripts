@@ -1,4 +1,6 @@
 if __name__ == '__main__':
-    # Tags mismatch investigation:
-    # /Users/zachvp/Music/DJ/410462_Hunted_(Original_Mix).aiff (cover image)
+    from . import music
+    r = music.update_played_tracks('/Users/zachvp/Library/CloudStorage/OneDrive-Personal/Backups/rekordbox/collections/mac-collection-06-27-2025.xml')
+    for t in r:
+        print(t)
     pass
