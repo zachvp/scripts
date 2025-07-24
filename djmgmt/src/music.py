@@ -259,26 +259,25 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
             # check if track already exists
             existing_track = collection.find(f'./{TAG_TRACK}[@{constants.ATTR_PATH}="{file_url}"]')
             
+            # load metadata Tags
             tags = Tags.load(file_path)
             if not tags:
                 continue
             
+            # map the XML attributes to the file metadata
             today = datetime.now().strftime('%Y-%m-%d')
             fallback_value = ''
-            
             track_attrs = {
-                constants.ATTR_TITLE      : tags.title or fallback_value,
-                constants.ATTR_ARTIST     : tags.artist or fallback_value,
-                constants.ATTR_ALBUM      : tags.album or fallback_value,
-                constants.ATTR_GENRE      : tags.genre or fallback_value,
-                constants.ATTR_KEY        : tags.key or fallback_value,
-                constants.ATTR_PATH       : file_url
+                constants.ATTR_TITLE  : tags.title or fallback_value,
+                constants.ATTR_ARTIST : tags.artist or fallback_value,
+                constants.ATTR_ALBUM  : tags.album or fallback_value,
+                constants.ATTR_GENRE  : tags.genre or fallback_value,
+                constants.ATTR_KEY    : tags.key or fallback_value,
+                constants.ATTR_PATH   : file_url
             }
             
+            # check for existing track
             if existing_track is not None:
-                # update existing track with latest metadata
-                track_id = cast(str, existing_track.get(constants.ATTR_TRACK_ID)) 
-                track_attrs[constants.ATTR_TRACK_ID] = track_id
                 # keep original date added if it exists
                 original_date = existing_track.get(constants.ATTR_DATE_ADDED)
                 if original_date:
@@ -287,10 +286,9 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
                     track_attrs[constants.ATTR_DATE_ADDED] = today
                     logging.warning(f"No date present for existing track: '{file_path}', using '{today}'")
                 
-                # update all attributes
+                # update all track attributes
                 for attr_name, attr_value in track_attrs.items():
                     existing_track.set(attr_name, attr_value)
-                
                 updated_tracks += 1
                 logging.debug(f"Updated existing track: '{file_path}'")
             else:
