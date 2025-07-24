@@ -243,35 +243,41 @@ def get_played_tracks(root: ET.Element) -> list[str]:
 
 def get_unplayed_tracks(root: ET.Element) -> list[str]:
     '''Returns a list of TRACK.Key/ID strings for all pruned tracks NOT in the 'archive' folder.'''
+    # load the XML references
     pruned = find_node(root, constants.XPATH_PRUNED)
-    played_tracks = set(get_played_tracks(root))
     
+    # determine unplayed tracks depending on the played tracks
     unplayed_tracks = []
+    played_tracks = set(get_played_tracks(root))
     for track in pruned:
         track_id = track.get(constants.ATTR_TRACK_KEY)
         if track_id and track_id not in played_tracks:
             unplayed_tracks.append(track_id)
     return unplayed_tracks
 
+# TODO: incorporate into update_library so the processed collection contains the dynamic playlists
 def record_unplayed_tracks(input_collection_path: str, output_collection_path: str) -> ET.ElementTree:
-    '''Updates the 'dynamic.unplayed playlist in the output XML collection.'''
+    '''Updates the 'dynamic.unplayed' playlist in the output XML collection.'''
+    # load the XML references
     input_root = load_collection_xml(input_collection_path)
     input_collection = find_node(input_root, constants.XPATH_COLLECTION)
-    unplayed = get_unplayed_tracks(input_root)
     template_root = load_collection_xml(COLLECTION_TEMPLATE_PATH)
     
-    # replace template's collection with input's collection
+    # replace template's collection with input's collection to resolve playlist track references
     template_collection = find_node(template_root, constants.XPATH_COLLECTION)
     template_collection.clear()
     template_collection.attrib = input_collection.attrib
     for track in input_collection:
         template_collection.append(track)
     
+    # populate the unplayed playlist
+    unplayed = get_unplayed_tracks(input_root)
     unplayed_node = find_node(template_root, './PLAYLISTS//NODE[@Name="unplayed"]')
     for track in unplayed:
         ET.SubElement(unplayed_node, TAG_TRACK, {constants.ATTR_TRACK_KEY : track})
-    
     unplayed_node.set('Entries', str(len(unplayed)))
+    
+    # write the collection containing the unplayed tracks
     tree = ET.ElementTree(template_root)
     tree.write(output_collection_path, encoding='UTF-8', xml_declaration=True)
     return tree
