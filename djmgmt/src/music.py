@@ -239,7 +239,9 @@ def get_unplayed_tracks(root: ET.Element) -> list[str]:
     played_tracks = set(get_played_tracks(root))
     for track in pruned:
         track_id = track.get(constants.ATTR_TRACK_KEY)
-        if track_id and track_id not in played_tracks:
+        if not track_id:
+            raise ValueError(f"Malformed collection XML: no track ID found for track in '{pruned.tag}'")
+        if track_id not in played_tracks:
             unplayed_tracks.append(track_id)
     return unplayed_tracks
 

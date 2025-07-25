@@ -269,7 +269,7 @@ class TestGetPlayedTracks(unittest.TestCase):
                     <NODE Name="CUE Analysis Playlist" Type="1" KeyType="0" Entries="0"/>
                     <NODE Name="archive" Type="0" KeyType="0" Entries="2">
                         <TRACK Key="0"/>
-                        <NODE Name="playlist_0" Type="1" KeyType="0" Entries="1">
+                        <NODE Name="playlist_0" Type="1" KeyType="0" Entries="2">
                             <TRACK Key="1"/>
                             <TRACK Key="0"/>
                         </NODE>
@@ -286,6 +286,40 @@ class TestGetPlayedTracks(unittest.TestCase):
         
         # Assert expectations
         self.assertEqual(actual, ['0', '1'])
+
+class TestGetUnplayedTracks(unittest.TestCase):
+    XML_PRUNED = f'''
+        <?xml version="1.0" encoding="UTF-8"?>
+
+        <DJ_PLAYLISTS Version="1.0.0">
+            <PRODUCT Name="rekordbox" Version="6.8.5" Company="AlphaTheta"/>
+            <COLLECTION Entries="0">
+            
+            </COLLECTION>
+            <PLAYLISTS>
+                <NODE Type="0" Name="ROOT" Count="2">
+                    <NODE Name="CUE Analysis Playlist" Type="1" KeyType="0" Entries="0"/>
+                    <NODE Name="_pruned" Type="1" KeyType="0" Entries="0">
+                        <TRACK Key="0"/>
+                        <TRACK Key="1"/>
+                    </NODE>
+                </NODE>
+            </PLAYLISTS>
+        </DJ_PLAYLISTS>
+        '''.strip()
+    
+    @patch('src.music.get_played_tracks')
+    def test_success(self,
+                     mock_get_played: MagicMock) -> None:
+        '''Tests that the function returns all unplayed tracks.'''
+        # Set up mocks
+        mock_root = ET.fromstring(TestGetUnplayedTracks.XML_PRUNED)
+        mock_get_played.return_value = ['0', '2']
+        
+        actual = music.get_unplayed_tracks(mock_root)
+        
+        # Assert expectations
+        self.assertEqual(actual, ['1'])
 
 class TestRecordCollection(unittest.TestCase):
     '''Tests for music.record_collection.'''
