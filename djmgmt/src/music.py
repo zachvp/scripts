@@ -271,6 +271,7 @@ def record_unplayed_tracks(input_collection_path: str, output_collection_path: s
     tree.write(output_collection_path, encoding='UTF-8', xml_declaration=True)
     return tree
 
+# TODO: move to library module
 # TODO: extend to save backup of previous X versions
 def record_collection(source: str, collection_path: str) -> ET.Element:
     '''Updates the '_pruned' playlist in the given XML collection with all music files in the source directory.

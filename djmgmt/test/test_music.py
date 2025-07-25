@@ -11,6 +11,19 @@ from src import music
 from src import constants
 from src.tags import Tags
 
+# Generation functions
+def _create_track_xml(index: int) -> str:
+    return f'''
+        <TRACK
+            TrackID="{index}"
+            Name="Test Track {index}"
+            Artist="MOCK_ARTIST_{index}"
+            Album="MOCK_ALBUM_{index}"
+            DateAdded="2020-02-03"
+            Location="file://localhost/Users/user/Music/DJ/MOCK_FILE_{index}.aiff">
+        </TRACK>
+    '''.strip()
+
 # Constants
 MOCK_INPUT_DIR = '/mock/input'
 MOCK_OUTPUT_DIR = '/mock/output'
@@ -22,7 +35,7 @@ MOCK_GENRE = 'mock_genre'
 MOCK_TONALITY = 'mock_tonality'
 MOCK_DATE_ADDED = 'mock_date_added'
 
-DJ_PLAYLISTS_XML = f'''
+XML_BASE = f'''
 <?xml version="1.0" encoding="UTF-8"?>
 
 <DJ_PLAYLISTS Version="1.0.0">
@@ -33,7 +46,9 @@ DJ_PLAYLISTS_XML = f'''
     <PLAYLISTS>
         <NODE Type="0" Name="ROOT" Count="2">
             <NODE Name="CUE Analysis Playlist" Type="1" KeyType="0" Entries="0"/>
-            <NODE Name="_pruned" Type="1" KeyType="0" Entries="0">
+            <NODE Name="_pruned" Type="1" KeyType="0" Entries="0"/>
+            <NODE Name="dynamic" Type="0" KeyType="0" Entries="1">
+                <NODE Name="unplayed" Type="1" KeyType="0" Entries="0"/>
             </NODE>
         </NODE>
     </PLAYLISTS>
@@ -204,6 +219,74 @@ class TestStandardizeLossless(unittest.TestCase):
         ## Check output
         self.assertEqual(actual, mock_encode.return_value)
 
+class TestGetPlayedTracks(unittest.TestCase):
+    XML_ARCHIVE = f'''
+    <?xml version="1.0" encoding="UTF-8"?>
+
+    <DJ_PLAYLISTS Version="1.0.0">
+        <PRODUCT Name="rekordbox" Version="6.8.5" Company="AlphaTheta"/>
+        <COLLECTION Entries="3">
+            {_create_track_xml(0)}
+            {_create_track_xml(1)}
+        </COLLECTION>
+        <PLAYLISTS>
+            <NODE Type="0" Name="ROOT" Count="2">
+                <NODE Name="CUE Analysis Playlist" Type="1" KeyType="0" Entries="0"/>
+                <NODE Name="archive" Type="0" KeyType="0" Entries="2">
+                    <TRACK Key="0"/>
+                    <NODE Name="playlist_0" Type="1" KeyType="0" Entries="1">
+                        <TRACK Key="1"/>
+                    </NODE>
+                </NODE>
+            </NODE>
+        </PLAYLISTS>
+    </DJ_PLAYLISTS>
+    '''.strip()
+    
+    def test_success_exists(self) -> None:
+        '''Tests that all tracks in the 'archive' folder are returned.'''
+        # Call target function
+        root = ET.fromstring(TestGetPlayedTracks.XML_ARCHIVE)
+        actual = music.get_played_tracks(root)
+        
+        # Assert expectations
+        self.assertEqual(actual, ['0', '1'])
+    
+    def test_success_deduplicate(self) -> None:
+        '''Tests that only unique track IDs are returned.'''
+        # Test data
+        XML_DUPLICATES = f'''
+        <?xml version="1.0" encoding="UTF-8"?>
+
+        <DJ_PLAYLISTS Version="1.0.0">
+            <PRODUCT Name="rekordbox" Version="6.8.5" Company="AlphaTheta"/>
+            <COLLECTION Entries="3">
+                {_create_track_xml(0)}
+                {_create_track_xml(1)}
+            </COLLECTION>
+            <PLAYLISTS>
+                <NODE Type="0" Name="ROOT" Count="2">
+                    <NODE Name="CUE Analysis Playlist" Type="1" KeyType="0" Entries="0"/>
+                    <NODE Name="archive" Type="0" KeyType="0" Entries="2">
+                        <TRACK Key="0"/>
+                        <NODE Name="playlist_0" Type="1" KeyType="0" Entries="1">
+                            <TRACK Key="1"/>
+                            <TRACK Key="0"/>
+                        </NODE>
+                        <TRACK Key="1"/>
+                    </NODE>
+                </NODE>
+            </PLAYLISTS>
+        </DJ_PLAYLISTS>
+        '''.strip()
+        
+        # Call target function
+        root = ET.fromstring(XML_DUPLICATES)
+        actual = music.get_played_tracks(root)
+        
+        # Assert expectations
+        self.assertEqual(actual, ['0', '1'])
+
 class TestRecordCollection(unittest.TestCase):
     '''Tests for music.record_collection.'''
     
@@ -224,7 +307,7 @@ class TestRecordCollection(unittest.TestCase):
         mock_path_exists.side_effect = [False, True]
         mock_collect_paths.return_value = [f"{MOCK_PARENT}mock_file.aiff", f"{MOCK_PARENT}03 - 暴風一族 (Remix).mp3"]
         mock_tags_load.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
-        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(DJ_PLAYLISTS_XML))
+        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(XML_BASE))
         
         # Call the target function
         dj_playlists = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
@@ -360,7 +443,7 @@ class TestRecordCollection(unittest.TestCase):
         mock_path_exists.return_value = True
         mock_collect_paths.return_value = [f"{MOCK_INPUT_DIR}{os.sep}mock_file_0.aiff"]
         mock_tags_load.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
-        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(DJ_PLAYLISTS_XML))
+        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(XML_BASE))
         
         # Insert the first track
         first_call = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
@@ -662,7 +745,7 @@ class TestRecordCollection(unittest.TestCase):
         mock_path_exists.side_effect = [False, True]
         mock_collect_paths.return_value = [f"{MOCK_INPUT_DIR}{os.sep}mock_file.aiff"]
         mock_tags_load.return_value = Tags() # mock empty tag data
-        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(DJ_PLAYLISTS_XML))
+        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(XML_BASE))
         
         # Call the target function
         dj_playlists = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
@@ -742,7 +825,7 @@ class TestRecordCollection(unittest.TestCase):
         # Setup mocks
         mock_path_exists.side_effect = [False, True]
         mock_collect_paths.return_value = ['mock_file.foo']
-        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(DJ_PLAYLISTS_XML))
+        mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(XML_BASE))
         
         # Call target function
         dj_playlists = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
