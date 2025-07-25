@@ -129,20 +129,27 @@ def swap_root(path: str, old_root: str, root: str) -> str:
 
     return root
 
-def load_collection(path: str) -> ET.ElementTree:
-    collection = ET.parse(path)
-    assert collection is not None, f"unable to parse collection at '{path}'"
-    return cast(ET.ElementTree, collection)
+def load_collection(path: str) -> ET.Element:
+    '''Returns the root node of the XML collection at `path`.'''
+    message = f"unable to parse collection at '{path}'"
+    try:
+        collection = ET.parse(path)
+    except ET.ParseError as e:
+        logging.error(f"{message}:\n{e}")
+        raise
+    assert collection is not None, message
+    return collection.getroot()
 
-def find_node(collection: ET.ElementTree, xpath: str) -> ET.Element:
+def find_node(root: ET.Element, xpath: str) -> ET.Element:
     '''Arguments:
-        collection -- The XML collection.
+        collection -- The XML collection root.
         xpath      -- The XPath of the node to find.
     Returns:
         The XML node according to the given arguments.
     '''
-    node = collection.find(xpath)
-    assert node is not None, f"unable to find {xpath} for collection"
+    node = root.find(xpath)
+    if node is None:
+        raise ValueError(f"Unable to find node for XPath '{xpath}' in '{root.tag}'")
     return node
 
 def filter_path_mappings(mappings: list[tuple[str, str]], collection: ET.Element, playlist_xpath: str) -> list[tuple[str, str]]:

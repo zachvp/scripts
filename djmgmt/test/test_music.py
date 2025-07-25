@@ -227,7 +227,7 @@ class TestRecordCollection(unittest.TestCase):
         mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(DJ_PLAYLISTS_XML))
         
         # Call the target function
-        actual = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        dj_playlists = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
         
         # Assert call expectations
         mock_xml_parse.assert_called_once_with(music.COLLECTION_TEMPLATE_PATH)
@@ -242,7 +242,6 @@ class TestRecordCollection(unittest.TestCase):
         
         # Assert that the XML contents are expected
         # Check DJ_PLAYLISTS root node
-        dj_playlists: ET.Element  = cast(ET.Element, actual.getroot()) 
         self.assertEqual(len(dj_playlists), 3)
         self.assertEqual(dj_playlists.tag, 'DJ_PLAYLISTS')
         self.assertEqual(dj_playlists.attrib, {'Version': '1.0.0'})
@@ -377,10 +376,10 @@ class TestRecordCollection(unittest.TestCase):
         mock_path_exists.return_value = True
         mock_collect_paths.return_value = [f"{FILE_PATH_MUSIC}mock_file_1.aiff", f"{FILE_PATH_MUSIC}03 - 暴風一族 (Remix).mp3"]
         mock_tags_load.return_value = Tags(MOCK_ARTIST, MOCK_ALBUM, MOCK_TITLE, MOCK_GENRE, MOCK_TONALITY)
-        mock_xml_parse.return_value = first_call
+        mock_xml_parse.return_value = ET.ElementTree(first_call)
         
         # Call the target function to check that 'mock_file_1' was inserted
-        actual = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        dj_playlists = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
             
         # Assert call expectations
         mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
@@ -395,7 +394,6 @@ class TestRecordCollection(unittest.TestCase):
         
         # Assert that the XML contents are expected
         # Check DJ_PLAYLISTS root node
-        dj_playlists = cast(ET.Element, actual.getroot())
         self.assertEqual(len(dj_playlists), 3)
         self.assertEqual(dj_playlists.tag, 'DJ_PLAYLISTS')
         self.assertEqual(dj_playlists.attrib, {'Version': '1.0.0'})
@@ -551,7 +549,7 @@ class TestRecordCollection(unittest.TestCase):
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
         
         # Assert that the XML contents are the same as before attempting to add the track.
-        self.assertEqual(ET.tostring(cast(ET.Element, actual.getroot()), encoding="UTF-8"),
+        self.assertEqual(ET.tostring(actual, encoding="UTF-8"),
                          ET.tostring(cast(ET.Element, mock_xml_parse.return_value.getroot()), encoding="UTF-8"))
             
     @patch.object(ET.ElementTree, 'write')
@@ -606,7 +604,7 @@ class TestRecordCollection(unittest.TestCase):
                                            f"{MOCK_TONALITY}_update")]
         
         # Call target function
-        actual = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        dj_playlists = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
         
         # Assert call expectations
         mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
@@ -616,7 +614,6 @@ class TestRecordCollection(unittest.TestCase):
         
         # Assert the expected XML contents
         # Check DJ_PLAYLISTS root node
-        dj_playlists: ET.Element  = cast(ET.Element, actual.getroot()) 
         self.assertEqual(len(dj_playlists), 3)
         self.assertEqual(dj_playlists.tag, 'DJ_PLAYLISTS')
         self.assertEqual(dj_playlists.attrib, {'Version': '1.0.0'})
@@ -668,7 +665,7 @@ class TestRecordCollection(unittest.TestCase):
         mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(DJ_PLAYLISTS_XML))
         
         # Call the target function
-        actual = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        dj_playlists = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
         
         # Assert call expectations
         mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
@@ -683,7 +680,6 @@ class TestRecordCollection(unittest.TestCase):
         
         # Assert that the XML contents are expected
         # Check DJ_PLAYLISTS root node
-        dj_playlists: ET.Element  = cast(ET.Element, actual.getroot()) 
         self.assertEqual(len(dj_playlists), 3)
         self.assertEqual(dj_playlists.tag, 'DJ_PLAYLISTS')
         self.assertEqual(dj_playlists.attrib, {'Version': '1.0.0'})
@@ -749,7 +745,7 @@ class TestRecordCollection(unittest.TestCase):
         mock_xml_parse.return_value = ET.ElementTree(ET.fromstring(DJ_PLAYLISTS_XML))
         
         # Call target function
-        actual = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
+        dj_playlists = music.record_collection(MOCK_INPUT_DIR, MOCK_XML_FILE_PATH)
         
         # Assert call expectations: all files should be skipped
         mock_collect_paths.assert_called_once_with(MOCK_INPUT_DIR)
@@ -758,7 +754,6 @@ class TestRecordCollection(unittest.TestCase):
         
         # Empty playlist still expected to be written
         # Check root 'DJ_PLAYLISTS' node
-        dj_playlists = cast(ET.Element, actual.getroot())
         self.assertEqual(len(dj_playlists), 3)
         self.assertEqual(dj_playlists.tag, 'DJ_PLAYLISTS')
         self.assertEqual(dj_playlists.attrib, {'Version': '1.0.0'})
@@ -868,10 +863,9 @@ class TestRecordCollection(unittest.TestCase):
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
         
         # Assert that the XML contents are the same as before attempting to add the track.
-        self.assertEqual(ET.tostring(cast(ET.Element, actual.getroot()), encoding="UTF-8"),
-                         ET.tostring(cast(ET.Element, mock_xml_parse.return_value.getroot()), encoding="UTF-8"))
+        self.assertEqual(ET.tostring(actual, encoding="UTF-8"),
+                         ET.tostring(mock_xml_parse.return_value, encoding="UTF-8"))
     
-    @patch('logging.error')
     @patch.object(ET.ElementTree, 'write')
     @patch('src.music.ET.parse')
     @patch('src.tags.Tags.load')
@@ -882,8 +876,7 @@ class TestRecordCollection(unittest.TestCase):
                                                mock_collect_paths: MagicMock,
                                                mock_tags_load: MagicMock,
                                                mock_xml_parse: MagicMock,
-                                               mock_xml_write: MagicMock,
-                                               mock_log_error: MagicMock) -> None:
+                                               mock_xml_write: MagicMock) -> None:
         '''Tests that the expected exception is raised when the collection file is invalid.'''
         # Setup mocks
         mock_path_exists.return_value = True
@@ -899,7 +892,6 @@ class TestRecordCollection(unittest.TestCase):
         mock_tags_load.assert_not_called()
         mock_xml_parse.assert_called_once_with(MOCK_XML_FILE_PATH)
         mock_xml_write.assert_not_called()
-        self.assertRegex(mock_log_error.call_args.args[0], r'^Error loading collection file.+$')
         
     @patch.object(ET.ElementTree, 'write')
     @patch('src.music.ET.parse')
@@ -1951,7 +1943,7 @@ class TestUpdateLibrary(unittest.TestCase):
         mock_create_sync_mappings.assert_called_once_with(mock_collection, mock_client_mirror)
         
         ## Call: filter_path_mappings
-        mock_filter_mappings.assert_called_once_with(mock_mappings_changed, mock_collection.getroot(), constants.XPATH_PRUNED)
+        mock_filter_mappings.assert_called_once_with(mock_mappings_changed, mock_collection, constants.XPATH_PRUNED)
         
         ## Call parameters: run_sync_mappings
         expected_mappings = mock_mappings_created + mock_mappings_filtered

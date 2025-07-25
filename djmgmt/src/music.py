@@ -25,6 +25,7 @@ from typing import cast
 from . import constants
 from . import common
 from . import encode
+from . import library
 from .tags import Tags
 
 # constants
@@ -210,30 +211,10 @@ def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: 
         sweep(temp_dir, source, False, valid_extensions, prefix_hints)
         return result
 
-def load_collection_xml(collection_path: str) -> ET.Element:
-    '''Loads the XML object from the given path and returns the root element.'''
-    # load the existing collection path if present, otherwise load the template file
-    if os.path.exists(collection_path):
-        xml_path = collection_path
-    else:
-        xml_path = COLLECTION_TEMPLATE_PATH
-    try:
-        tree = ET.parse(xml_path)
-    except Exception as e:
-        logging.error(f"Error loading collection file: {e}")
-        raise
-    return tree.getroot()
-
-def find_node(root: ET.Element, query: str) -> ET.Element:
-    node = root.find(query)
-    if node is None:
-        raise ValueError(f"Unable to find node for query '{query}' in '{root.tag}'")
-    return node
-
 def get_played_tracks(root: ET.Element) -> list[str]:
     '''Returns a list of TRACK.Key/ID strings for all playlist tracks in the 'archive' folder.'''
     # load XML references
-    archive = find_node(root, constants.XPATH_ARCHIVE)
+    archive = library.find_node(root, constants.XPATH_ARCHIVE)
     
     # search for and collect tracks in archive
     played_tracks = []
@@ -251,7 +232,7 @@ def get_played_tracks(root: ET.Element) -> list[str]:
 def get_unplayed_tracks(root: ET.Element) -> list[str]:
     '''Returns a list of TRACK.Key/ID strings for all pruned tracks NOT in the 'archive' folder.'''
     # load XML references
-    pruned = find_node(root, constants.XPATH_PRUNED)
+    pruned = library.find_node(root, constants.XPATH_PRUNED)
     
     # determine unplayed tracks depending on the played tracks
     unplayed_tracks = []
@@ -267,12 +248,12 @@ def get_unplayed_tracks(root: ET.Element) -> list[str]:
 def record_unplayed_tracks(input_collection_path: str, output_collection_path: str) -> ET.ElementTree:
     '''Updates the 'dynamic.unplayed' playlist in the output XML collection.'''
     # load XML references
-    input_root = load_collection_xml(input_collection_path)
-    input_collection = find_node(input_root, constants.XPATH_COLLECTION)
-    template_root = load_collection_xml(COLLECTION_TEMPLATE_PATH)
+    input_root = library.load_collection(input_collection_path)
+    input_collection = library.find_node(input_root, constants.XPATH_COLLECTION)
+    template_root = library.load_collection(COLLECTION_TEMPLATE_PATH)
     
     # replace template's collection with input's collection to resolve playlist track references
-    template_collection = find_node(template_root, constants.XPATH_COLLECTION)
+    template_collection = library.find_node(template_root, constants.XPATH_COLLECTION)
     template_collection.clear()
     template_collection.attrib = input_collection.attrib
     for track in input_collection:
@@ -280,7 +261,7 @@ def record_unplayed_tracks(input_collection_path: str, output_collection_path: s
     
     # populate the unplayed playlist
     unplayed = get_unplayed_tracks(input_root)
-    unplayed_node = find_node(template_root, constants.XPATH_UNPLAYED)
+    unplayed_node = library.find_node(template_root, constants.XPATH_UNPLAYED)
     for track in unplayed:
         ET.SubElement(unplayed_node, TAG_TRACK, {constants.ATTR_TRACK_KEY : track})
     unplayed_node.set('Entries', str(len(unplayed)))
@@ -291,14 +272,15 @@ def record_unplayed_tracks(input_collection_path: str, output_collection_path: s
     return tree
 
 # TODO: extend to save backup of previous X versions
-def record_collection(source: str, collection_path: str) -> ET.ElementTree:
+def record_collection(source: str, collection_path: str) -> ET.Element:
     '''Updates the '_pruned' playlist in the given XML collection with all music files in the source directory.
     Returns the XML collection tree.'''
     # load XML references
-    root          = load_collection_xml(collection_path)
-    collection    = find_node(root, constants.XPATH_COLLECTION)
-    playlist_root = find_node(root, constants.XPATH_PLAYLISTS)
-    pruned        = find_node(root, constants.XPATH_PRUNED)
+    xml_path      = collection_path if os.path.exists(collection_path) else COLLECTION_TEMPLATE_PATH
+    root          = library.load_collection(xml_path)
+    collection    = library.find_node(root, constants.XPATH_COLLECTION)
+    playlist_root = library.find_node(root, constants.XPATH_PLAYLISTS)
+    pruned        = library.find_node(root, constants.XPATH_PRUNED)
     
     # count existing tracks
     existing_tracks = len(collection.findall(TAG_TRACK))
@@ -375,7 +357,7 @@ def record_collection(source: str, collection_path: str) -> ET.ElementTree:
     tree.write(collection_path, encoding='UTF-8', xml_declaration=True)
     logging.info(f"Collection updated: {new_tracks} new tracks, {updated_tracks} updated tracks at {collection_path}")
     
-    return tree
+    return root
 
 # Primary functions
 def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str], prefix_hints: set[str]) -> list[tuple[str, str]]:
@@ -628,7 +610,8 @@ def update_library(source: str,
         The source, library, and client_mirror_path arguments should all be distinct directories.
     '''
     from tempfile import TemporaryDirectory
-    from . import sync, tags_info, library
+    from . import sync
+    from . import tags_info
     
     # create a temporary directory to process the files from source
     with TemporaryDirectory() as processing_dir:
@@ -641,7 +624,7 @@ def update_library(source: str,
 
         # combine any changed mappings in _pruned with the standard filtered collection mappings
         changed = tags_info.compare_tags(library_path, client_mirror_path)
-        changed = library.filter_path_mappings(changed, cast(ET.Element, collection.getroot()) , constants.XPATH_PRUNED)
+        changed = library.filter_path_mappings(changed, collection, constants.XPATH_PRUNED)
         mappings = sync.create_sync_mappings(collection, client_mirror_path)
         if changed:
             mappings += changed

@@ -315,21 +315,21 @@ def rsync_healthcheck() -> bool:
             logging.error(f"return code '{error.returncode}':\n{error.stderr}".strip())
             return False
     
-def create_sync_mappings(collection: ET.ElementTree, output_dir: str) -> list[tuple[str, str]]:
+def create_sync_mappings(root: ET.Element, output_dir: str) -> list[tuple[str, str]]:
     '''Creates a mapping list of system paths based on the given XML collection and output directory.
     Each list entry maps from a source collection file path to a target date context + metadata-structured file path.
     See organize_library_dates.generate_date_paths for more info.'''
     from . import library
     
     # collect the target playlist IDs to sync
-    pruned = library.find_node(collection, constants.XPATH_PRUNED)
+    pruned = library.find_node(root, constants.XPATH_PRUNED)
     playlist_ids: set[str] = {
         track.attrib[constants.ATTR_TRACK_KEY]
         for track in pruned
     }
     
     # generate the paths to sync based on the target playlist
-    collection_node = library.find_node(collection, constants.XPATH_COLLECTION)
+    collection_node = library.find_node(root, constants.XPATH_COLLECTION)
     mappings = library.generate_date_paths(collection_node,
                                            output_dir,
                                            playlist_ids=playlist_ids,

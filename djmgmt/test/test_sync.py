@@ -4,6 +4,7 @@ import unittest
 import subprocess
 import xml.etree.ElementTree as ET
 from unittest.mock import patch, MagicMock, call
+from typing import cast
 
 from src import sync, constants, subsonic_client
 
@@ -527,7 +528,7 @@ class TestCreateSyncMappings(unittest.TestCase):
         mock_is_processed.return_value = False # mock unprocessed contexts
         
         # Call target function
-        root = ET.ElementTree(ET.fromstring(COLLECTION_XML))
+        root = cast(ET.Element, ET.ElementTree(ET.fromstring(COLLECTION_XML)).getroot())
         actual = sync.create_sync_mappings(root, MOCK_OUTPUT_DIR)
         
         # Assert expectations
@@ -557,7 +558,7 @@ class TestCreateSyncMappings(unittest.TestCase):
         mock_is_processed.return_value = True # mock all processed contexts
         
         # Call target function
-        root = ET.ElementTree(ET.fromstring(COLLECTION_XML))
+        root = cast(ET.Element, ET.ElementTree(ET.fromstring(COLLECTION_XML)).getroot())
         actual = sync.create_sync_mappings(root, MOCK_OUTPUT_DIR)
         
         # Assert expectations
