@@ -140,6 +140,11 @@ def load_collection(path: str) -> ET.Element:
     assert collection is not None, message
     return collection.getroot()
 
+def find_collection_backup(backup_dir: str) -> str:
+    '''Finds the path for the most recently modified collection.xml file.'''
+    paths = common.collect_paths(backup_dir, filter={'.xml'})
+    return max(paths, key=os.path.getmtime) if paths else ''
+    
 def find_node(root: ET.Element, xpath: str) -> ET.Element:
     '''Arguments:
         collection -- The XML collection root.
@@ -311,7 +316,7 @@ def collect_filenames(collection: ET.Element, playlist_ids: set[str] = set()) ->
         names.append(name)
     return names
 
-# MAIN
+# Main
 if __name__ == '__main__':
     # setup
     common.configure_log(level=logging.DEBUG, path=__file__)

@@ -29,16 +29,15 @@ def configure_log(level: int=logging.DEBUG, path: str=DEFAULT_PATH) -> None:
                         datefmt="%D %H:%M:%S",
                         filemode='w')
 
-def collect_paths(root: str) -> list[str]:
-    '''Returns the paths of all files for the given root.'''
+# TODO: refactor calling functions to use filter
+def collect_paths(root: str, filter: set[str] = set()) -> list[str]:
+    '''Returns the paths of all files for the given root.
+    If `filter` is provided, only files with a matching extension will be returned.'''
     paths: list[str] = []
-    for working_dir, dirnames, names in os.walk(root):
-        for index, directory in enumerate(dirnames):
-            if directory.startswith('.'):
-                del dirnames[index]
-        
+    for working_dir, _, names in os.walk(root):
         for name in names:
-            if name.startswith('.'):
+            _, extension = os.path.splitext(name)
+            if name.startswith('.') or (filter and extension and extension not in filter):
                 continue
             paths.append(os.path.join(working_dir, name))
     return paths

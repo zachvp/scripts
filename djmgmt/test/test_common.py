@@ -92,23 +92,6 @@ class TestCollectPaths(unittest.TestCase):
         # Assert expectations
         mock_walk.assert_called_once_with(MOCK_INPUT)
         self.assertEqual(actual, [f"{MOCK_INPUT}{os.sep}{mock_file}"])
-    
-    @patch('os.walk')
-    def test_success_ignore_hidden_dirs(self, mock_walk: MagicMock) -> None:
-        '''Tests that hidden directories are ignored/deleted.'''
-        # Set up mocks
-        mock_file = 'mock_file'
-        mock_hidden = '.mock_hidden'
-        dirs = [mock_hidden]
-        mock_walk.return_value = [(MOCK_INPUT, dirs, [mock_file])]
-        
-        # Call target function
-        actual = common.collect_paths(MOCK_INPUT)
-        
-        # Assert expectations
-        mock_walk.assert_called_once_with(MOCK_INPUT)
-        self.assertEqual(actual, [f"{MOCK_INPUT}{os.sep}{mock_file}"])
-        self.assertEqual(len(dirs), 0)
         
     @patch('os.walk')
     def test_success_ignore_hidden_files(self, mock_walk: MagicMock) -> None:
@@ -123,6 +106,8 @@ class TestCollectPaths(unittest.TestCase):
         # Assert expectations
         mock_walk.assert_called_once_with(MOCK_INPUT)
         self.assertEqual(actual, [f"{MOCK_INPUT}{os.sep}{mock_file}"])
+        
+    # TODO: add test for filter
 
 class TestWritePaths(unittest.TestCase):
     @patch('builtins.open', new_callable=mock_open)

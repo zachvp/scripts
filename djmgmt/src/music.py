@@ -20,7 +20,6 @@ import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from urllib.parse import quote
-from typing import cast
 
 from . import constants
 from . import common
@@ -49,6 +48,7 @@ class Namespace(argparse.Namespace):
     ## optional
     interactive: bool    
     client_mirror_path: str
+    collection_backup_directory: str
     
     # primary functions
     FUNCTION_SWEEP = 'sweep'
@@ -66,27 +66,44 @@ class Namespace(argparse.Namespace):
 # Helper functions
 # TODO: include function docstring in help summary (-h)
 def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> type[Namespace]:
+    # create the parser
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    
+    # configure arguments
     parser.add_argument('function', type=str, help=f"Which script function to run. One of '{valid_functions}'.\
         The following functions only require a single argument: '{single_arg_functions}'.")
+    # TODO: define argument strings as Namespace constants
     parser.add_argument('input', type=str, help='The input directory to sweep.')
     parser.add_argument('output', nargs='?', type=str, help='The output directory to place the swept tracks.')
     parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode.')
     parser.add_argument('--client-mirror-path', '-m', type=str, help='The client mirror path to pass to media sync.')
-
+    parser.add_argument('--collection-backup-directory', '-b', type=str, help='The directory that stores the backup XML files.')
+    
+    # parse arguments
     args = parser.parse_args(namespace=Namespace)
 
+    # validate the arguments
     if args.function not in valid_functions:
-        parser.error(f"invalid function '{args.function}'")
+        parser.error(f"Invalid function '{args.function}'")
     if not args.output and args.function not in single_arg_functions:
-        parser.error(f"the 'output' argument is required for function '{args.function}'")
-    if args.function == Namespace.FUNCTION_UPDATE_LIBRARY and not args.client_mirror_path:
-        parser.error(f"the '--client-mirror-path argument' is required for {Namespace.FUNCTION_UPDATE_LIBRARY}")
+        parser.error(f"The 'output' argument is required for function '{args.function}'")
+    if args.function == Namespace.FUNCTION_UPDATE_LIBRARY:
+        if not args.client_mirror_path:
+            parser.error(f"The '--client-mirror-path' argument is required for {Namespace.FUNCTION_UPDATE_LIBRARY}")
+        if not args.collection_backup_directory:
+            parser.error(f"The '--collection-backup-path' argument is required for {Namespace.FUNCTION_UPDATE_LIBRARY}")
 
-    # normalize path arguments
+    # normalize and validate path arguments
     args.input = os.path.normpath(args.input)
     if args.client_mirror_path:
+        if not os.path.exists(args.client_mirror_path):
+            parser.error(f"The '--client-mirror-path' '{args.client_mirror_path}' does not exist.")
         args.client_mirror_path = os.path.normpath(args.client_mirror_path)
+    
+    if args.collection_backup_directory:
+        if not os.path.exists(args.collection_backup_directory):
+            parser.error(f"The '--collection-backup-path' '{args.collection_backup_directory}' does not exist.")
+        args.collection_backup_directory = os.path.normpath(args.collection_backup_directory)
 
     # handle input and output for single vs. multiple arg functions
     if args.output:
@@ -96,7 +113,6 @@ def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> typ
 
     return args
 
-# TODO: add tests
 def compress_dir(input_path: str, output_path: str) -> tuple[str, list[str]]:
     compressed: list[str] = []
     archive_path = f"{output_path}.zip"
@@ -245,9 +261,8 @@ def get_unplayed_tracks(root: ET.Element) -> list[str]:
             unplayed_tracks.append(track_id)
     return unplayed_tracks
 
-# TODO: incorporate into update_library so the processed collection contains the dynamic playlists
 # TODO: add test coverage
-def record_unplayed_tracks(input_collection_path: str, output_collection_path: str) -> ET.ElementTree:
+def record_unplayed_tracks(input_collection_path: str, output_collection_path: str) -> ET.Element:
     '''Updates the 'dynamic.unplayed' playlist in the output XML collection.'''
     # load XML references
     input_root = library.load_collection(input_collection_path)
@@ -271,10 +286,11 @@ def record_unplayed_tracks(input_collection_path: str, output_collection_path: s
     # write the collection containing the unplayed tracks
     tree = ET.ElementTree(template_root)
     tree.write(output_collection_path, encoding='UTF-8', xml_declaration=True)
-    return tree
+    return template_root
 
 # TODO: move to library module
 # TODO: extend to save backup of previous X versions
+# TODO: reconcile generated track IDs with the latest collection backup
 def record_collection(source: str, collection_path: str) -> ET.Element:
     '''Updates the '_pruned' playlist in the given XML collection with all music files in the source directory.
     Returns the XML collection tree.'''
@@ -599,6 +615,7 @@ def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints:
 def update_library(source: str,
                    library_path: str,
                    client_mirror_path: str,
+                   collection_backup_directory: str,
                    interactive: bool,
                    valid_extensions: set[str],
                    prefix_hints: set[str]) -> None:
@@ -624,6 +641,10 @@ def update_library(source: str,
         # move the processed files to the library, and update the djmgmt collection record
         sweep(processing_dir, library_path, interactive, valid_extensions, prefix_hints)
         collection = record_collection(library_path, COLLECTION_PATH)
+
+        # update the dynamic playlists
+        reference_collection_path = library.find_collection_backup(collection_backup_directory)
+        record_unplayed_tracks(reference_collection_path, COLLECTION_PATH)
 
         # combine any changed mappings in _pruned with the standard filtered collection mappings
         changed = tags_info.compare_tags(library_path, client_mirror_path)
@@ -660,6 +681,7 @@ if __name__ == '__main__':
         update_library(script_args.input,
                        script_args.output,
                        script_args.client_mirror_path,
+                       script_args.collection_backup_directory,
                        script_args.interactive,
                        constants.EXTENSIONS,
                        PREFIX_HINTS)
