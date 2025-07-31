@@ -36,10 +36,19 @@ def collect_paths(root: str, filter: set[str] = set()) -> list[str]:
     paths: list[str] = []
     for working_dir, _, names in os.walk(root):
         for name in names:
+            # construct the absolute file path
+            full_path = os.path.join(working_dir, name)
+            
+            # skip hidden directories
+            directory = os.path.split(os.path.dirname(full_path))[-1]
+            if directory.startswith('.'):
+                continue
+            
+            # skip hidden files or files that don't match the extension filter
             _, extension = os.path.splitext(name)
             if name.startswith('.') or (filter and extension and extension not in filter):
                 continue
-            paths.append(os.path.join(working_dir, name))
+            paths.append(full_path)
     return paths
 
 def add_output_path(output_path: str, input_paths: list[str], root_input_path: str) -> list[tuple[str, str]]:

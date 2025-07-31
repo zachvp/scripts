@@ -107,6 +107,21 @@ class TestCollectPaths(unittest.TestCase):
         mock_walk.assert_called_once_with(MOCK_INPUT)
         self.assertEqual(actual, [f"{MOCK_INPUT}{os.sep}{mock_file}"])
         
+    @patch('os.walk')
+    def test_success_ignore_hidden_directories(self, mock_walk: MagicMock) -> None:
+        # Set up mocks
+        mock_file = 'mock_file'
+        mock_hidden = '.mock_hidden'
+        mock_walk.return_value = [(MOCK_INPUT, [mock_hidden], []),
+                                  (os.path.join(MOCK_INPUT, mock_hidden), [], [mock_file])]
+        
+        # Call target function
+        actual = common.collect_paths(MOCK_INPUT)
+        
+        # Assert expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT)
+        self.assertEqual(actual, [])
+        
     # TODO: add test for filter
 
 class TestWritePaths(unittest.TestCase):
