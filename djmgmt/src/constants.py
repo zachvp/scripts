@@ -56,6 +56,7 @@ XPATH_PLAYLISTS  = _playlist_node('ROOT')
 XPATH_PRUNED     = _playlist_node('_pruned')
 XPATH_ARCHIVE    = _playlist_node('archive')
 XPATH_UNPLAYED   = _playlist_node('unplayed')
+XPATH_PLAYED     = _playlist_node('played')
 
 # file information
 EXTENSIONS = {'.mp3', '.wav', '.aif', '.aiff', '.flac'}
