@@ -1,7 +1,7 @@
 import unittest
 import logging
 import os
-from unittest.mock import MagicMock, patch, mock_open, call
+from unittest.mock import MagicMock, patch, mock_open
 from typing import cast
 
 # Constants
@@ -95,6 +95,7 @@ class TestCollectPaths(unittest.TestCase):
         
     @patch('os.walk')
     def test_success_ignore_hidden_files(self, mock_walk: MagicMock) -> None:
+        '''Tests that a hidden file is ignored.'''
         # Set up mocks
         mock_file = 'mock_file'
         mock_hidden = '.mock_hidden'
@@ -109,6 +110,7 @@ class TestCollectPaths(unittest.TestCase):
         
     @patch('os.walk')
     def test_success_ignore_hidden_directories(self, mock_walk: MagicMock) -> None:
+        '''Tests that a file in a hidden directory is ignored.'''
         # Set up mocks
         mock_file = 'mock_file'
         mock_hidden = '.mock_hidden'
@@ -122,7 +124,47 @@ class TestCollectPaths(unittest.TestCase):
         mock_walk.assert_called_once_with(MOCK_INPUT)
         self.assertEqual(actual, [])
         
-    # TODO: add test for filter
+    @patch('os.walk')
+    def test_success_filter_include(self, mock_walk: MagicMock) -> None:
+        '''Tests that a file that matches the filter is collected.'''
+        # Set up mocks
+        mock_file = 'mock_file.foo'
+        mock_walk.return_value = [(MOCK_INPUT, [], [mock_file])]
+        
+        # Call target function
+        actual = common.collect_paths(MOCK_INPUT, filter={'.foo'})
+        
+        # Assert expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT)
+        self.assertEqual(actual, [f"{MOCK_INPUT}{os.sep}{mock_file}"])
+        
+    @patch('os.walk')
+    def test_success_filter_exclude(self, mock_walk: MagicMock) -> None:
+        '''Tests that a file that doesn't match the filter is excluded.'''
+        # Set up mocks
+        mock_file = 'mock_file.foo'
+        mock_walk.return_value = [(MOCK_INPUT, [], [mock_file])]
+        
+        # Call target function
+        actual = common.collect_paths(MOCK_INPUT, filter={'.bar'})
+        
+        # Assert expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT)
+        self.assertEqual(actual, [])
+        
+    @patch('os.walk')
+    def test_success_filter_empty(self, mock_walk: MagicMock) -> None:
+        '''Tests that an empty filter still collects the file.'''
+        # Set up mocks
+        mock_file = 'mock_file.foo'
+        mock_walk.return_value = [(MOCK_INPUT, [], [mock_file])]
+        
+        # Call target function
+        actual = common.collect_paths(MOCK_INPUT, filter=set())
+        
+        # Assert expectations
+        mock_walk.assert_called_once_with(MOCK_INPUT)
+        self.assertEqual(actual, [f"{MOCK_INPUT}{os.sep}{mock_file}"])
 
 class TestWritePaths(unittest.TestCase):
     @patch('builtins.open', new_callable=mock_open)
