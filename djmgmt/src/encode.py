@@ -30,6 +30,7 @@ class Namespace(argparse.Namespace):
     store_skipped: bool
     interactive: bool
     scan_mode: str
+    # threads: int TODO: add and integrate
     
     # functions
     FUNCTION_LOSSLESS    = 'lossless'
@@ -253,25 +254,23 @@ async def run_command_async(command: list[str]) -> tuple[int, str]:
 
 # primary functions
 def encode_lossless_cli(args: type[Namespace]) -> list[tuple[str, str]]:
-    result = asyncio.run(encode_lossless(args.input,
-                                         args.output,
-                                         args.extension,
-                                         args.store_path,
-                                         args.store_skipped,
-                                         args.interactive))
-    return result
+    return asyncio.run(encode_lossless(args.input,
+                                       args.output,
+                                       extension=args.extension,
+                                       store_path=args.store_path,
+                                       store_skipped=args.store_skipped,
+                                       interactive=args.interactive))
 
 # TODO: add support for FLAC
-# TODO: extend so that output extension can be passed as a parameter
-# TODO: extend to preserve input extension
 async def encode_lossless(input_dir: str,
                           output_dir: str,
-                          extension: str,
+                          extension: str = '',
                           store_path: str | None = None,
                           store_skipped: bool = False,
                           interactive: bool = False,
-                          threads: int = 4) -> list[tuple[str, str]]:
-    '''Primary script function. Recursively walks the input path specified in `args` to re-encode each eligible file.
+                          threads: int = 16,
+                          encode_always: bool = False) -> list[tuple[str, str]]:
+    '''Primary script function. Recursively walks the input path specified in `input_dir` to re-encode each eligible file.
     Returns a list of the processed (input_file_path, output_file_path) tuples.
     A file is eligible if all conditions are met:
         1) It is an uncompressed `aiff` or `wav` type.
@@ -281,109 +280,9 @@ async def encode_lossless(input_dir: str,
 
     If `args` is configured properly, the script can also store each difference in file size before and after re-encoding.
     '''
-    # TODO: extend to keep current extension if extension not provided
-    if not extension.startswith('.'):
-        error = ValueError(f"invalid extension {extension}")
-        logging.error(error)
-        raise error
-    
-    # core data
-    processed_files: list[tuple[str, str]] = []
-    size_diff_sum = 0.0
-    tasks: list[tuple[str, str, Task[tuple[int, str]]]] = []
-
-    # set up storage
-    store_path_size_diff: str | None = None
-    store_path_skipped: str | None = None
-    skipped_files: list[str] | None = None
-    if store_path:
-        store_path_size_diff = setup_storage(store_path, 'size-diff.tsv')
-        if store_skipped:
-            store_path_skipped = setup_storage(store_path, 'skipped.tsv')
-            skipped_files = []
-
-        # interactive mode: confirm storage with user
-        if interactive:
-            choice = input("storage set up, does everything look okay? [y/N]")
-            if choice != 'y':
-                logging.info("user quit")
-                return processed_files
-
-    # main processing loop
-    for working_dir, dirnames, filenames in os.walk(input_dir):
-        # prune hidden directories
-        for index, directory in enumerate(dirnames):
-            if directory.startswith('.'):
-                logging.debug(f"skip: hidden directory '{os.path.join(working_dir, directory)}'")
-                del dirnames[index]
-
-        for name in filenames:
-            input_path = os.path.join(working_dir, name)
-            name_split = os.path.splitext(name)
-
-            if name.startswith('.'):
-                logging.debug(f"skip: hidden file '{input_path}'")
-                logging.debug(f"skip: hidden files are not written to skip storage '{input_path}'")
-                continue
-            if name_split[1] not in { '.aif', '.aiff', '.wav', }:
-                logging.debug(f"skip: unsupported file: '{input_path}'")
-                if skipped_files:
-                    skipped_files.append(f"{input_path}\n")
-                continue
-            if not name.endswith('.wav') and\
-            check_skip_sample_rate(input_path) and\
-            check_skip_bit_depth(input_path):
-                logging.debug(f"skip: optimal sample rate and bit depth: '{input_path}'")
-                if skipped_files:
-                    skipped_files.append(f"{input_path}\n")
-                continue
-
-            # -- build the output path
-            # swap existing extension with the configured one
-            output_filename = f"{name_split[0]}{extension}"
-            output_path = os.path.join(output_dir, ''.join(output_filename))
-
-            if os.path.splitext(os.path.basename(input_path))[0] != os.path.splitext(os.path.basename(output_path))[0]:
-                choice = input(f"warn: mismatched file names for '{input_path}' and '{output_path}'. Continue? [y/N]")
-                if choice != 'y' or choice.lower() == 'n':
-                    logging.info('exit, user quit')
-                    break
-
-            # interactive mode
-            if interactive:
-                choice = input(f"re-encode '{input_path}'? [y/N]")
-                if choice != 'y':
-                    logging.info('exit, user quit')
-                    break
-
-            # -- build and run the ffmpeg encode command
-            command = ffmpeg_lossless(input_path, output_path)
-            task = asyncio.create_task(run_command_async(command))
-            tasks.append((input_path, output_path, task))
-            
-            # run task batch
-            if len(tasks) > threads - 1:
-                run_tasks = [t[2] for t in tasks]
-                await asyncio.gather(*run_tasks)
-                for src_path, dest_path, _ in tasks:
-                    processed_files.append((src_path, dest_path))
-                    
-                    # compute (input - output) size difference after encoding
-                    size_diff = os.path.getsize(src_path)/10**6 - os.path.getsize(dest_path)/10**6
-                    size_diff_sum += size_diff
-                    size_diff = round(size_diff, 2)
-                    logging.info(f"file size diff: {size_diff} MB")
-                    
-                    if store_path and store_path_size_diff:
-                        with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
-                            store_file.write(f"{src_path}\t{dest_path}\t{size_diff}\n")
-                logging.debug(f"ran {len(run_tasks)} tasks")
-                tasks.clear()
-                # separate entries
-                logging.info("= = = =")
-    
-    # run final batch
-    if tasks:
+    async def run_batch():
+        nonlocal size_diff_sum
+        
         run_tasks = [t[2] for t in tasks]
         await asyncio.gather(*run_tasks)
         for src_path, dest_path, _ in tasks:
@@ -402,6 +301,80 @@ async def encode_lossless(input_dir: str,
         tasks.clear()
         # separate entries
         logging.info("= = = =")
+    
+    # validate extension
+    if extension:
+        if not extension.startswith('.') or len(extension) != len(extension.strip()):
+            error = ValueError(f"invalid extension {extension}")
+            logging.error(error)
+            raise error
+    
+    # core data
+    processed_files: list[tuple[str, str]] = []
+    size_diff_sum = 0.0
+    tasks: list[tuple[str, str, Task[tuple[int, str]]]] = []
+
+    # set up storage
+    store_path_size_diff = None
+    store_path_skipped = None
+    skipped_files: list[str] | None = None
+    if store_path:
+        store_path_size_diff = setup_storage(store_path, 'size-diff.tsv')
+        if store_skipped:
+            store_path_skipped = setup_storage(store_path, 'skipped.tsv')
+            skipped_files = []
+
+        # interactive: confirm storage with user
+        if interactive:
+            choice = input("storage set up, does everything look okay? [y/N]")
+            if choice != 'y':
+                logging.info("user quit")
+                return processed_files
+
+    # main processing loop
+    # for working_dir, dirnames, filenames in os.walk(input_dir):
+    extensions = {'.aif', '.aiff', '.wav'}
+    for input_path in common.collect_paths(input_dir, filter=extensions):
+        name = os.path.basename(input_path)
+        filename, input_extension = os.path.splitext(name)
+        output_extension = extension
+        
+        # skip files that meet encoding requirements
+        if not encode_always:
+            if not name.endswith('.wav') and\
+            check_skip_sample_rate(input_path) and\
+            check_skip_bit_depth(input_path):
+                logging.debug(f"skip: optimal sample rate and bit depth: '{input_path}'")
+                if skipped_files:
+                    skipped_files.append(f"{input_path}\n")
+                continue
+
+        # use the existing input extension if an output extension is not provided
+        if not extension and input_extension in extensions:
+            output_extension = input_extension
+
+        # build the output path with the resolved extension
+        output_path = os.path.join(output_dir, f"{filename}{output_extension}")
+
+        # interactive: confirm encoding action with user
+        if interactive:
+            choice = input(f"re-encode '{input_path}'? [y/N]")
+            if choice != 'y':
+                logging.info('exit, user quit')
+                break
+
+        # create the ffmpeg encode command and task
+        command = ffmpeg_lossless(input_path, output_path)
+        task = asyncio.create_task(run_command_async(command))
+        tasks.append((input_path, output_path, task))
+        
+        # run task batch
+        if len(tasks) == threads:
+            await run_batch()
+    
+    # run final batch
+    if tasks:
+        await run_batch()
 
     if store_path and store_path_size_diff:
         with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:

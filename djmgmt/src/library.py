@@ -18,7 +18,6 @@ import xml.etree.ElementTree as ET
 import argparse
 import logging
 from urllib.parse import unquote
-from typing import cast
 
 from . import constants
 from . import common
