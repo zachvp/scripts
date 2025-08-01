@@ -189,7 +189,7 @@ class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):
         mock_skip_sample_rate.return_value = False
         
         # Call target function, encoding to AIFF
-        actual = await encode.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff', store_path='/mock/store/path')
+        actual = await encode.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff', store_path_dir='/mock/store/path')
         
         # Assert that storage is set up once and opened to write each file and the cumulative file size.
         mock_setup_storage.assert_called_once()
@@ -232,7 +232,7 @@ class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):
         mock_skip_sample_rate.return_value = [False, True]
         
         # Call target function, encoding to AIFF
-        actual = await encode.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff', store_path='/mock/store/path', store_skipped=True)
+        actual = await encode.encode_lossless(MOCK_INPUT, MOCK_OUTPUT, '.aiff', store_path_dir='/mock/store/path', store_skipped=True)
         
         # Assert that storage is set up twice and opened to write each file and the cumulative file size.
         self.assertEqual(mock_setup_storage.call_count, 2)

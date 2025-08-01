@@ -257,7 +257,7 @@ def encode_lossless_cli(args: type[Namespace]) -> list[tuple[str, str]]:
     return asyncio.run(encode_lossless(args.input,
                                        args.output,
                                        extension=args.extension,
-                                       store_path=args.store_path,
+                                       store_path_dir=args.store_path,
                                        store_skipped=args.store_skipped,
                                        interactive=args.interactive))
 
@@ -265,7 +265,7 @@ def encode_lossless_cli(args: type[Namespace]) -> list[tuple[str, str]]:
 async def encode_lossless(input_dir: str,
                           output_dir: str,
                           extension: str = '',
-                          store_path: str | None = None,
+                          store_path_dir: str | None = None,
                           store_skipped: bool = False,
                           interactive: bool = False,
                           threads: int = 16,
@@ -294,7 +294,7 @@ async def encode_lossless(input_dir: str,
             size_diff = round(size_diff, 2)
             logging.info(f"file size diff: {size_diff} MB")
             
-            if store_path and store_path_size_diff:
+            if store_path_dir and store_path_size_diff:
                 with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
                     store_file.write(f"{src_path}\t{dest_path}\t{size_diff}\n")
         logging.debug(f"ran {len(run_tasks)} tasks")
@@ -318,10 +318,10 @@ async def encode_lossless(input_dir: str,
     store_path_size_diff = None
     store_path_skipped = None
     skipped_files: list[str] | None = None
-    if store_path:
-        store_path_size_diff = setup_storage(store_path, 'size-diff.tsv')
+    if store_path_dir:
+        store_path_size_diff = setup_storage(store_path_dir, 'size-diff.tsv')
         if store_skipped:
-            store_path_skipped = setup_storage(store_path, 'skipped.tsv')
+            store_path_skipped = setup_storage(store_path_dir, 'skipped.tsv')
             skipped_files = []
 
         # interactive: confirm storage with user
@@ -376,7 +376,7 @@ async def encode_lossless(input_dir: str,
     if tasks:
         await run_batch()
 
-    if store_path and store_path_size_diff:
+    if store_path_dir and store_path_size_diff:
         with open(store_path_size_diff, 'a', encoding='utf-8') as store_file:
             store_file.write(f"\n=> size diff sum: {round(size_diff_sum, 2)} MB")
             logging.info(f"wrote cumulative size difference to '{store_path_size_diff}'")

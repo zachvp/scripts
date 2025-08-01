@@ -9,7 +9,8 @@
 6. Use GitHub for project management
 
 ## Manual library goals
-1. Refactor genres: Move House/Techno to Techno/
-2. Backup SoundCloud mixes locally: create local mirror of all uploaded signature mixes
+1. Convert WAV files to AIFF
+2. Refactor genres: Move House/Techno to Techno/
+3. Backup SoundCloud mixes locally: create local mirror of all uploaded signature mixes
     Add cover image, encode to MP3
     Use mix URL -> recording filename as possible hint
