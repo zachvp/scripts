@@ -244,6 +244,8 @@ def get_played_tracks(root: ET.Element) -> list[str]:
     return played_tracks
 
 # TODO: write played tracks to XML
+def record_played_tracks() -> ET.Element:
+    pass
 
 def get_unplayed_tracks(root: ET.Element) -> list[str]:
     '''Returns a list of TRACK.Key/ID strings for all pruned tracks NOT in the 'archive' folder.'''
@@ -288,12 +290,15 @@ def record_unplayed_tracks(input_collection_path: str, output_collection_path: s
     tree.write(output_collection_path, encoding='UTF-8', xml_declaration=True)
     return template_root
 
+def record_tracks(input_collection_path: str, output_collection_path: str, tracks: list[str], playlist: str) -> ET.Element:
+    pass
+
 # TODO: move to library module
 # TODO: extend to save backup of previous X versions
-# TODO: reconcile generated track IDs with the latest collection backup
 def record_collection(source: str, collection_path: str) -> ET.Element:
-    '''Updates the '_pruned' playlist in the given XML collection with all music files in the source directory.
-    Returns the XML collection tree.'''
+    '''Updates the tracks for the 'COLLECTION' and '_pruned' playlist in the given XML `collection_path`
+    with all music files in the `source` directory.
+    Returns the XML collection root.'''
     # load XML references
     xml_path      = collection_path if os.path.exists(collection_path) else COLLECTION_TEMPLATE_PATH
     root          = library.load_collection(xml_path)
