@@ -161,6 +161,7 @@ def extract_all_normalized_encodings(zip_path: str, output: str) -> tuple[str, l
             info.filename = corrected
             file.extract(info, os.path.normpath(output))
             extracted.append(info.filename)
+    logging.debug(f"extracting archive '{zip_path}' to {extracted}")
     return (zip_path, extracted)
 
 def flatten_zip(zip_path: str, extract_path: str) -> None:
@@ -212,6 +213,8 @@ def get_dirs(dir_path: str) -> list[str]:
     return dirs
 
 def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: set[str], interactive: bool) -> list[tuple[str, str]]:
+    '''Standardizes all lossless files in the source directory according to `.encode.encode_lossless()` using the .aiff extension.
+    Returns a list of each (source, encoded_file) mapping.'''
     from tempfile import TemporaryDirectory
     import asyncio
     
@@ -432,7 +435,7 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
         if name_split[1] in valid_extensions or is_valid_archive:
             logging.debug(f"filter matched file '{input_path}'")
             if interactive:
-                logging.info(f"move from '{input_path}' to '{output_path}'")
+                print(f"move from '{input_path}' to '{output_path}'")
                 choice = input('Continue? [y/N/q]')
                 if choice == 'q':
                     logging.info('user quit')
@@ -440,9 +443,10 @@ def sweep(source: str, output: str, interactive: bool, valid_extensions: set[str
                 if choice != 'y' or choice in 'nN':
                     logging.info('skip: user skipped file')
                     continue
+            logging.debug(f"move from '{input_path}' to '{output_path}'")
             shutil.move(input_path, output_path)
             swept.append((input_path, output_path))
-    logging.info("swept all files")
+    logging.info(f"swept all files ({len(swept)})\n{swept}")
     return swept    
 
 def sweep_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints: set[str]) -> None:
@@ -456,8 +460,9 @@ def flatten_hierarchy(source: str, output: str, interactive: bool) -> list[tuple
 
         # move the files to the output root
         if not os.path.exists(output_path):
-            logging.info(f"move '{input_path}' to '{output_path}'")
+            msg = f"move '{input_path}' to '{output_path}'"
             if interactive:
+                print(msg)
                 choice = input('Continue? [y/N/q]')
                 if choice == 'q':
                     logging.info('info: user quit')
@@ -465,6 +470,7 @@ def flatten_hierarchy(source: str, output: str, interactive: bool) -> list[tuple
                 if choice != 'y' or choice in 'nN':
                     logging.info(f"skip: {input_path}")
                     continue
+            logging.debug(msg)
             try:
                 shutil.move(input_path, output_path)
                 flattened.append((input_path, output_path))
@@ -474,6 +480,7 @@ def flatten_hierarchy(source: str, output: str, interactive: bool) -> list[tuple
                     continue
         else:
             logging.debug(f"skip: {input_path}")
+    logging.debug(f"flattened all files ({len(flattened)})\n{flattened}")
     return flattened
 
 def flatten_hierarchy_cli(args: type[Namespace]) -> None:
@@ -491,8 +498,10 @@ def extract(source: str, output: str, interactive: bool) -> list[tuple[str, list
                 logging.info(f"skip: existing ouput path '{zip_output_path}'")
                 continue
 
-            logging.info(f"extract {input_path} to {output}")
+            msg = f"extracting '{input_path}' to '{output}'"
+            logging.debug(msg)
             if interactive:
+                print(msg)
                 choice = input('Continue? [y/N/q]')
                 if choice == 'q':
                     logging.info('user quit')
@@ -515,41 +524,45 @@ def compress_all_cli(args: type[Namespace]) -> None:
             compress_dir(os.path.join(working_dir, directory), os.path.join(args.output, directory))
 
 def prune_non_user_dirs(source: str, interactive: bool) -> list[str]:
+    '''Removes all directories that pass the filter according to `has_no_user_files()`.
+    Returns a list of all removed directories.'''
     search_dirs: list[str] = []
     pruned: set[str] = set()
 
+    # DFS for all directories inside 'source' that don't contain user files
+    logging.debug(f"prune_non_user_dirs starting from root '{source}'")
     dir_list = get_dirs(source)
-    search_dirs.append(source)
-
-    logging.debug(f"prune search_dirs source: '{search_dirs}'")
-
+    search_dirs = [os.path.join(source, d) for d in dir_list]
     while len(search_dirs) > 0:
         search_dir = search_dirs.pop(0)
-        if has_no_user_files(search_dir) and search_dir != source:
+        if has_no_user_files(search_dir):
             pruned.add(search_dir)
         else:
             logging.info(f"search_dir: {search_dir}")
-
             dir_list = get_dirs(search_dir)
             for d in dir_list:
                 search_dirs.append(os.path.join(search_dir, d))
 
+    # remove the collected directories
     for path in pruned:
-        logging.info(f"will remove: '{path}'")
+        msg = f"will remove: '{path}'"
         if interactive:
+            print(msg)
             choice = input("continue? [y/N]")
             if choice != 'y':
                 logging.info('skip: user skipped')
                 continue
+        logging.debug(msg)
         try:
             shutil.rmtree(path)
         except OSError as e:
             if e.errno == 39: # directory not empty
                 logging.warning(f"skip: non-empty dir {path}")
 
-    logging.info(f"search_dirs, end: {search_dirs}")
-    
-    return list(pruned)
+    # return the pruned directories
+    result = list(pruned)
+    logging.debug(f"pruned all non-user directories ({len(result)}\n{result})")
+    return result
 
 def prune_non_user_dirs_cli(args: type[Namespace]) -> None:
     '''CLI wrapper for the core `prune_non_user_dirs` function.'''
