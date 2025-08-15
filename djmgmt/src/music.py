@@ -230,7 +230,7 @@ def standardize_lossless(source: str, valid_extensions: set[str], prefix_hints: 
 def get_played_tracks(root: ET.Element) -> list[str]:
     '''Returns a list of TRACK.Key/ID strings for all playlist tracks in the 'archive' folder.'''
     # load XML references
-    archive = library.find_node(root, constants.XPATH_ARCHIVE)
+    archive = library.find_node(root, constants.XPATH_MIXTAPES)
     
     # search for and collect tracks in archive
     played_tracks = []

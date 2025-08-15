@@ -229,7 +229,7 @@ class TestGetPlayedTracks(unittest.TestCase):
         <PLAYLISTS>
             <NODE Type="0" Name="ROOT" Count="2">
                 <NODE Name="CUE Analysis Playlist" Type="1" KeyType="0" Entries="0"/>
-                <NODE Name="archive" Type="0" KeyType="0" Entries="2">
+                <NODE Name="mixtapes" Type="0" KeyType="0" Entries="2">
                     <TRACK Key="0"/>
                     <NODE Name="playlist_0" Type="1" KeyType="0" Entries="1">
                         <TRACK Key="1"/>
@@ -264,7 +264,7 @@ class TestGetPlayedTracks(unittest.TestCase):
             <PLAYLISTS>
                 <NODE Type="0" Name="ROOT" Count="2">
                     <NODE Name="CUE Analysis Playlist" Type="1" KeyType="0" Entries="0"/>
-                    <NODE Name="archive" Type="0" KeyType="0" Entries="2">
+                    <NODE Name="mixtapes" Type="0" KeyType="0" Entries="2">
                         <TRACK Key="0"/>
                         <NODE Name="playlist_0" Type="1" KeyType="0" Entries="2">
                             <TRACK Key="1"/>
