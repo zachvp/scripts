@@ -59,9 +59,10 @@ class Namespace(argparse.Namespace):
     FUNCTION_PROCESS = 'process'
     FUNCTION_PRUNE_NON_MUSIC = 'prune_non_music'
     FUNCTION_UPDATE_LIBRARY = 'update_library'
+    FUNCTION_RECORD_UNPLAYED = 'record_unplayed'
     
     FUNCTIONS_SINGLE_ARG = {FUNCTION_COMPRESS, FUNCTION_FLATTEN, FUNCTION_PRUNE, FUNCTION_PRUNE_NON_MUSIC}
-    FUNCTIONS = {FUNCTION_SWEEP, FUNCTION_EXTRACT, FUNCTION_PROCESS, FUNCTION_UPDATE_LIBRARY}.union(FUNCTIONS_SINGLE_ARG)
+    FUNCTIONS = {FUNCTION_SWEEP, FUNCTION_EXTRACT, FUNCTION_PROCESS, FUNCTION_UPDATE_LIBRARY, FUNCTION_RECORD_UNPLAYED}.union(FUNCTIONS_SINGLE_ARG)
 
 # Helper functions
 # TODO: include function docstring in help summary (-h)
@@ -656,23 +657,21 @@ def update_library(source: str,
         # process all of the source files into the temp dir
         process(source, processing_dir, interactive, valid_extensions, prefix_hints)
         
-        # move the processed files to the library, and update the djmgmt collection record
+        # move the processed files to the library
         sweep(processing_dir, library_path, interactive, valid_extensions, prefix_hints)
-        collection = record_collection(library_path, COLLECTION_PATH)
+    
+    # update the djmgmt collection record according to any new files
+    collection = record_collection(library_path, COLLECTION_PATH)
 
-        # update the dynamic playlists
-        reference_collection_path = library.find_collection_backup(collection_backup_directory)
-        record_unplayed_tracks(reference_collection_path, COLLECTION_PATH)
-
-        # combine any changed mappings in _pruned with the standard filtered collection mappings
-        changed = tags_info.compare_tags(library_path, client_mirror_path)
-        changed = library.filter_path_mappings(changed, collection, constants.XPATH_PRUNED)
-        mappings = sync.create_sync_mappings(collection, client_mirror_path)
-        if changed:
-            mappings += changed
-        
-        # run the sync
-        sync.run_sync_mappings(mappings)
+    # combine any changed mappings in _pruned with the standard filtered collection mappings
+    changed = tags_info.compare_tags(library_path, client_mirror_path)
+    changed = library.filter_path_mappings(changed, collection, constants.XPATH_PRUNED)
+    mappings = sync.create_sync_mappings(collection, client_mirror_path)
+    if changed:
+        mappings += changed
+    
+    # run the sync
+    sync.run_sync_mappings(mappings)
 
 if __name__ == '__main__':
     common.configure_log(path=__file__)
@@ -703,3 +702,5 @@ if __name__ == '__main__':
                        script_args.interactive,
                        constants.EXTENSIONS,
                        PREFIX_HINTS)
+    elif script_args.function == Namespace.FUNCTION_RECORD_UNPLAYED:
+        record_unplayed_tracks(script_args.input, script_args.output)

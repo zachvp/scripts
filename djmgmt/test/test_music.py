@@ -2005,8 +2005,6 @@ class TestUpdateLibrary(unittest.TestCase):
     @patch('src.library.filter_path_mappings')
     @patch('src.sync.create_sync_mappings')
     @patch('src.tags_info.compare_tags')
-    @patch('src.music.record_unplayed_tracks')
-    @patch('src.library.find_collection_backup')
     @patch('src.music.record_collection')
     @patch('src.music.sweep')
     @patch('src.music.process')
@@ -2016,8 +2014,6 @@ class TestUpdateLibrary(unittest.TestCase):
                      mock_process: MagicMock,
                      mock_sweep: MagicMock,
                      mock_record_collection: MagicMock,
-                     mock_find_collection_backup: MagicMock,
-                     mock_record_unplayed: MagicMock,
                      mock_compare_tags: MagicMock,
                      mock_create_sync_mappings: MagicMock,
                      mock_filter_mappings: MagicMock,
@@ -2032,7 +2028,6 @@ class TestUpdateLibrary(unittest.TestCase):
         
         mock_temp_dir.return_value.__enter__.return_value = mock_temp_dir_path
         mock_record_collection.return_value = mock_collection
-        mock_find_collection_backup.return_value = '/mock/backup/path'
         mock_compare_tags.return_value = mock_mappings_changed.copy()
         mock_create_sync_mappings.return_value = mock_mappings_created.copy()
         mock_filter_mappings.return_value = mock_mappings_filtered.copy()
@@ -2062,12 +2057,6 @@ class TestUpdateLibrary(unittest.TestCase):
         ## Call parameters: record_collection
         mock_record_collection.assert_called_once_with(mock_library, music.COLLECTION_PATH)
         
-        ## Call parameters: find_collection_backup
-        mock_find_collection_backup.assert_called_once_with(mock_collection_backup_dir)
-        
-        ## Call parameters: record_unplayed_tracks
-        mock_record_unplayed.assert_called_once_with(mock_find_collection_backup.return_value, music.COLLECTION_PATH)
-
         ## Call parameters: compare_tags
         mock_compare_tags.assert_called_once_with(mock_library, mock_client_mirror)
         
@@ -2085,8 +2074,6 @@ class TestUpdateLibrary(unittest.TestCase):
     @patch('src.library.filter_path_mappings')
     @patch('src.tags_info.compare_tags')
     @patch('src.sync.create_sync_mappings')
-    @patch('src.music.record_unplayed_tracks')
-    @patch('src.library.find_collection_backup')
     @patch('src.music.record_collection')
     @patch('src.music.sweep')
     @patch('src.music.process')
@@ -2094,8 +2081,6 @@ class TestUpdateLibrary(unittest.TestCase):
                         mock_process: MagicMock,
                         mock_sweep: MagicMock,
                         mock_record_collection: MagicMock,
-                        mock_find_collection_backup: MagicMock,
-                        mock_record_unplayed: MagicMock,
                         mock_create_sync_mappings: MagicMock,
                         mock_compare_tags: MagicMock,
                         mock_filter_path_mappings: MagicMock,
@@ -2127,8 +2112,6 @@ class TestUpdateLibrary(unittest.TestCase):
         mock_process.assert_called_once()
         mock_sweep.assert_called_once()
         mock_record_collection.assert_called_once()
-        mock_find_collection_backup.assert_called_once()
-        mock_record_unplayed.assert_called_once()
         mock_create_sync_mappings.assert_called_once()
         mock_compare_tags.assert_called_once()
         mock_filter_path_mappings.assert_called_once()
