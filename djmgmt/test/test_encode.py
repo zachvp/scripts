@@ -332,7 +332,7 @@ class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):
         mock_get_size.assert_not_called()
         
         # Assert the expected function output result -- should be empty for unsupported files
-        self.assertEqual(actual, [])
+        self.assertListEqual(actual, [])
         
     @patch('src.encode.encode_lossless')
     def test_success_cli(self, mock_encode: MagicMock) -> None:
@@ -351,13 +351,13 @@ class TestEncodeLossless(unittest.IsolatedAsyncioTestCase):
         expected_args = (args.input, args.output)
         expected_kwargs = {
             'extension'     : args.extension,
-            'store_path'    : args.store_path,
+            'store_path_dir'    : args.store_path,
             'store_skipped' : args.store_skipped,
             'interactive'   : args.interactive
         }
         
-        self.assertEqual(mock_encode.call_args.args, expected_args)
-        self.assertEqual(mock_encode.call_args.kwargs, expected_kwargs)
+        self.assertTupleEqual(mock_encode.call_args.args, expected_args)
+        self.assertDictEqual(mock_encode.call_args.kwargs, expected_kwargs)
 
 class TestEncodeLossy(unittest.IsolatedAsyncioTestCase):
     @patch('src.encode.run_command_async')
