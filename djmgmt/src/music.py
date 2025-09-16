@@ -631,6 +631,43 @@ def process_cli(args: type[Namespace], valid_extensions: set[str], prefix_hints:
     '''CLI wrapper for the core `process` function.'''
     process(args.input, args.output, args.interactive, valid_extensions, prefix_hints)
 
+# TODO: implement merge XML function
+'''
+# Determine which file has the more recent modify time
+
+# Create merged tree
+
+# Merge collection tracks
+    Collect all track nodes from A
+    Collect all track nodes from B
+    For each track node in A
+        Create merged node as copy of node
+        If node.path exists in B
+            Use node attributes from more recently modified file for merged node
+        If merged node ID exists in merged tree collection
+            Generate new ID for merged node
+            Update entry in _pruned with new ID
+        Add merged node to merged tree collection
+    For each track node in B
+        Create merged node as copy of node
+        If node.path exists in A
+            Skip
+        If merged node ID exists in merged tree collection
+            Generate new ID for merged node
+            Update entry in _pruned with new ID
+        Add merged node to merged tree collection
+
+# Merge playlists
+    Exclude the 'dynamic' folder
+    Create merged _pruned node
+    Collect all _pruned track IDs from A into merged _pruned
+    For each track in B
+        If track.id does not exist in merged _pruned
+            Add track.id to merged _pruned
+
+# Write the merged tree to the dynamic collection file
+'''
+
 def update_library(source: str,
                    library_path: str,
                    client_mirror_path: str,
