@@ -74,8 +74,8 @@ def parse_args(valid_functions: set[str], single_arg_functions: set[str]) -> typ
     parser.add_argument('function', type=str, help=f"Which script function to run. One of '{valid_functions}'.\
         The following functions only require a single argument: '{single_arg_functions}'.")
     # TODO: define argument strings as Namespace constants
-    parser.add_argument('input', type=str, help='The input directory to sweep.')
-    parser.add_argument('output', nargs='?', type=str, help='The output directory to place the swept tracks.')
+    parser.add_argument('input', type=str, help='The input path.')
+    parser.add_argument('output', nargs='?', type=str, help='The output path.')
     parser.add_argument('--interactive', '-i', action='store_true', help='Run script in interactive mode.')
     parser.add_argument('--client-mirror-path', '-m', type=str, help='The client mirror path to pass to media sync.')
     parser.add_argument('--collection-backup-directory', '-b', type=str, help='The directory that stores the backup XML files.')
