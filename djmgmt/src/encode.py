@@ -78,11 +78,12 @@ def parse_args(functions: set[str]) -> type[Namespace]:
         parser.error(f"function '{args.function}' requires '--extension' argument")
         
     # validate scan mode argument
-    args.scan_mode = args.scan_mode.lower()
-    if not args.scan_mode and args.function == Namespace.FUNCTION_MISSING_ART:
+    if args.scan_mode:
+        args.scan_mode = args.scan_mode.lower()
+        if args.scan_mode not in Namespace.SCAN_MODES:
+            parser.error(f"invalid scan mode: '{args.scan_mode}'")
+    elif args.function == Namespace.FUNCTION_MISSING_ART:
         parser.error(f"funtion '{args.function}' requires '--scan-mode' option")
-    if args.scan_mode and args.scan_mode not in Namespace.SCAN_MODES:
-        parser.error(f"invalid scan mode: '{args.scan_mode}'")
 
     return args
 
